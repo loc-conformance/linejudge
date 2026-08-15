@@ -8,6 +8,8 @@
 !.vscode/extensions.json
 *.code-workspace
 
+.zed/*
+
 .history
 .ionide
 
