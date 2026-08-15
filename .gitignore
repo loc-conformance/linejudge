@@ -1,0 +1,15 @@
+/target/
+
+**/*.rs.bk
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+*.code-workspace
+
+.history
+.ionide
+
+/archive/
+/temp/

@@ -1,0 +1,15 @@
+[package]
+name = "linejudge"
+version = "0.1.0"
+authors = ["subamanis <petrospapa21@gmail.com>"]
+edition = "2024"
+description = "The test corpus and harness that check line-of-code counters against their own declared rules"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/loc-conformance/linejudge"
+
+[dependencies]
+
+[profile.release]
+debug = false
+codegen-units = 1
+strip = "symbols"

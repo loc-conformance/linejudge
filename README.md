@@ -1,2 +1,2 @@
 # linejudge
-Provides the tooling and the corpus of tests for loc-counters
+The test corpus and harness that check line-of-code counters against their own declared rules.
