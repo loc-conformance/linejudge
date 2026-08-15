@@ -1,0 +1,21 @@
+trap = """
+an inner block does not end the outer one in a language whose pairs nest"""
+
+[answer.mezura.content]
+real    = { lines = 2, code = 1, comments = 1, extra = 0 }
+counted = { lines = 2, code = 1, comments = 1, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+note    = """
+the inner closer ends the comment although Haskell's pair nests, so the text after it is left
+standing as code"""
+
+[answer.tokei.default]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

@@ -1,0 +1,27 @@
+trap = """
+an apostrophe inside a heredoc body. A heredoc names its own closer at runtime, which no
+declaration of comment and string symbols can express"""
+
+[answer.mezura.content]
+real    = { lines = 5, code = 3, comments = 2, extra = 0 }
+counted = { lines = 5, code = 5, comments = 0, extra = 0 }
+note    = """
+the apostrophe opens a string and every comment under it is counted as code"""
+
+[answer.mezura.region]
+real    = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
+note    = """
+the apostrophe opens a string and every comment under it is counted as code"""
+
+[answer.scc.default]
+real    = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
+note    = """
+the apostrophe opens a string and every comment under it is counted as code"""
+
+[answer.tokei.default]
+real    = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
+note    = """
+the apostrophe opens a string and every comment under it is counted as code"""

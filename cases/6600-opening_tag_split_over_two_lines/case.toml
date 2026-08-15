@@ -1,0 +1,51 @@
+trap = """
+the opening tag is split over two lines, which is legal, and is not the opener any language file
+declares"""
+
+region.required = [
+    { language = "JavaScript", lines = 2 },
+]
+
+[answer.mezura.content]
+real            = { lines = 5, code = 4, comments = 1, extra = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, extra = 0 },
+]
+counted         = { lines = 5, code = 5, comments = 0, extra = 0 }
+counted-regions = []
+note            = """
+the block is not found, so the comment inside it is read with the page's symbols, and HTML has
+no //"""
+
+[answer.mezura.region]
+real            = { lines = 5, code = 4, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 5, code = 5, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so the comment inside it is read with the page's symbols, and HTML has
+no //"""
+
+[answer.scc.default]
+real            = { lines = 5, code = 4, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 5, code = 5, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so the comment inside it is read with the page's symbols, and HTML has
+no //"""
+
+[answer.tokei.default]
+real            = { lines = 5, code = 4, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 5, code = 5, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so the comment inside it is read with the page's symbols, and HTML has
+no //"""

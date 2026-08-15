@@ -1,0 +1,19 @@
+trap = """
+a line holding only a brace. A definition, not a mistake: neither code nor comment to a counter
+that asks what a line says, code to one that asks whether the file would compile without it"""
+
+[answer.mezura.content]
+real    = { lines = 3, code = 2, comments = 0, extra = 1 }
+counted = { lines = 3, code = 2, comments = 0, extra = 1 }
+
+[answer.mezura.region]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+
+[answer.tokei.default]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }

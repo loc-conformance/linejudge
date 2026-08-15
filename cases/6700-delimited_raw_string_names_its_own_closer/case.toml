@@ -1,0 +1,28 @@
+trap = """
+a delimited raw string names its own terminator, so no declared symbol can close it"""
+
+[answer.mezura.content]
+real    = { lines = 4, code = 4, comments = 0, extra = 0 }
+counted = { lines = 4, code = 1, comments = 3, extra = 0 }
+note    = """
+the plain R"( is declared and this delimited form is not, so the block opener inside the string
+opens a comment"""
+
+[answer.mezura.region]
+real    = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note    = """
+the plain R"( is declared and this delimited form is not, so the block opener inside the string
+opens a comment"""
+
+[answer.scc.default]
+real    = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note    = """
+the delimited form is not recognised, so the block opener inside the string opens a comment"""
+
+[answer.tokei.default]
+real    = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note    = """
+the delimited form is not recognised, so the block opener inside the string opens a comment"""

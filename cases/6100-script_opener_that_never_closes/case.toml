@@ -1,0 +1,30 @@
+trap = """
+the text of a script tag written inside a paragraph, with no closing tag anywhere after it.
+Nothing marks an opener as a tag rather than the same word written out, so a block that never
+closes is text and the rest of the file belongs to the page"""
+
+region.required = []
+
+[answer.mezura.content]
+real            = { lines = 2, code = 2, comments = 0, extra = 0 }
+real-regions    = []
+counted         = { lines = 2, code = 2, comments = 0, extra = 0 }
+counted-regions = []
+
+[answer.mezura.region]
+real            = { lines = 2, code = 2, comments = 0, blanks = 0 }
+real-regions    = []
+counted         = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted-regions = []
+
+[answer.scc.default]
+real            = { lines = 2, code = 2, comments = 0, blanks = 0 }
+real-regions    = []
+counted         = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted-regions = []
+
+[answer.tokei.default]
+real            = { lines = 2, code = 2, comments = 0, blanks = 0 }
+real-regions    = []
+counted         = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted-regions = []

@@ -1,0 +1,22 @@
+trap = """
+a backslash at the end of a line comment continues it onto the next line in C"""
+
+[answer.mezura.content]
+real    = { lines = 3, code = 1, comments = 2, extra = 0 }
+counted = { lines = 3, code = 1, comments = 2, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 3, code = 1, comments = 2, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 3, code = 1, comments = 2, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+note    = """
+the comment ends at the newline, so the line joined to it is counted as code"""
+
+[answer.tokei.default]
+real    = { lines = 3, code = 1, comments = 2, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+note    = """
+the comment ends at the newline, so the line joined to it is counted as code"""

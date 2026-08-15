@@ -1,0 +1,19 @@
+trap = """
+a docstring opened on one line and closed on another keeps the lines between out of the comment
+count, since a string is not a comment"""
+
+[answer.mezura.content]
+real    = { lines = 5, code = 4, comments = 1, extra = 0 }
+counted = { lines = 5, code = 4, comments = 1, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 5, code = 4, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 5, code = 4, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+
+[answer.tokei.default]
+real    = { lines = 5, code = 4, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }

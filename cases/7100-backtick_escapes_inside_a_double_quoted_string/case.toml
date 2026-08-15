@@ -1,0 +1,23 @@
+trap = """
+the backtick is what escapes inside PowerShell's double quoted string, so the quote in the middle
+of the line closes nothing"""
+
+[answer.mezura.content]
+real    = { lines = 3, code = 2, comments = 1, extra = 0 }
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note    = """
+the backtick is no escape to it, so the last quote opens a string that crosses lines"""
+
+[answer.tokei.default]
+real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note    = """
+the backtick is no escape to it, so the last quote opens a string that crosses lines"""

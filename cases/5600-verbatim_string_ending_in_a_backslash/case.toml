@@ -1,0 +1,19 @@
+trap = """
+a verbatim string whose last byte is a backslash. In F# the body of @"..." is literal, so the
+closing quote closes it whatever precedes it, and the line ends where it looks like it ends"""
+
+[answer.mezura.content]
+real    = { lines = 3, code = 2, comments = 1, extra = 0 }
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.tokei.default]
+real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }

@@ -1,0 +1,21 @@
+trap = """
+a raw string ends at its own closer even when the last byte is a backslash"""
+
+[answer.mezura.content]
+real    = { lines = 2, code = 1, comments = 1, extra = 0 }
+counted = { lines = 2, code = 1, comments = 1, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+note    = """
+the backslash is read as escaping the closing quote, so the string is left open and the comment
+under it counts as code"""
+
+[answer.tokei.default]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

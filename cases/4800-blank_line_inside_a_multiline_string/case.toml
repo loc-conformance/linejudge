@@ -1,0 +1,19 @@
+trap = """
+a blank line inside a multi line string. A definition and not a mistake: blank to a counter that
+asks what a line says, code to one that asks which region the line sits in"""
+
+[answer.mezura.content]
+real    = { lines = 6, code = 5, comments = 0, extra = 1 }
+counted = { lines = 6, code = 5, comments = 0, extra = 1 }
+
+[answer.mezura.region]
+real    = { lines = 6, code = 6, comments = 0, blanks = 0 }
+counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 6, code = 6, comments = 0, blanks = 0 }
+counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
+
+[answer.tokei.default]
+real    = { lines = 6, code = 6, comments = 0, blanks = 0 }
+counted = { lines = 6, code = 6, comments = 0, blanks = 0 }

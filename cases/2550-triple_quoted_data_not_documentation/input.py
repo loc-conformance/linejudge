@@ -1,0 +1,6 @@
+data = (
+"""
+alpha
+"""
+)
+print(data)

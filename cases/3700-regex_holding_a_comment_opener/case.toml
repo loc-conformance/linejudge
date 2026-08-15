@@ -1,0 +1,27 @@
+trap = """
+a comment opener inside a regex literal. Telling a regex from a division needs the token before
+the slash, which is a lexer's job, and every counter measured here answers the same way"""
+
+[answer.mezura.content]
+real    = { lines = 3, code = 3, comments = 0, extra = 0 }
+counted = { lines = 3, code = 1, comments = 2, extra = 0 }
+note    = """
+the /* opens a comment and swallows the two lines under it"""
+
+[answer.mezura.region]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note    = """
+the /* opens a comment and swallows the two lines under it"""
+
+[answer.scc.default]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note    = """
+the /* opens a comment and swallows the two lines under it"""
+
+[answer.tokei.default]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note    = """
+the /* opens a comment and swallows the two lines under it"""

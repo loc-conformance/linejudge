@@ -1,0 +1,51 @@
+trap = """
+a script tag can name its language with a mime type instead of a lang attribute, and a mime type
+spells the language out: 'text/typescript', not 'text/ts'. The counts are the same whichever
+language answers, so what this case is about is the label"""
+
+region.required = [
+    { language = "TypeScript", lines = 2 },
+]
+
+[answer.mezura.content]
+real            = { lines = 4, code = 3, comments = 1, extra = 0 }
+real-regions    = [
+    { language = "TypeScript", lines = 2, code = 1, comments = 1, extra = 0 },
+]
+counted         = { lines = 4, code = 3, comments = 1, extra = 0 }
+counted-regions = [
+    { language = "TypeScript", lines = 2, code = 1, comments = 1, extra = 0 },
+]
+
+[answer.mezura.region]
+real            = { lines = 4, code = 3, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "TypeScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 4, code = 3, comments = 1, blanks = 0 }
+counted-regions = [
+    { language = "TypeScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+
+[answer.scc.default]
+real            = { lines = 4, code = 3, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "TypeScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so the comment inside it counts as markup"""
+
+[answer.tokei.default]
+real            = { lines = 4, code = 3, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "TypeScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 4, code = 3, comments = 1, blanks = 0 }
+counted-regions = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+note            = """
+the block is counted as JavaScript, although the mime type names TypeScript and their TypeScript
+is a language of its own"""

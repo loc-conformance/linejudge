@@ -1,0 +1,18 @@
+trap = """
+the first closer really does end the block in C, which does not nest"""
+
+[answer.mezura.content]
+real    = { lines = 2, code = 1, comments = 1, extra = 0 }
+counted = { lines = 2, code = 1, comments = 1, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
+[answer.tokei.default]
+real    = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

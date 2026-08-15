@@ -1,0 +1,28 @@
+trap = """
+Lua writes a string with the same long brackets its comments use, so the -- inside one is text
+and the line holding the closing bracket is still the string"""
+
+[answer.mezura.content]
+real    = { lines = 3, code = 3, comments = 0, extra = 0 }
+counted = { lines = 3, code = 1, comments = 1, extra = 1 }
+note    = """
+the string form of the long bracket is not declared, so the -- inside it opens a comment"""
+
+[answer.mezura.region]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+note    = """
+the string form of the long bracket is not declared, so the -- inside it opens a comment"""
+
+[answer.scc.default]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+note    = """
+the string form of the long bracket is not recognised, so the -- inside it opens a comment"""
+
+[answer.tokei.default]
+real    = { lines = 3, code = 3, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+note    = """
+the long bracket is handled for the comment form and not for the string one, so the -- inside it
+opens a comment"""

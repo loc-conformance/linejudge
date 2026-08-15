@@ -1,0 +1,18 @@
+trap = """
+a line comment symbol inside a template literal is text"""
+
+[answer.mezura.content]
+real    = { lines = 4, code = 4, comments = 0, extra = 0 }
+counted = { lines = 4, code = 4, comments = 0, extra = 0 }
+
+[answer.mezura.region]
+real    = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+
+[answer.scc.default]
+real    = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+
+[answer.tokei.default]
+real    = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 4, comments = 0, blanks = 0 }

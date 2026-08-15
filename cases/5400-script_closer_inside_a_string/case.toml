@@ -1,0 +1,37 @@
+trap = """
+a script element ends at the first closing tag whatever the JavaScript around it is doing, which
+is why one writes the closer with a backslash inside a string. So the block here is empty and
+everything under the closer is markup, including what looks like a comment"""
+
+region.required = [
+    { language = "JavaScript", lines = 0 },
+]
+
+[answer.mezura.content]
+real            = { lines = 5, code = 5, comments = 0, extra = 0 }
+real-regions    = []
+counted         = { lines = 5, code = 5, comments = 0, extra = 0 }
+counted-regions = []
+
+[answer.mezura.region]
+real            = { lines = 5, code = 5, comments = 0, blanks = 0 }
+real-regions    = []
+counted         = { lines = 5, code = 5, comments = 0, blanks = 0 }
+counted-regions = []
+
+[answer.scc.default]
+real            = { lines = 5, code = 5, comments = 0, blanks = 0 }
+real-regions    = []
+counted         = { lines = 5, code = 5, comments = 0, blanks = 0 }
+counted-regions = []
+
+[answer.tokei.default]
+real            = { lines = 5, code = 5, comments = 0, blanks = 0 }
+real-regions    = []
+counted         = { lines = 6, code = 6, comments = 0, blanks = 0 }
+counted-regions = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, blanks = 0 },
+]
+note            = """
+the closing line is counted once as markup and once as script, so the file is reported as one
+line longer than it is"""

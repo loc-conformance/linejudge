@@ -1,0 +1,48 @@
+trap = """
+a closing tag written with a space before its bracket, which is legal and rare. It is not the
+closer any language file declares, and all four totals are the same whether the block is found or
+not, which is what hides it"""
+
+region.required = [
+    { language = "JavaScript", lines = 1 },
+]
+
+[answer.mezura.content]
+real            = { lines = 4, code = 4, comments = 0, extra = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, extra = 0 },
+]
+counted         = { lines = 4, code = 4, comments = 0, extra = 0 }
+counted-regions = []
+note            = """
+the block is not found, so its line is counted as the page and not as JavaScript"""
+
+[answer.mezura.region]
+real            = { lines = 4, code = 4, comments = 0, blanks = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, blanks = 0 },
+]
+counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so its line is counted as the page and not as JavaScript"""
+
+[answer.scc.default]
+real            = { lines = 4, code = 4, comments = 0, blanks = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, blanks = 0 },
+]
+counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so its line is counted as the page and not as JavaScript"""
+
+[answer.tokei.default]
+real            = { lines = 4, code = 4, comments = 0, blanks = 0 }
+real-regions    = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, blanks = 0 },
+]
+counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted-regions = []
+note            = """
+the block is not found, so its line is counted as the page and not as JavaScript"""

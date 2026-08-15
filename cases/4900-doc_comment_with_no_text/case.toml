@@ -1,0 +1,39 @@
+trap = """
+a doc comment line holding nothing but its marker, which is how a blank line is put between two
+paragraphs of documentation. A bare marker says nothing, so it is extra to a counter that asks
+what a line says"""
+
+region.optional = [
+    { language = "Markdown", lines = 3 },
+]
+
+[answer.mezura.content]
+real            = { lines = 4, code = 1, comments = 2, extra = 1 }
+real-regions    = []
+counted         = { lines = 4, code = 1, comments = 2, extra = 1 }
+counted-regions = []
+
+[answer.mezura.region]
+real            = { lines = 4, code = 1, comments = 3, blanks = 0 }
+real-regions    = []
+counted         = { lines = 4, code = 1, comments = 3, blanks = 0 }
+counted-regions = []
+
+[answer.scc.default]
+real            = { lines = 4, code = 1, comments = 3, blanks = 0 }
+real-regions    = []
+counted         = { lines = 4, code = 1, comments = 3, blanks = 0 }
+counted-regions = []
+
+[answer.tokei.default]
+real            = { lines = 4, code = 1, comments = 3, blanks = 0 }
+real-regions    = [
+    { language = "Markdown", lines = 3, code = 0, comments = 3, blanks = 0 },
+]
+counted         = { lines = 4, code = 1, comments = 2, blanks = 1 }
+counted-regions = [
+    { language = "Markdown", lines = 3, code = 0, comments = 2, blanks = 1 },
+]
+note            = """
+the bare marker is counted blank, although a blank line inside a '/** */' doc comment of the same
+language counts as comment, so the answer turns on which of the two doc syntaxes was used"""
