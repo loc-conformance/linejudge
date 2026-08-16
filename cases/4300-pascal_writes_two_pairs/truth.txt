@@ -1,6 +1,6 @@
 { a brace comment holding a *) token as text }
-CccccccccccccccccccccccccccccccccccccccccccccC
+CccccccccccccccccccccccccccccccccccccccccccccU
 (* a parenthesis comment holding a } token as text *)
-CCcccccccccccccccccccccccccccccccccccccccccccccccccCC
+CCcccccccccccccccccccccccccccccccccccccccccccccccccUU
 x := 1;
 . .. ..

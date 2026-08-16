@@ -1,6 +1,6 @@
 x' = "don't"
-.. . SsssssS
+.. . SsssssZ
 y' = 'a'
-.. . SsS
+.. . SsZ
 -- a real comment
 CCccccccccccccccc

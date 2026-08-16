@@ -1,5 +1,5 @@
 let dir = @"C:\temp\"
-... ... . SSssssssssS
+... ... . SSssssssssZ
 // a real comment
 CCccccccccccccccc
 let x = 1

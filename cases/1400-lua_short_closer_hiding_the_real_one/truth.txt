@@ -1,6 +1,6 @@
 --[=[ a level one comment
 CCCCCcccccccccccccccccccc
 ]]=]
-cCCC
+cUUU
 x = 1
 . . .

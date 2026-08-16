@@ -1,6 +1,6 @@
 b = a'
 . . ..
 c = 'x'
-. . SsS
+. . SsZ
 # a real comment
 Cccccccccccccccc

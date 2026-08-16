@@ -3,6 +3,6 @@ CCCCCCccccccccccccccc
 ]] this is text, not the end
 cccccccccccccccccccccccccccc
 ]==]
-CCCC
+UUUU
 x = 1
 . . .

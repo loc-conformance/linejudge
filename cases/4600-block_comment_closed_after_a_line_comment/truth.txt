@@ -7,7 +7,7 @@ class Kept
     int old = 1;
 cccccccccccccccc
     //*/
-ccccccCC
+ccccccUU
     int kept = 2;
     ... .... . ..
 }

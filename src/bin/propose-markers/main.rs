@@ -10,6 +10,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use linejudge::truth::Marks;
+use linejudge::truth::{COMMENT_MARKS, STRING_MARKS};
+
 const USAGE: &str = r#"propose-markers <spec>
 
     Run from the root of this repository, it writes the truth.txt of every case the spec names.
@@ -36,10 +39,11 @@ const USAGE: &str = r#"propose-markers <spec>
     bounds the span without a closing symbol. What comes out is
 
         /* block */ // trailing
-        CCcccccccCC CCccccccccc
+        CCcccccccUU CCccccccccc
 
-    where a capital marks a byte of a symbol, a small letter the inside of the span, a dot a
-    byte that belongs to no span, and a space stays a space.
+    where C and U mark the bytes of a comment's opening and closing symbols and c the bytes
+    between them, S Z and s say the same about a string, a dot is a byte that belongs to no
+    span, and a space stays a space.
 
     A span that crosses lines is one row naming its whole range, with ' ... ' standing for the
     lines between, which need nothing said about them:
@@ -55,6 +59,14 @@ const USAGE: &str = r#"propose-markers <spec>
         5 < </SCRIPT>
         1 C (Markdown optional) ///| A documented function.
 
+    Tags nest, and every line belongs to the innermost of them, so a php file whose page holds a
+    script is written as two pairs one inside the other:
+
+        2 > (HTML) ?>
+        4 > (JavaScript) <script>
+        7 < </script>
+        9 < <?php
+
     Lines are numbered from 1 and a line no row names comes out as all dots, which is what a
     line of plain code is. Rows touching one line are written in the order they sit on it, and
     each is searched for after the previous one ends. A text that is still ambiguous is refused,
@@ -67,7 +79,7 @@ enum Item {
     Span {
         from: usize,
         to: usize,
-        kind: char,
+        marks: Marks,
         label: Option<String>,
         opener: String,
         interior: String,
@@ -138,19 +150,21 @@ fn parse_row(row: &str) -> Result<Item, String> {
         None => (parse_line(range)?, parse_line(range)?),
     };
     let (kind, rest) = rest.split_once(' ').ok_or_else(|| format!("[{row}] has no text"))?;
-    let kind = match kind {
-        "S" | "C" | ">" | "<" => kind.chars().next().unwrap_or('S'),
-        _ => return Err(format!("[{kind}] is not S, C, > or <")),
-    };
     let (label, text) = split_label(rest.trim_start())?;
     let (text, occurrence) = split_occurrence(text);
 
-    if kind == '>' || kind == '<' {
-        if from != to {
-            return Err(format!("[{row}] gives a tag a range, and a tag row is one line"));
+    let marks = match kind {
+        "S" => STRING_MARKS,
+        "C" => COMMENT_MARKS,
+        ">" | "<" => {
+            if from != to {
+                return Err(format!("[{row}] gives a tag a range, and a tag row is one line"));
+            }
+            let kind = kind.chars().next().unwrap_or('>');
+            return Ok(Item::Tag { line: from, kind, label, text: text.to_string(), occurrence });
         }
-        return Ok(Item::Tag { line: from, kind, label, text: text.to_string(), occurrence });
-    }
+        _ => return Err(format!("[{kind}] is not S, C, > or <")),
+    };
 
     let mut parts = text.split('|');
     let opener = parts.next().unwrap_or_default().to_string();
@@ -167,7 +181,7 @@ fn parse_row(row: &str) -> Result<Item, String> {
     Ok(Item::Span {
         from,
         to,
-        kind,
+        marks,
         label,
         opener,
         interior: interior.to_string(),
@@ -270,33 +284,34 @@ fn paint(
             note_label(id, labels, index, label)?;
             Ok(())
         }
-        Item::Span { from, to, kind, label, opener, interior, closer, occurrence } => {
-            let upper = kind.to_ascii_uppercase() as u8;
-            let lower = kind.to_ascii_lowercase() as u8;
+        Item::Span { from, to, marks, label, opener, interior, closer, occurrence } => {
+            let opens = marks.opener as u8;
+            let inside = marks.interior as u8;
+            let closes = marks.closer as u8;
             let first = from - 1;
             let last = to - 1;
             if from == to {
                 let text = format!("{opener}{interior}{}", closer.as_deref().unwrap_or_default());
                 let at = find_text(id, sources, first, &text, *occurrence, cursors)?;
-                paint_run(&mut markers[first][at..at + text.len()], lower);
-                paint_run(&mut markers[first][at..at + opener.len()], upper);
-                let closing = closer.as_deref().unwrap_or_default().len();
-                paint_run(&mut markers[first][at + text.len() - closing..at + text.len()], upper);
+                paint_run(&mut markers[first][at..at + text.len()], inside);
+                paint_run(&mut markers[first][at..at + opener.len()], opens);
+                let closer_len = closer.as_deref().unwrap_or_default().len();
+                paint_run(&mut markers[first][at + text.len() - closer_len..at + text.len()], closes);
                 if closer.is_none() {
-                    paint_run(&mut markers[first][at + opener.len()..], lower);
+                    paint_run(&mut markers[first][at + opener.len()..], inside);
                 }
                 note_label(id, labels, first, label)?;
                 return Ok(());
             }
             let at = find_text(id, sources, first, opener, None, cursors)?;
-            paint_run(&mut markers[first][at..], lower);
-            paint_run(&mut markers[first][at..at + opener.len()], upper);
+            paint_run(&mut markers[first][at..], inside);
+            paint_run(&mut markers[first][at..at + opener.len()], opens);
             cursors.insert(first, sources[first].len());
             for index in first + 1..last {
                 if sources[index].is_empty() {
-                    lone.insert(index, lower);
+                    lone.insert(index, inside);
                 } else {
-                    paint_run(&mut markers[index], lower);
+                    paint_run(&mut markers[index], inside);
                 }
             }
             match closer {
@@ -304,10 +319,10 @@ fn paint(
                 // opener was already anchored by where the span begins.
                 Some(closing) => {
                     let at = find_text(id, sources, last, closing, *occurrence, cursors)?;
-                    paint_run(&mut markers[last][..at], lower);
-                    paint_run(&mut markers[last][at..at + closing.len()], upper);
+                    paint_run(&mut markers[last][..at], inside);
+                    paint_run(&mut markers[last][at..at + closing.len()], closes);
                 }
-                None => paint_run(&mut markers[last], lower),
+                None => paint_run(&mut markers[last], inside),
             }
             note_label(id, labels, first, label)?;
             Ok(())
@@ -409,12 +424,15 @@ mod tests {
         };
         let input = read("input.html");
         let spec = read("spec.txt");
-        let golden = read("truth.txt");
 
         let cases = parse_spec(&spec).unwrap();
         assert_eq!(cases.len(), 1, "the fixture spec names one case");
         let painted =
             build_truth("the golden", &cases[0].1, &input.lines().collect::<Vec<&str>>()).unwrap();
+        if env::var("LINEJUDGE_UPDATE_GOLDEN").is_ok() {
+            fs::write(dir.join("truth.txt"), &painted).unwrap_or_else(|e| panic!("truth.txt: {e}"));
+        }
+        let golden = read("truth.txt");
         assert_eq!(painted, golden);
 
         let truth = Truth::read(&golden, &input).unwrap_or_else(|f| panic!("{f:?}"));
@@ -433,7 +451,7 @@ mod tests {
     #[test]
     fn two_spans_on_one_line_are_painted_in_the_order_they_sit_on_it() {
         let truth = propose(&["/* block */ // trailing"], &["1 C /*| block |*/", "1 C //| trailing"]);
-        assert_eq!(truth, "/* block */ // trailing\nCCcccccccCC CCccccccccc\n");
+        assert_eq!(truth, "/* block */ // trailing\nCCcccccccUU CCccccccccc\n");
     }
 
     #[test]
@@ -454,7 +472,7 @@ mod tests {
         let truth = propose(&source, &["1-5 S \"\"\"| ... |\"\"\""]);
         assert_eq!(
             truth,
-            "value = \"\"\"\n..... . SSS\nfirst\nsssss\n\ns\nthird\nsssss\n\"\"\"\nSSS\n\
+            "value = \"\"\"\n..... . SSS\nfirst\nsssss\n\ns\nthird\nsssss\n\"\"\"\nZZZ\n\
              print(value)\n............\n"
         );
     }
@@ -477,7 +495,7 @@ mod tests {
         assert_eq!(
             truth,
             "<script\n>>>>>>> JavaScript\n  type=\"text/javascript\">\n\
-             \x20 .....SsssssssssssssssS>\n</script>\n<<<<<<<<<\n"
+             \x20 .....SsssssssssssssssZ>\n</script>\n<<<<<<<<<\n"
         );
     }
 
@@ -498,7 +516,7 @@ mod tests {
         assert_eq!(
             truth,
             "int w = 8; /* tail\n... . . .. CCccccc\n*/ int z = 9; */* int y = 10;\n\
-             CC ... . . .. ... ... . . ...\n"
+             UU ... . . .. ... ... . . ...\n"
         );
     }
 

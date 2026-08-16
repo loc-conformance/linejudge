@@ -1,5 +1,5 @@
 <script type="text/typescript">
->>>>>>> .....SsssssssssssssssS> TypeScript
+>>>>>>> .....SsssssssssssssssZ> TypeScript
 // a comment inside the section
 CCccccccccccccccccccccccccccccc
 interface Point { x: number }

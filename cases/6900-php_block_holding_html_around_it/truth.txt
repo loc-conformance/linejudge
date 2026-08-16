@@ -5,10 +5,10 @@
 <p>hello</p>
 ............
 <!-- an html comment, which php has no symbol for -->
-CCCCccccccccccccccccccccccccccccccccccccccccccccccCCC
+CCCCccccccccccccccccccccccccccccccccccccccccccccccUUU
 <?php
 <<<<<
 echo "hi";
-.... SssS.
+.... SssZ.
 ?>
 ..

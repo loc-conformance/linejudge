@@ -1,11 +1,11 @@
 <!-- a page comment -->
-CCCCccccccccccccccccCCC
+CCCCccccccccccccccccUUU
 <div title="<!-- text in an attribute">
-.... ......SsssssssssssssssssssssssssS.
+.... ......SsssssssssssssssssssssssssZ.
 <p>it's fine, an apostrophe opens nothing</p>
 ....... ..... .. .......... ..... ...........
 <script type="text/typescript">
->>>>>>> .....SsssssssssssssssS> TypeScript
+>>>>>>> .....SsssssssssssssssZ> TypeScript
 // a line comment
 CCccccccccccccccc
 /** A documented function.
@@ -15,15 +15,15 @@ cc
  * The paragraph after the empty line.
 cccccccccccccccccccccccccccccccccccccc
  */
-cCC
+cUU
 function f() {
 ........ ... .
   var s = "a string";
-  ... . . SssssssssS.
+  ... . . SssssssssZ.
   var t = `a template
   ... . . Sssssssssss
 still the template`;
-ssssssssssssssssssS.
+ssssssssssssssssssZ.
   return s + t;
   ...... . . ..
 }
@@ -31,9 +31,9 @@ ssssssssssssssssssS.
 </script>
 <<<<<<<<<
 <style lang="scss">
->>>>>> .....SssssS> SCSS
+>>>>>> .....SssssZ> SCSS
 /* a css comment */ .a { color: red; }
-CCcccccccccccccccCC .. . ...... .... .
+CCcccccccccccccccUU .. . ...... .... .
 </style>
 <<<<<<<<
 </div>

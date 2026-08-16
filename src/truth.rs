@@ -1,13 +1,17 @@
-const ALPHABET: &str = "SsCc.>< \t";
+const ALPHABET: &str = "SsZCcU.>< \t";
+pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
+const KINDS: [Marks; 2] = [STRING_MARKS, COMMENT_MARKS];
 const OPTIONAL_TAG: &str = "(optional)";
+pub const STRING_MARKS: Marks = Marks { name: "string", opener: 'S', interior: 's', closer: 'Z' };
 
 /// The hand-verified spans of one case, read from its `truth.txt`: under a copy of every source
-/// line, one marker character per byte, `S` and `s` for a string's delimiters and its interior,
-/// `C` and `c` for a comment's, `.` for a byte outside every span, whitespace outside spans kept
-/// as it stands, and a blank line that a span is open across carrying a lone `s` or `c`. A tag
-/// that opens a stretch of another language is marked `>` and the tag that closes it `<`, the
-/// language named after the markers of the opening line; a region with no tag is the same name
-/// on the line where its span opens. Which lines belong to a region is computed, never declared.
+/// line, one marker character per byte, `S` `s` `Z` for a string's opening symbol, its bytes and
+/// its closing symbol, `C` `c` `U` for a comment's, `.` for a byte outside every span, whitespace
+/// outside spans kept as it stands, and a blank line that a span is open across carrying a lone
+/// `s` or `c`. A tag that opens a stretch of another language is marked `>` and the tag that
+/// closes it `<`, the language named after the markers of the opening line; a region with no tag
+/// is the same name on the line where its span opens. Which lines belong to a region is computed,
+/// never declared.
 #[derive(Debug)]
 pub struct Truth {
     pub lines: Vec<TruthLine>,
@@ -23,6 +27,27 @@ pub struct TruthLine {
 pub struct RegionClaim {
     pub language: String,
     pub optional: bool,
+}
+
+/// The three marker characters of one kind of span, so that whoever writes a marker line and
+/// whoever reads it take the alphabet from the same place.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Marks {
+    pub name: &'static str,
+    pub opener: char,
+    pub interior: char,
+    pub closer: char,
+}
+
+impl Marks {
+    fn find_role(&self, mark: char) -> Option<Role> {
+        match mark {
+            _ if mark == self.opener => Some(Role::Opens),
+            _ if mark == self.interior => Some(Role::Inside),
+            _ if mark == self.closer => Some(Role::Closes),
+            _ => None,
+        }
+    }
 }
 
 impl Truth {
@@ -64,6 +89,11 @@ impl Truth {
         if let Some(extra) = rows.next() {
             faults.push(format!("the truth holds [{extra}] past the end of its input"));
         }
+        // A marker that did not parse leaves no line behind, so the walk below would be reading
+        // one file's markers against another file's lines.
+        if faults.is_empty() {
+            check_span_structure(&lines, &mut faults);
+        }
         if !faults.is_empty() {
             return Err(faults);
         }
@@ -85,6 +115,53 @@ struct RawLine {
     label: Option<RegionClaim>,
 }
 
+enum Role {
+    Opens,
+    Inside,
+    Closes,
+}
+
+// A span ends at its closing symbol where it has one, and where it has none, a line comment or a
+// character literal written `\"`, it ends where its own bytes stop: at the end of its line, or at
+// the first byte that is not its interior. So a mark that is not this span's says only that the
+// span was over, which leaves one thing a marker cannot explain and this refuses, the bytes or
+// the closing symbol of a span where no such span is open.
+fn check_span_structure(lines: &[RawLine], faults: &mut Vec<String>) {
+    let mut open: Option<Marks> = None;
+    for line in lines {
+        if let Some(marks) = open
+            && !line.marker.starts_with([marks.interior, marks.closer])
+        {
+            open = None;
+        }
+        let source = &line.source;
+        let mut marker = line.marker.chars().peekable();
+        while let Some(mark) = marker.next() {
+            while marker.peek() == Some(&mark) {
+                marker.next();
+            }
+            let found =
+                KINDS.into_iter().find_map(|marks| marks.find_role(mark).map(|role| (marks, role)));
+            let Some((marks, role)) = found else {
+                open = None;
+                continue;
+            };
+            match (role, open) {
+                (Role::Opens, _) => open = Some(marks),
+                (Role::Closes, Some(already)) if already == marks => open = None,
+                (Role::Closes, _) => {
+                    faults.push(format!("[{source}] closes a {} where none is open", marks.name))
+                }
+                (Role::Inside, Some(already)) if already == marks => {}
+                (Role::Inside, _) => faults.push(format!(
+                    "[{source}] holds the bytes of a {} where none is open",
+                    marks.name
+                )),
+            }
+        }
+    }
+}
+
 fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>), String> {
     let width = source.chars().count();
     let marker: String = row.chars().take(width).collect();
@@ -101,7 +178,8 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
     if !excess.starts_with(' ') {
         return Err(format!("the marker under [{source}] runs past the end of the line"));
     }
-    if !marker.contains('>') && !marker.contains('S') && !marker.contains('C') {
+    let opens_a_span = marker.chars().any(|ch| find_marks_of_opener(ch).is_some());
+    if !marker.contains('>') && !opens_a_span {
         return Err(format!("[{}] labels a line that opens no tag and no span", excess.trim()));
     }
     let named = excess.trim();
@@ -113,9 +191,9 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
     Ok((marker, Some(RegionClaim { language: language.to_string(), optional })))
 }
 
-// Regions nest, a page's script inside a fence being the everyday file, and every line belongs
-// to the innermost one: the tags are a stack, and a tag's own lines belong to the region that
-// encloses the tag, which for a top-level tag is the file itself.
+// Regions nest, a php page holding markup that holds a script being the everyday file, and every
+// line belongs to the innermost one: the tags are a stack, and a tag's own lines belong to the
+// region that encloses the tag, which for a top-level tag is the file itself.
 fn assign_regions(lines: &[RawLine]) -> Result<Vec<Option<RegionClaim>>, Vec<String>> {
     let mut faults = Vec::new();
     let mut regions: Vec<Option<RegionClaim>> = lines.iter().map(|_| None).collect();
@@ -160,13 +238,11 @@ fn assign_regions(lines: &[RawLine]) -> Result<Vec<Option<RegionClaim>>, Vec<Str
     if faults.is_empty() { Ok(regions) } else { Err(faults) }
 }
 
-// A label on a span-opening line claims the consecutive lines wholly covered by that span kind
-// that either continue an open span or open a new one with the same bytes, so a `///` block ends
-// where a plain `//` begins. A new span is recognised against the labeled line's opening bytes,
-// which carries every symmetric closer (a docstring's `"""`) and will need the delimiter pair
-// spelled out the day an asymmetric closer (`*/` at the start of its own line) wants in. Inside
-// a tagged region the claim nests, the innermost language winning as everywhere; only two
-// labeled spans running into each other have no meaning.
+// A label on a span-opening line claims the consecutive lines wholly covered by that kind that
+// either continue the span opened above it, its closing symbol included, or open a new one with
+// the same bytes, so a `///` block ends where a plain `//` begins. Inside a tagged region the
+// claim nests, the innermost language winning as everywhere; only two labeled spans running into
+// each other have no meaning.
 fn claim_labeled_spans(
     lines: &[RawLine],
     regions: &mut [Option<RegionClaim>],
@@ -178,14 +254,14 @@ fn claim_labeled_spans(
         if line.marker.contains('>') {
             continue;
         }
-        let Some(kind) = line.marker.chars().find(|ch| *ch == 'S' || *ch == 'C') else {
+        let Some(marks) = line.marker.chars().find_map(find_marks_of_opener) else {
             continue;
         };
-        let signature = read_opening_bytes(line, kind);
+        let signature = read_opening_bytes(line, marks);
         for (at, this) in lines.iter().enumerate().skip(index) {
             let belongs = at == index
-                || (is_wholly_covered(this, kind)
-                    && (begins_inside(this, kind) || read_opening_bytes(this, kind) == signature));
+                || (is_wholly_covered(this, marks)
+                    && (begins_inside(this, marks) || read_opening_bytes(this, marks) == signature));
             if !belongs {
                 break;
             }
@@ -199,23 +275,26 @@ fn claim_labeled_spans(
     }
 }
 
-fn is_wholly_covered(line: &RawLine, kind: char) -> bool {
-    let lower = kind.to_ascii_lowercase();
-    !line.marker.is_empty() && line.marker.chars().all(|ch| ch == kind || ch == lower)
+fn find_marks_of_opener(mark: char) -> Option<Marks> {
+    KINDS.into_iter().find(|marks| marks.opener == mark)
 }
 
-fn begins_inside(line: &RawLine, kind: char) -> bool {
-    line.marker.starts_with(kind.to_ascii_lowercase())
+fn is_wholly_covered(line: &RawLine, marks: Marks) -> bool {
+    !line.marker.is_empty() && line.marker.chars().all(|ch| marks.find_role(ch).is_some())
 }
 
-/// The source bytes under the line's first run of uppercase marks of this kind: `///` under
-/// `CCC`, `"""` under `SSS`. What tells a doc comment from the plain comment beside it.
-fn read_opening_bytes(line: &RawLine, kind: char) -> String {
+fn begins_inside(line: &RawLine, marks: Marks) -> bool {
+    line.marker.starts_with([marks.interior, marks.closer])
+}
+
+/// The source bytes under the line's first run of opening marks of this kind: `///` under `CCC`,
+/// `"""` under `SSS`. What tells a doc comment from the plain comment beside it.
+fn read_opening_bytes(line: &RawLine, marks: Marks) -> String {
     line.source
         .chars()
         .zip(line.marker.chars())
-        .skip_while(|(_, mark)| *mark != kind)
-        .take_while(|(_, mark)| *mark == kind)
+        .skip_while(|(_, mark)| *mark != marks.opener)
+        .take_while(|(_, mark)| *mark == marks.opener)
         .map(|(byte, _)| byte)
         .collect()
 }
@@ -264,9 +343,9 @@ mod tests {
     }
 
     #[test]
-    fn a_labeled_multiline_span_carries_its_interior_and_its_symmetric_closer() {
+    fn a_labeled_multiline_span_carries_its_interior_and_its_closing_line() {
         let input = "\"\"\"\nnotes\n\"\"\"\nx = 1\n";
-        let marked = "\"\"\"\nSSS Markdown (optional)\nnotes\nsssss\n\"\"\"\nSSS\nx = 1\n. . .\n";
+        let marked = "\"\"\"\nSSS Markdown (optional)\nnotes\nsssss\n\"\"\"\nZZZ\nx = 1\n. . .\n";
         let truth = Truth::read(marked, input).unwrap();
         assert!(truth.lines[1].region.is_some());
         assert!(truth.lines[2].region.is_some(), "the closing quotes match the opening bytes");
@@ -306,7 +385,7 @@ mod tests {
     #[test]
     fn a_labeled_span_inside_a_tagged_region_is_the_inner_region_of_the_two() {
         let input = "<script>\n/** doc */\n</script>\n";
-        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccCC Markdown (optional)\n\
+        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccUU Markdown (optional)\n\
                       </script>\n<<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
         let claim = truth.lines[1].region.as_ref().unwrap();
@@ -353,9 +432,62 @@ mod tests {
     #[test]
     fn an_enclosed_blank_line_takes_a_lone_marker_and_an_outside_one_takes_none() {
         let input = "a = \"\"\"\n\nb\n\"\"\"\n\nx = 1\n";
-        let marked = "a = \"\"\"\n. . SSS\n\ns\nb\ns\n\"\"\"\nSSS\n\nx = 1\n. . .\n";
+        let marked = "a = \"\"\"\n. . SSS\n\ns\nb\ns\n\"\"\"\nZZZ\n\nx = 1\n. . .\n";
         let truth = Truth::read(marked, input).unwrap();
         assert_eq!(truth.lines[1].marker, "s");
         assert_eq!(truth.lines[4].marker, "");
+    }
+
+    #[test]
+    fn every_mark_of_every_kind_is_on_the_alphabet() {
+        for marks in KINDS {
+            for mark in [marks.opener, marks.interior, marks.closer] {
+                assert!(ALPHABET.contains(mark), "{} of a {}", mark, marks.name);
+            }
+        }
+    }
+
+    #[test]
+    fn a_span_that_closes_where_none_is_open_is_refused() {
+        let refused = Truth::read("x = 1 */\n. . . UU\n", "x = 1 */\n").unwrap_err();
+        assert!(refused[0].contains("closes a comment where none is open"), "{refused:?}");
+        let refused = Truth::read("x = 1 \"\n. . . Z\n", "x = 1 \"\n").unwrap_err();
+        assert!(refused[0].contains("closes a string where none is open"), "{refused:?}");
+    }
+
+    #[test]
+    fn bytes_that_belong_to_no_open_span_are_refused() {
+        let refused = Truth::read("int x = 1;\ncc. . . ..\n", "int x = 1;\n").unwrap_err();
+        assert!(refused[0].contains("bytes of a comment where none is open"), "{refused:?}");
+        let refused = Truth::read("/* a . b */\nCCccc.cccUU\n", "/* a . b */\n").unwrap_err();
+        assert!(refused[0].contains("bytes of a comment where none is open"), "{refused:?}");
+        let read = Truth::read("/* a */ x\nCCcccUU .\n", "/* a */ x\n").unwrap();
+        assert_eq!(read.lines.len(), 1, "the same line with nothing left over is read");
+    }
+
+    // A pair written inside an open comment, which a language whose comments nest allows, is that
+    // comment's bytes like everything else in it: marking it as a comment of its own leaves the
+    // outer one closed too early, and the lines under it holding bytes that belong to nothing.
+    #[test]
+    fn a_comment_pair_inside_an_open_comment_is_that_comment_s_bytes() {
+        let input = "/* outer\n   /* inner */\n   still inside\n*/\n";
+        let marked = "/* outer\nCCcccccc\n   /* inner */\ncccCCcccccccUU\n   still inside\n\
+                      ccccccccccccccc\n*/\nUU\n";
+        let refused = Truth::read(marked, input).unwrap_err();
+        assert!(refused[0].contains("bytes of a comment where none is open"), "{refused:?}");
+        let owned = "/* outer\nCCcccccc\n   /* inner */\ncccccccccccccc\n   still inside\n\
+                     ccccccccccccccc\n*/\nUU\n";
+        assert!(Truth::read(owned, input).is_ok());
+    }
+
+    // Clojure writes a character as `\"`, one symbol and one byte, so a span can end where its
+    // bytes do and never carry a closing symbol at all.
+    #[test]
+    fn a_span_with_no_closing_symbol_ends_where_its_bytes_do() {
+        let read = Truth::read("(def q \\\")\n.... . Ss.\n", "(def q \\\")\n").unwrap();
+        assert_eq!(read.lines.len(), 1);
+        let input = "s = \"never closed\n";
+        let read = Truth::read("s = \"never closed\n. . Sssssssssssss\n", input).unwrap();
+        assert_eq!(read.lines.len(), 1, "and a file may end before its string does");
     }
 }

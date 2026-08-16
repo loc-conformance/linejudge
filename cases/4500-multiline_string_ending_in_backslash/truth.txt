@@ -1,12 +1,12 @@
 package main
 ....... ....
 Separators :: `/\`
-.......... .. SssS
+.......... .. SssZ
 /*
 CC
 a block comment that must be seen
 ccccccccccccccccccccccccccccccccc
 */
-CC
+UU
 // a real comment
 CCccccccccccccccc

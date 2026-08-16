@@ -1,4 +1,4 @@
 /* block */ // trailing
-CCcccccccCC CCccccccccc
+CCcccccccUU CCccccccccc
 int x = 1;
 ... . . ..

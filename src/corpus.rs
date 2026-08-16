@@ -605,7 +605,7 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
-        fs::write(dir.join(TRUTH_FILE), "/* a block\nCCcccccccc\n*/ int x = 1;\nCC ... . . ..\n")
+        fs::write(dir.join(TRUTH_FILE), "/* a block\nCCcccccccc\n*/ int x = 1;\nUU ... . . ..\n")
             .unwrap();
         fs::write(dir.join(CASE_FILE), declaration).unwrap();
         let read = Corpus::read(&root);

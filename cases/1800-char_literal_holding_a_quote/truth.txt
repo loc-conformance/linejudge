@@ -1,5 +1,5 @@
 let quote: char = '"';
-... ...... .... . SsS.
+... ...... .... . SsZ.
 // a real comment
 CCccccccccccccccc
 // a second real comment

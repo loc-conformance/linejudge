@@ -3,6 +3,6 @@ let t = `a template
 // not a comment, it is inside the template
 sssssssssssssssssssssssssssssssssssssssssss
 still the template`;
-ssssssssssssssssssS.
+ssssssssssssssssssZ.
 let x = 1;
 ... . . ..

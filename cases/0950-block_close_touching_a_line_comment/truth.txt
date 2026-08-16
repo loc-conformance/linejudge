@@ -1,4 +1,4 @@
 /* block *///trailing
-CCcccccccCCCCcccccccc
+CCcccccccUUCCcccccccc
 int x = 1;
 ... . . ..

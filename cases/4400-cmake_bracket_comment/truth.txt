@@ -3,6 +3,6 @@ CCCCCcccccccccccccccccc
 ]] not the end
 cccccccccccccc
 ]==]
-CCCC
+UUUU
 set(X 1)
 ..... ..

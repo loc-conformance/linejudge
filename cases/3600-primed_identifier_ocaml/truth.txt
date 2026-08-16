@@ -1,6 +1,6 @@
 let x' = "don't"
-... .. . SsssssS
+... .. . SsssssZ
 let y' = 'a'
-... .. . SsS
+... .. . SsZ
 (* a real comment *)
-CCccccccccccccccccCC
+CCccccccccccccccccUU

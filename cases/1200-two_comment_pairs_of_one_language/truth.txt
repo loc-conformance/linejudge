@@ -1,6 +1,6 @@
 /* a plain block holding a +/ token as text */
-CCccccccccccccccccccccccccccccccccccccccccccCC
+CCccccccccccccccccccccccccccccccccccccccccccUU
 /+ a nesting block holding a */ token as text +/
-CCccccccccccccccccccccccccccccccccccccccccccccCC
+CCccccccccccccccccccccccccccccccccccccccccccccUU
 int x = 1;
 ... . . ..

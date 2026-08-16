@@ -5,6 +5,6 @@ ssssssssssssssssssssssssssssssssssssssssssssssssss
 still inside, and a lone ) is not the end
 sssssssssssssssssssssssssssssssssssssssss
 )";
-SS.
+ZZ.
 printf(")");
-.......SsS..
+.......SsZ..

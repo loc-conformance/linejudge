@@ -3,6 +3,6 @@ char *s = "line one\
 	// not a real comment\
 sssssssssssssssssssssss
 	line three";
-sssssssssssS.
+sssssssssssZ.
 int x = 1;
 ... . . ..

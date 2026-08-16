@@ -5,6 +5,6 @@ def f():
     # this is not a comment, it is inside the docstring
 sssssssssssssssssssssssssssssssssssssssssssssssssssssss
     """
-ssssSSS
+ssssZZZ
     return 1
     ...... .

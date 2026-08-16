@@ -1,4 +1,4 @@
 let s = "#";
-... . . SsS.
+... . . SsZ.
 // a real comment
 CCccccccccccccccc

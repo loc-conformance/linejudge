@@ -1,5 +1,5 @@
 let msg: &'static str = "don't panic";
-... .... ........ ... . SsssssssssssS.
+... .... ........ ... . SsssssssssssZ.
 // a real comment
 CCccccccccccccccc
 // a second real comment

@@ -1,8 +1,8 @@
 {- first block
 CCcccccccccccc
 -}{- second block opens where the first closed
-CCCCcccccccccccccccccccccccccccccccccccccccccc
+UUCCcccccccccccccccccccccccccccccccccccccccccc
 -}
-CC
+UU
 x = 1
 . . .

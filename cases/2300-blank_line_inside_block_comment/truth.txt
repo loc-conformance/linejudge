@@ -3,6 +3,6 @@ CCcccccccccccccccccccccccccccccccccccccccccccc
 
 c
 and text after the blank */
-cccccccccccccccccccccccccCC
+cccccccccccccccccccccccccUU
 int x = 1;
 ... . . ..

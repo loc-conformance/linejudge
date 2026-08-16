@@ -7,6 +7,6 @@ s
 third line after a blank one
 ssssssssssssssssssssssssssss
 """
-SSS
+ZZZ
 print(value)
 ............

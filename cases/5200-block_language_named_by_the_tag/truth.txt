@@ -5,7 +5,7 @@
 </template>
 <<<<<<<<<<<
 <script lang="ts">
->>>>>>> .....SssS> TypeScript
+>>>>>>> .....SssZ> TypeScript
 // a ts comment
 CCccccccccccccc
 interface Point { x: number }
@@ -13,7 +13,7 @@ interface Point { x: number }
 </script>
 <<<<<<<<<
 <style lang="scss">
->>>>>> .....SssssS> SCSS
+>>>>>> .....SssssZ> SCSS
 // an scss line comment, which plain css does not have
 CCcccccccccccccccccccccccccccccccccccccccccccccccccccc
 .a { .b { color: red; } }

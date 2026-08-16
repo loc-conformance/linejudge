@@ -1,10 +1,10 @@
 a = """one"""
-. . SSSsssSSS
+. . SSSsssZZZ
 b = """two
 . . SSSsss
 still inside the docstring
 ssssssssssssssssssssssssss
 """
-SSS
+ZZZ
 # a real comment
 Cccccccccccccccc

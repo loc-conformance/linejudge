@@ -1,8 +1,8 @@
 /* first block
 CCcccccccccccc
 */ /* the space between them changes nothing
-CC CCccccccccccccccccccccccccccccccccccccccc
+UU CCccccccccccccccccccccccccccccccccccccccc
 */
-CC
+UU
 int x = 1;
 ... . . ..

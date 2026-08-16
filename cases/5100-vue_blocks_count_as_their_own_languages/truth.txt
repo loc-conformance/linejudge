@@ -1,9 +1,9 @@
 <template>
 >>>>>>>>>> HTML (optional)
   <p class="a">it's fine</p>
-  .. ......SsS..... ........
+  .. ......SsZ..... ........
   <!-- a template comment -->
-  CCCCccccccccccccccccccccCCC
+  CCCCccccccccccccccccccccUUU
 </template>
 <<<<<<<<<<<
 <script>
@@ -12,13 +12,13 @@
 CCccccccccccccc
 
 var x = "</p>";
-... . . SssssS.
+... . . SssssZ.
 </script>
 <<<<<<<<<
 <style>
 >>>>>>> CSS
 /* a css comment */
-CCcccccccccccccccCC
+CCcccccccccccccccUU
 .a { color: red; }
 .. . ...... .... .
 </style>

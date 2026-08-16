@@ -1,4 +1,4 @@
 /* outer /* inner */
-CCccccccccccccccccCC
+CCccccccccccccccccUU
 int x = 1;
 ... . . ..

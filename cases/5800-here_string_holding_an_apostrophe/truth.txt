@@ -3,7 +3,7 @@ $s = @'
 it is a here string with an apostrophe: don't
 sssssssssssssssssssssssssssssssssssssssssssss
 '@
-SS
+ZZ
 # a real comment
 Cccccccccccccccc
 $x = 1

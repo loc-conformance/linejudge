@@ -1,7 +1,7 @@
 fn js_escape(s: &str) -> String {
 .. ............ ..... .. ...... .
     s.replace('\\', "\\\\").replace('"', "\\\"")
-    ..........SssS. SssssS..........SsS. SssssS.
+    ..........SssZ. SssssZ..........SsZ. SssssZ.
 }
 .
 // one

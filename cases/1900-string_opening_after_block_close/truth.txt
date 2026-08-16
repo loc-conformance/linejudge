@@ -1,6 +1,6 @@
 /* a block
 CCcccccccc
 */"a string with no space before it" ;
-CCSssssssssssssssssssssssssssssssssS .
+UUSssssssssssssssssssssssssssssssssZ .
 // a real comment
 CCccccccccccccccc

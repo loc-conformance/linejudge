@@ -1,4 +1,4 @@
 {- outer {- inner -} still the outer comment -}
-CCcccccccccccccccccccccccccccccccccccccccccccCC
+CCcccccccccccccccccccccccccccccccccccccccccccUU
 x = 1
 . . .

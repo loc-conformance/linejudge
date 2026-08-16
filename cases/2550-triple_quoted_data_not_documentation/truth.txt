@@ -5,7 +5,7 @@ SSS
 alpha
 sssss
 """
-SSS
+ZZZ
 )
 .
 print(data)

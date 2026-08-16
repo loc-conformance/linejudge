@@ -1,7 +1,7 @@
 int a = 1;
 ... . . ..
 /* block */ // trailing \
-CCcccccccCC CCccccccccccc
+CCcccccccUU CCccccccccccc
 int x = 1;
 cccccccccc
 int y = 2;

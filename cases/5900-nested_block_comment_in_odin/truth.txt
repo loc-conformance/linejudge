@@ -3,10 +3,10 @@ package main
 /* outer
 CCcccccc
    /* inner */
-cccCCcccccccCC
+cccccccccccccc
    still a comment
 cccccccccccccccccc
 */
-CC
+UU
 x := 1
 . .. .
