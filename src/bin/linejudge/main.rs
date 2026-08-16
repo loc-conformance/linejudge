@@ -3,14 +3,17 @@
 mod report;
 
 use std::env;
+use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::vec::IntoIter;
 
 use linejudge::adapter::Adapter;
 use linejudge::corpus::Corpus;
-use linejudge::counters::{COUNTERS_FILE, Counters};
+use linejudge::counters::COUNTERS_FILE;
+use linejudge::counters::Counters;
 use linejudge::known_failures::KnownFailures;
+use linejudge::verdict::measure_and_judge_every_case;
 
 use crate::report::{report_entries_that_name_nothing, report_the_verdicts_of_one_dialect};
 
@@ -33,29 +36,47 @@ fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
         Ok(broken) if broken => ExitCode::FAILURE,
         Ok(_) => ExitCode::SUCCESS,
-        Err(message) => {
+        // A report cut short by 'linejudge check | head' is not a run that failed, and complaining
+        // about it would mean writing into the pipe that has just gone away.
+        Err(Trouble::Writing(trouble)) if trouble.kind() == ErrorKind::BrokenPipe => {
+            ExitCode::SUCCESS
+        }
+        Err(Trouble::Writing(trouble)) => {
+            eprintln!("{trouble}");
+            ExitCode::FAILURE
+        }
+        Err(Trouble::Said(message)) => {
             eprintln!("{message}");
             ExitCode::FAILURE
         }
     }
 }
 
-fn run(args: Vec<String>) -> Result<bool, String> {
+enum Trouble {
+    Said(String),
+    Writing(io::Error),
+}
+
+impl From<String> for Trouble {
+    fn from(message: String) -> Trouble {
+        Trouble::Said(message)
+    }
+}
+
+impl From<io::Error> for Trouble {
+    fn from(trouble: io::Error) -> Trouble {
+        Trouble::Writing(trouble)
+    }
+}
+
+fn run(args: Vec<String>) -> Result<bool, Trouble> {
     let settings = Settings::of(args)?;
+    let mut out = io::stdout().lock();
     if settings.wants_help {
-        println!("{USAGE}");
+        writeln!(out, "{USAGE}")?;
         return Ok(false);
     }
-    let corpus = Corpus::read(&settings.corpus).map_err(|faults| {
-        let mut report = format!("{} cases could not be read:", faults.len());
-        for fault in &faults {
-            report.push_str(&format!("\n  {fault}"));
-        }
-        report
-    })?;
-    if corpus.cases.is_empty() {
-        return Err(format!("{} holds no case at all", settings.corpus.display()));
-    }
+    let corpus = read_the_corpus(&settings.corpus)?;
     let adapters = match &settings.name_of_counter {
         Some(name) => vec![Adapter::read_one(&settings.adapters, name)?],
         None => Adapter::read_all(&settings.adapters)?,
@@ -70,7 +91,6 @@ fn run(args: Vec<String>) -> Result<bool, String> {
         }
         _ => Counters::read(Path::new(COUNTERS_FILE))?,
     };
-
     let known_failures = match &settings.known_failures {
         Some(path) => Some(KnownFailures::read(path)?),
         None => None,
@@ -80,31 +100,33 @@ fn run(args: Vec<String>) -> Result<bool, String> {
     let mut ran = 0;
     for adapter in &adapters {
         let Some(binary) = counters.find_binary(&adapter.name_of_counter) else {
-            println!("{}: no binary named for it, nothing run", adapter.name_of_counter);
+            writeln!(out, "{}: no binary named for it, nothing run", adapter.name_of_counter)?;
             continue;
         };
         ran += 1;
         let version = adapter.read_version_or_unknown(binary);
         for dialect in &adapter.dialects {
+            let judged = measure_and_judge_every_case(adapter, dialect, binary, &corpus)?;
             broken |= report_the_verdicts_of_one_dialect(
+                &mut out,
                 adapter,
                 dialect,
                 binary,
                 &version,
-                &corpus,
+                &judged,
                 known_failures.as_ref(),
             )?;
         }
         if let Some(known_failures) = &known_failures {
-            report_entries_that_name_nothing(adapter, &corpus, known_failures);
+            report_entries_that_name_nothing(&mut out, adapter, &corpus, known_failures)?;
         }
     }
     // A run that counted nothing and said everything was fine is the one failure a green build
     // hides, and a name misspelled in the counters file is all it takes.
     if ran == 0 {
-        return Err(format!(
+        return Err(Trouble::Said(format!(
             "no counter was run: name a binary with --bin, or in {COUNTERS_FILE} beside the command"
-        ));
+        )));
     }
     Ok(broken)
 }
@@ -170,6 +192,20 @@ fn value_of(flag: &str, args: &mut IntoIter<String>) -> Result<String, String> {
     args.next().ok_or_else(|| format!("{flag} was given nothing"))
 }
 
+fn read_the_corpus(dir: &Path) -> Result<Corpus, String> {
+    let corpus = Corpus::read(dir).map_err(|faults| {
+        let mut report = format!("{} cases could not be read:", faults.len());
+        for fault in &faults {
+            report.push_str(&format!("\n  {fault}"));
+        }
+        report
+    })?;
+    if corpus.cases.is_empty() {
+        return Err(format!("{} holds no case at all", dir.display()));
+    }
+    Ok(corpus)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,7 +222,7 @@ mod tests {
     fn a_flag_with_nothing_after_it_is_refused_and_so_is_an_unknown_one() {
         assert!(settings_of(&["check", "--counter"]).unwrap_err().contains("was given nothing"));
         assert!(settings_of(&["check", "--fast", "yes"]).unwrap_err().contains("not a flag"));
-        assert!(settings_of(&["sweep"]).unwrap_err().contains("not a command"));
+        assert!(settings_of(&["measure"]).unwrap_err().contains("not a command"));
         assert!(settings_of(&[]).unwrap_err().contains("linejudge check"));
     }
 

@@ -1,4 +1,7 @@
-use crate::corpus::Answer;
+use std::path::Path;
+
+use crate::adapter::{Adapter, Dialect};
+use crate::corpus::{Answer, Case, Corpus};
 use crate::measurement::Measurement;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -35,6 +38,33 @@ impl Verdict {
     pub fn breaks_the_run(&self) -> bool {
         self.is_a_failure() && *self != Verdict::KnownFailure
     }
+}
+
+/// One counter's answer to one case, beside what the case records and what the verdict was.
+pub struct Judged<'a> {
+    pub verdict: Verdict,
+    pub case: &'a Case,
+    pub answer: &'a Answer,
+    pub live: Option<Measurement>,
+}
+
+/// Runs the counter once per case, so this is as slow as the counter is, times the corpus. A case
+/// that records no answer for this way of counting is passed over rather than judged.
+pub fn measure_and_judge_every_case<'a>(
+    adapter: &Adapter,
+    dialect: &Dialect,
+    binary: &Path,
+    corpus: &'a Corpus,
+) -> Result<Vec<Judged<'a>>, String> {
+    let mut judged = Vec::new();
+    for case in &corpus.cases {
+        let Some(answer) = case.find_answer(&adapter.name_of_counter, &dialect.name) else {
+            continue;
+        };
+        let live = adapter.measure(dialect, binary, &case.input)?;
+        judged.push(Judged { verdict: judge(answer, live.as_ref()), case, answer, live });
+    }
+    Ok(judged)
 }
 
 pub fn judge(answer: &Answer, live: Option<&Measurement>) -> Verdict {

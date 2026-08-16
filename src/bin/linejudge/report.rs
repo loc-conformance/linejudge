@@ -1,61 +1,46 @@
+use std::io::{self, Write};
 use std::path::Path;
 
 use linejudge::adapter::{Adapter, Dialect};
-use linejudge::corpus::{Answer, Case, Corpus, Counts, RegionCounts};
+use linejudge::corpus::{Corpus, Counts, RegionCounts};
 use linejudge::known_failures::KnownFailures;
-use linejudge::measurement::Measurement;
-use linejudge::verdict::{Verdict, judge};
-
-// One counter's answer to one case, beside what the case records and what the verdict was.
-pub struct Judged<'a> {
-    pub verdict: Verdict,
-    pub case: &'a Case,
-    pub answer: &'a Answer,
-    pub live: Option<Measurement>,
-}
+use linejudge::verdict::{Judged, Verdict};
 
 // Returns whether what it found should break the run: without a list of known failures that is
 // any failure the corpus does not already record, and with one it is any failure the list does
 // not name.
 pub fn report_the_verdicts_of_one_dialect(
+    out: &mut dyn Write,
     adapter: &Adapter,
     dialect: &Dialect,
     binary: &Path,
     version: &str,
-    corpus: &Corpus,
+    judged: &[Judged],
     known_failures: Option<&KnownFailures>,
-) -> Result<bool, String> {
-    let mut judged: Vec<Judged> = Vec::new();
-    for case in &corpus.cases {
-        let Some(answer) = case.find_answer(&adapter.name_of_counter, &dialect.name) else {
-            continue;
-        };
-        let live: Option<Measurement> = adapter.measure(dialect, binary, &case.input)?;
-        judged.push(Judged { verdict: judge(answer, live.as_ref()), case, answer, live });
-    }
-
-    println!("\n{}.{}  [{version}]", adapter.name_of_counter, dialect.name);
-    println!("  {}", format_summary(&judged));
-    let told = |one: &Judged| describe(adapter, dialect, binary, one);
+) -> io::Result<bool> {
+    writeln!(out, "\n{}.{}  [{version}]", adapter.name_of_counter, dialect.name)?;
+    writeln!(out, "  {}", format_summary(judged))?;
 
     let Some(known_failures) = known_failures else {
-        for one in &judged {
+        for one in judged {
             match one.verdict {
                 Verdict::NewFailure => {
-                    println!("  new failure   {}", one.case.name);
-                    told(one);
+                    writeln!(out, "  new failure   {}", one.case.name)?;
+                    describe(out, adapter, dialect, binary, one)?;
                 }
                 Verdict::NoLongerClaimed => {
-                    println!("  claims the file no longer   {}", one.case.name);
-                    told(one);
+                    writeln!(out, "  claims the file no longer   {}", one.case.name)?;
+                    describe(out, adapter, dialect, binary, one)?;
                 }
                 Verdict::NowClaimed => {
-                    println!("  claims a file the case says it does not   {}", one.case.name);
-                    told(one);
+                    writeln!(out, "  claims a file the case says it does not   {}", one.case.name)?;
+                    describe(out, adapter, dialect, binary, one)?;
                 }
-                Verdict::Fixed => {
-                    println!("  now agrees, the case still records a failure   {}", one.case.name)
-                }
+                Verdict::Fixed => writeln!(
+                    out,
+                    "  now agrees, the case still records a failure   {}",
+                    one.case.name
+                )?,
                 _ => {}
             }
         }
@@ -63,19 +48,19 @@ pub fn report_the_verdicts_of_one_dialect(
     };
 
     let mut unnamed = 0;
-    for one in &judged {
+    for one in judged {
         let named = known_failures.names(&dialect.name, &one.case.number);
         match (one.verdict.is_a_failure(), named) {
             (true, false) => {
                 unnamed += 1;
-                println!("  fails and is not a known failure   {}", one.case.name);
-                told(one);
+                writeln!(out, "  fails and is not a known failure   {}", one.case.name)?;
+                describe(out, adapter, dialect, binary, one)?;
             }
             (true, true) if one.verdict == Verdict::NewFailure => {
-                println!("  known, and it now fails in a new way   {}", one.case.name);
-                told(one);
+                writeln!(out, "  known, and it now fails in a new way   {}", one.case.name)?;
+                describe(out, adapter, dialect, binary, one)?;
             }
-            (false, true) => println!("  passes, take it off the list   {}", one.case.name),
+            (false, true) => writeln!(out, "  passes, take it off the list   {}", one.case.name)?,
             _ => {}
         }
     }
@@ -83,10 +68,11 @@ pub fn report_the_verdicts_of_one_dialect(
 }
 
 pub fn report_entries_that_name_nothing(
+    out: &mut dyn Write,
     adapter: &Adapter,
     corpus: &Corpus,
     known_failures: &KnownFailures,
-) {
+) -> io::Result<()> {
     for (dialect, number) in known_failures.entries() {
         let dialect_is_real =
             dialect.is_none_or(|d| adapter.dialects.iter().any(|one| one.name == d));
@@ -96,36 +82,43 @@ pub fn report_entries_that_name_nothing(
                 Some(dialect) => format!("{dialect}:{number}"),
                 None => number.to_string(),
             };
-            println!("  names nothing, take it off the list   {entry}");
+            writeln!(out, "  names nothing, take it off the list   {entry}")?;
         }
     }
+    Ok(())
 }
 
-fn describe(adapter: &Adapter, dialect: &Dialect, binary: &Path, one: &Judged) {
+fn describe(
+    out: &mut dyn Write,
+    adapter: &Adapter,
+    dialect: &Dialect,
+    binary: &Path,
+    one: &Judged,
+) -> io::Result<()> {
     match (&one.answer.given, &one.live) {
         (Some(recorded), Some(live)) => {
             match &recorded.note {
-                Some(note) => println!("      note    {}", format_as_one_line(note)),
-                None => println!("      trap    {}", format_as_one_line(&one.case.trap)),
+                Some(note) => writeln!(out, "      note    {}", format_as_one_line(note))?,
+                None => writeln!(out, "      trap    {}", format_as_one_line(&one.case.trap))?,
             }
-            println!("      wants   {}", format_counts(&recorded.real));
-            println!("      answers {}", format_counts(&live.counts));
+            writeln!(out, "      wants   {}", format_counts(&recorded.real))?;
+            writeln!(out, "      answers {}", format_counts(&live.counts))?;
             if recorded.real_regions != live.regions {
-                println!("      wants regions   {}", format_regions(&recorded.real_regions));
-                println!("      answers regions {}", format_regions(&live.regions));
+                writeln!(out, "      wants regions   {}", format_regions(&recorded.real_regions))?;
+                writeln!(out, "      answers regions {}", format_regions(&live.regions))?;
             }
         }
         (Some(recorded), None) => {
-            println!("      wants   {}", format_counts(&recorded.real));
-            println!("      answers nothing, it claims no such file");
+            writeln!(out, "      wants   {}", format_counts(&recorded.real))?;
+            writeln!(out, "      answers nothing, it claims no such file")?;
         }
         (None, Some(live)) => {
-            println!("      the case records no answer, since this counter claimed no such file");
-            println!("      answers {}", format_counts(&live.counts));
+            writeln!(out, "      the case records no answer, since this counter claimed no such file")?;
+            writeln!(out, "      answers {}", format_counts(&live.counts))?;
         }
-        (None, None) => return,
+        (None, None) => return Ok(()),
     }
-    println!("      run     {}", adapter.format_command(dialect, binary, &one.case.input));
+    writeln!(out, "      run     {}", adapter.format_command(dialect, binary, &one.case.input))
 }
 
 fn format_summary(judged: &[Judged]) -> String {
@@ -165,7 +158,10 @@ fn format_regions(regions: &[RegionCounts]) -> String {
     }
     regions
         .iter()
-        .map(|region| format!("{} of {} lines", region.language, region.lines))
+        .map(|region| {
+            let lines = if region.lines == 1 { "line" } else { "lines" };
+            format!("{} of {} {lines}", region.language, region.lines)
+        })
         .collect::<Vec<_>>()
         .join(", ")
 }
