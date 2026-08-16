@@ -5,14 +5,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::buckets::{check_buckets, find_buckets};
+
 const CASE_FILE: &str = "case.toml";
 const INPUT_STEM: &str = "input.";
-const DIALECT_BUCKETS: [(&str, &str, [&str; 3]); 4] = [
-    ("mezura", "content", ["code", "comments", "extra"]),
-    ("mezura", "region", ["code", "comments", "blanks"]),
-    ("scc", "default", ["code", "comments", "blanks"]),
-    ("tokei", "default", ["code", "comments", "blanks"]),
-];
 
 pub struct Corpus {
     pub cases: Vec<Case>,
@@ -53,12 +49,13 @@ impl Corpus {
 
 pub struct Case {
     pub name: String,
+    pub number: String,
     pub input: PathBuf,
     pub lines: u32,
     pub trap: String,
     pub declares_regions: bool,
-    pub required: Vec<Extent>,
-    pub optional: Vec<Extent>,
+    pub required_regions: Vec<RegionExtent>,
+    pub optional_regions: Vec<RegionExtent>,
     pub answers: Vec<Answer>,
 }
 
@@ -91,8 +88,10 @@ impl Case {
 
         let declares_regions = raw.region.is_some();
         let regions = raw.region.unwrap_or_default();
-        let required: Vec<Extent> = regions.required.into_iter().map(Extent::from).collect();
-        let optional: Vec<Extent> = regions.optional.into_iter().map(Extent::from).collect();
+        let required_regions: Vec<RegionExtent> =
+            regions.required.into_iter().map(RegionExtent::from).collect();
+        let optional_regions: Vec<RegionExtent> =
+            regions.optional.into_iter().map(RegionExtent::from).collect();
 
         let mut answers = Vec::new();
         let mut faults = Vec::new();
@@ -104,20 +103,26 @@ impl Case {
                 }
             }
         }
-        answers.sort_by(|a, b| (&a.counter, &a.dialect).cmp(&(&b.counter, &b.dialect)));
+        answers.sort_by(|a, b| (&a.name_of_counter, &a.dialect).cmp(&(&b.name_of_counter, &b.dialect)));
 
+        let number = name.split('-').next().unwrap_or(&name).to_string();
         let case = Case {
             name,
+            number,
             input,
             lines,
             trap: raw.trap,
             declares_regions,
-            required,
-            optional,
+            required_regions,
+            optional_regions,
             answers,
         };
         faults.extend(case.find_faults());
         if faults.is_empty() { Ok(case) } else { Err(faults) }
+    }
+
+    pub fn find_answer(&self, counter: &str, dialect: &str) -> Option<&Answer> {
+        self.answers.iter().find(|a| a.name_of_counter == counter && a.dialect == dialect)
     }
 
     fn find_faults(&self) -> Vec<Fault> {
@@ -128,8 +133,8 @@ impl Case {
             fault("the trap says nothing".to_string());
         }
         for answer in &self.answers {
-            let key = format!("{}.{}", answer.counter, answer.dialect);
-            let Some(buckets) = find_buckets(&answer.counter, &answer.dialect) else {
+            let key = format!("{}.{}", answer.name_of_counter, answer.dialect);
+            let Some(buckets) = find_buckets(&answer.name_of_counter, &answer.dialect) else {
                 fault(format!("{key} is a block of no counter this suite knows"));
                 continue;
             };
@@ -145,6 +150,17 @@ impl Case {
                     fault(format!("{key} region {} {wrong}", region.language));
                 }
             }
+            // No counter reports one language twice for one file, so a repeated language is a
+            // copy of a line rather than an answer, and it would fail the case for ever.
+            for (side, regions) in
+                [("real", &given.real_regions), ("counted", &given.counted_regions)]
+            {
+                for pair in regions.windows(2) {
+                    if pair[0].language == pair[1].language {
+                        fault(format!("{key}.{side} names {} twice", pair[0].language));
+                    }
+                }
+            }
 
             // Only the real side is held to the file and to its own arithmetic. A counter that
             // reports 18 lines for a file of 17, or buckets that do not add up, has to have
@@ -155,11 +171,11 @@ impl Case {
                     given.real.lines, self.lines
                 ));
             }
-            if given.real.sum() != given.real.lines {
+            if given.real.sum() != u64::from(given.real.lines) {
                 fault(format!("{key}.real does not add up to its own line count"));
             }
             for region in &given.real_regions {
-                if region.sum() != region.lines {
+                if region.sum() != u64::from(region.lines) {
                     fault(format!(
                         "{key}.real region {} does not add up to its own line count",
                         region.language
@@ -176,7 +192,7 @@ impl Case {
             }
             // A required region of no lines is answered by naming it nowhere: no counter prints a
             // row for a region with nothing in it.
-            for extent in &self.required {
+            for extent in &self.required_regions {
                 let found = given
                     .real_regions
                     .iter()
@@ -200,9 +216,9 @@ impl Case {
             }
             for region in &given.real_regions {
                 let declared = self
-                    .required
+                    .required_regions
                     .iter()
-                    .chain(&self.optional)
+                    .chain(&self.optional_regions)
                     .any(|e| e.language == region.language && e.lines == region.lines);
                 if !declared {
                     fault(format!(
@@ -212,9 +228,9 @@ impl Case {
                 }
             }
 
-            match (given.agrees(), &given.note) {
-                (true, Some(_)) => fault(format!("{key} carries a note and answers correctly")),
-                (false, None) => fault(format!("{key} answers differently and says nothing")),
+            match (given.agrees(), given.says_something()) {
+                (true, true) => fault(format!("{key} carries a note and answers correctly")),
+                (false, false) => fault(format!("{key} answers differently and says nothing")),
                 _ => {}
             }
         }
@@ -222,26 +238,28 @@ impl Case {
     }
 }
 
-pub struct Extent {
+pub struct RegionExtent {
     pub language: String,
     pub lines: u32,
 }
 
-impl From<RawExtent> for Extent {
-    fn from(raw: RawExtent) -> Extent {
-        Extent { language: raw.language, lines: raw.lines }
+impl From<RawExtent> for RegionExtent {
+    fn from(raw: RawExtent) -> RegionExtent {
+        RegionExtent { language: raw.language, lines: raw.lines }
     }
 }
 
 pub struct Answer {
-    pub counter: String,
+    pub name_of_counter: String,
     pub dialect: String,
-    pub given: Option<Given>,
+    /// `None` is a counter that does not claim the file, which is not the same as answering zero
+    /// and is not a failure of any kind.
+    pub given: Option<Recorded>,
 }
 
 impl Answer {
-    fn of(counter: String, dialect: String, raw: RawAnswer) -> Result<Answer, String> {
-        let key = format!("{counter}.{dialect}");
+    fn of(name_of_counter: String, dialect: String, raw: RawAnswer) -> Result<Answer, String> {
+        let key = format!("{name_of_counter}.{dialect}");
         if raw.unclaimed {
             let alone = raw.real.is_none()
                 && raw.counted.is_none()
@@ -251,7 +269,7 @@ impl Answer {
             if !alone {
                 return Err(format!("{key} is unclaimed and still answers"));
             }
-            return Ok(Answer { counter, dialect, given: None });
+            return Ok(Answer { name_of_counter, dialect, given: None });
         }
         let (Some(real), Some(counted)) = (raw.real, raw.counted) else {
             return Err(format!("{key} is missing its real or its counted answer"));
@@ -261,9 +279,9 @@ impl Answer {
             return Err(format!("{key} states one of its two region lists and not the other"));
         }
         Ok(Answer {
-            counter,
+            name_of_counter,
             dialect,
-            given: Some(Given {
+            given: Some(Recorded {
                 real: real.into(),
                 real_regions: regions_of(raw.real_regions),
                 counted: counted.into(),
@@ -275,30 +293,37 @@ impl Answer {
     }
 }
 
-pub struct Given {
+/// What a case file records about one counter: the right answer under that counter's own
+/// definitions, what it printed when it was last measured, and the note saying why they differ.
+pub struct Recorded {
     pub real: Counts,
     pub real_regions: Vec<RegionCounts>,
     pub counted: Counts,
     pub counted_regions: Vec<RegionCounts>,
     pub note: Option<String>,
-    states_regions: bool,
+    pub states_regions: bool,
 }
 
-impl Given {
+impl Recorded {
     pub fn agrees(&self) -> bool {
         self.real == self.counted && self.real_regions == self.counted_regions
     }
+
+    pub fn says_something(&self) -> bool {
+        self.note.as_ref().is_some_and(|note| !note.trim().is_empty())
+    }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Counts {
     pub lines: u32,
     pub buckets: BTreeMap<String, u32>,
 }
 
 impl Counts {
-    fn sum(&self) -> u32 {
-        self.buckets.values().sum()
+    // Summed wide, because a case file is text and can hold any number that fits its own field.
+    fn sum(&self) -> u64 {
+        self.buckets.values().map(|value| u64::from(*value)).sum()
     }
 }
 
@@ -308,7 +333,7 @@ impl From<RawCounts> for Counts {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RegionCounts {
     pub language: String,
     pub lines: u32,
@@ -316,8 +341,8 @@ pub struct RegionCounts {
 }
 
 impl RegionCounts {
-    fn sum(&self) -> u32 {
-        self.buckets.values().sum()
+    fn sum(&self) -> u64 {
+        self.buckets.values().map(|value| u64::from(*value)).sum()
     }
 }
 
@@ -327,6 +352,7 @@ impl From<RawRegionCounts> for RegionCounts {
     }
 }
 
+#[derive(Debug)]
 pub struct Fault {
     pub case: String,
     pub message: String,
@@ -357,31 +383,10 @@ fn find_input(dir: &Path) -> Result<PathBuf, String> {
     }
 }
 
-fn find_buckets(counter: &str, dialect: &str) -> Option<[&'static str; 3]> {
-    DIALECT_BUCKETS
-        .iter()
-        .find(|(c, d, _)| *c == counter && *d == dialect)
-        .map(|(_, _, buckets)| *buckets)
-}
-
-fn check_buckets(found: &BTreeMap<String, u32>, wanted: &[&str; 3]) -> Result<(), String> {
-    for name in wanted {
-        if !found.contains_key(*name) {
-            return Err(format!("has no {name} bucket"));
-        }
-    }
-    for name in found.keys() {
-        if !wanted.contains(&name.as_str()) {
-            return Err(format!("has a bucket named {name}, which this counter has not"));
-        }
-    }
-    Ok(())
-}
-
 fn regions_of(raw: Option<Vec<RawRegionCounts>>) -> Vec<RegionCounts> {
     let mut regions: Vec<RegionCounts> =
         raw.unwrap_or_default().into_iter().map(RegionCounts::from).collect();
-    regions.sort_by(|a, b| (&a.language, a.lines).cmp(&(&b.language, b.lines)));
+    regions.sort();
     regions
 }
 
@@ -468,6 +473,21 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
                 panic!("{}", report.join("\n"));
             }
         }
+    }
+
+    #[test]
+    fn every_case_of_the_corpus_answers_every_counter_this_suite_knows() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
+        let corpus = Corpus::read(&dir).unwrap_or_else(|_| panic!("the corpus does not read"));
+        let mut silent = Vec::new();
+        for case in &corpus.cases {
+            for (counter, dialect) in crate::buckets::find_every_dialect() {
+                if case.find_answer(counter, dialect).is_none() {
+                    silent.push(format!("{} says nothing about {counter}.{dialect}", case.name));
+                }
+            }
+        }
+        assert!(silent.is_empty(), "{}", silent.join("\n"));
     }
 
     #[test]
@@ -561,9 +581,4 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
         }
     }
 
-    impl fmt::Debug for Fault {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{self}")
-        }
-    }
 }

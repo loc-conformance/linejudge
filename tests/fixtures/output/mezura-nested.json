@@ -1,0 +1,125 @@
+{
+  "format": 1,
+  "kind": "run",
+  "mezura_version": "3.0.0",
+  "generated_at": "2026-08-16T00:38:50+03:00",
+  "scope": {
+    "targets": [
+      {"module": null, "path": "D:/dev/Rusty/linejudge/cases/5100-vue_blocks_count_as_their_own_languages/input.vue"}
+    ],
+    "exclude": [],
+    "languages": [],
+    "excluded_languages": [],
+    "forced_languages": {},
+    "counting": "content",
+    "search_in_dotted": false,
+    "gitignore": true,
+    "keywords_counted": true
+  },
+  "scan": {
+    "files_found": 1,
+    "files_of_interest": 1,
+    "files_excluded": 0,
+    "files_faulty": 0,
+    "dirs_unreadable": 0
+  },
+  "total": {
+    "files": 1,
+    "lines": 13,
+    "code": 9,
+    "comments": 3,
+    "extra": 1,
+    "bytes": 190,
+    "average_bytes": 190,
+    "classes": {
+      "words_in_code": 9,
+      "string_content": 0,
+      "comment_words_beside_code": 0,
+      "words_in_comment": 3,
+      "punctuation_in_code": 0,
+      "punctuation_in_comment": 0,
+      "blank": 1,
+      "blank_in_comment": 0,
+      "blank_in_string": 0
+    },
+    "keywords": {}
+  },
+  "languages": [
+    {
+      "name": "Vue",
+      "files": 1,
+      "lines": 13,
+      "code": 9,
+      "comments": 3,
+      "extra": 1,
+      "bytes": 190,
+      "average_bytes": 190,
+      "classes": {
+        "words_in_code": 9,
+        "string_content": 0,
+        "comment_words_beside_code": 0,
+        "words_in_comment": 3,
+        "punctuation_in_code": 0,
+        "punctuation_in_comment": 0,
+        "blank": 1,
+        "blank_in_comment": 0,
+        "blank_in_string": 0
+      },
+      "keywords": {},
+      "nested_languages": [
+        {
+          "name": "CSS",
+          "files": 1,
+          "lines": 2,
+          "code": 1,
+          "comments": 1,
+          "extra": 0,
+          "bytes": 39,
+          "classes": {
+            "words_in_code": 1,
+            "string_content": 0,
+            "comment_words_beside_code": 0,
+            "words_in_comment": 1,
+            "punctuation_in_code": 0,
+            "punctuation_in_comment": 0,
+            "blank": 0,
+            "blank_in_comment": 0,
+            "blank_in_string": 0
+          }
+        },
+        {
+          "name": "JavaScript",
+          "files": 1,
+          "lines": 3,
+          "code": 1,
+          "comments": 1,
+          "extra": 1,
+          "bytes": 33,
+          "classes": {
+            "words_in_code": 1,
+            "string_content": 0,
+            "comment_words_beside_code": 0,
+            "words_in_comment": 1,
+            "punctuation_in_code": 0,
+            "punctuation_in_comment": 0,
+            "blank": 1,
+            "blank_in_comment": 0,
+            "blank_in_string": 0
+          }
+        }
+      ]
+    }
+  ],
+  "languages_hidden": 0,
+  "files_hidden": 0,
+  "faulty_files": [],
+  "unreadable_dirs": [],
+  "warnings": [
+    {
+      "code": "config-section-unknown",
+      "affects": "settings",
+      "subject": "default",
+      "message": "In config 'default': 'braces-as-code' is not something a configuration file can carry, the section is ignored."
+    }
+  ]
+}

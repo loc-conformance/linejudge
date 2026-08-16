@@ -1,0 +1,10 @@
+name   = "scc"
+output = "scc-json"
+args   = ["--format", "json", "{file}"]
+
+[acquisition]
+channel = "github-release-asset"
+name    = "boyter/scc"
+
+[dialect.default]
+args = []

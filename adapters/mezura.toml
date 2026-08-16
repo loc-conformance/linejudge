@@ -1,0 +1,13 @@
+name   = "mezura"
+output = "mezura-json"
+args   = ["{file}", "--output", "json", "--hide", "timing"]
+
+[acquisition]
+channel = "crates-io"
+name    = "mezura"
+
+[dialect.content]
+args = ["--counting", "content"]
+
+[dialect.region]
+args = ["--counting", "region"]

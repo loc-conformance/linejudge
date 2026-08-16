@@ -1,0 +1,10 @@
+name   = "tokei"
+output = "tokei-json"
+args   = ["--output", "json", "{file}"]
+
+[acquisition]
+channel = "crates-io"
+name    = "tokei"
+
+[dialect.default]
+args = []
