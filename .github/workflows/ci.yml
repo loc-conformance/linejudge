@@ -42,10 +42,13 @@ jobs:
         run: cargo test --verbose
 
       # The corpus is read byte for byte and its answers are compared across machines, so a
-      # checkout that rewrote line endings would fail in ways that look like counting bugs
+      # checkout that rewrote line endings would fail in ways that look like counting bugs.
+      # It looks for CRLF rather than for the absence of LF: a counter's captured answer that is
+      # one line with no newline after it has no line ending at all to be LF, and nor has a file
+      # git reads as binary.
       - name: No file was checked out with CRLF
         shell: bash
         run: |
-          if git ls-files --eol | grep -v "w/lf"; then
-            echo "the working copy holds a file whose line endings are not LF"; exit 1
+          if git ls-files --eol | grep -E "w/(crlf|mixed)"; then
+            echo "the working copy holds a file with CRLF line endings"; exit 1
           fi
