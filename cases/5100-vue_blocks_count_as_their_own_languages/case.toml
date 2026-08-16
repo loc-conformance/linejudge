@@ -3,20 +3,7 @@ one file, three languages: the script and style blocks are counted with their ow
 the js comment and the css comment are comments although the Vue file holding them has neither
 symbol"""
 
-region.required = [
-    { language = "JavaScript", lines = 3 },
-    { language = "CSS", lines = 2 },
-]
-region.optional = [
-    { language = "HTML", lines = 2 },
-]
-
 [answer.mezura.content]
-real            = { lines = 13, code = 9, comments = 3, extra = 1 }
-real-regions    = [
-    { language = "CSS", lines = 2, code = 1, comments = 1, extra = 0 },
-    { language = "JavaScript", lines = 3, code = 1, comments = 1, extra = 1 },
-]
 counted         = { lines = 13, code = 9, comments = 3, extra = 1 }
 counted-regions = [
     { language = "CSS", lines = 2, code = 1, comments = 1, extra = 0 },
@@ -24,11 +11,6 @@ counted-regions = [
 ]
 
 [answer.mezura.region]
-real            = { lines = 13, code = 9, comments = 3, blanks = 1 }
-real-regions    = [
-    { language = "CSS", lines = 2, code = 1, comments = 1, blanks = 0 },
-    { language = "JavaScript", lines = 3, code = 1, comments = 1, blanks = 1 },
-]
 counted         = { lines = 13, code = 9, comments = 3, blanks = 1 }
 counted-regions = [
     { language = "CSS", lines = 2, code = 1, comments = 1, blanks = 0 },
@@ -36,11 +18,6 @@ counted-regions = [
 ]
 
 [answer.scc.default]
-real            = { lines = 13, code = 9, comments = 3, blanks = 1 }
-real-regions    = [
-    { language = "CSS", lines = 2, code = 1, comments = 1, blanks = 0 },
-    { language = "JavaScript", lines = 3, code = 1, comments = 1, blanks = 1 },
-]
 counted         = { lines = 13, code = 13, comments = 0, blanks = 0 }
 counted-regions = []
 note            = """
@@ -48,12 +25,6 @@ the file is counted as one language from beginning to end, so neither block is f
 their comments are code"""
 
 [answer.tokei.default]
-real            = { lines = 13, code = 9, comments = 3, blanks = 1 }
-real-regions    = [
-    { language = "CSS", lines = 2, code = 1, comments = 1, blanks = 0 },
-    { language = "HTML", lines = 2, code = 1, comments = 1, blanks = 0 },
-    { language = "JavaScript", lines = 3, code = 1, comments = 1, blanks = 1 },
-]
 counted         = { lines = 13, code = 10, comments = 2, blanks = 1 }
 counted-regions = [
     { language = "CSS", lines = 2, code = 1, comments = 1, blanks = 0 },

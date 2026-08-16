@@ -2,45 +2,25 @@ trap = """
 HTML reads its tag names without regard to case, so an upper case SCRIPT opens a script element
 exactly as a lower case one does"""
 
-region.required = [
-    { language = "JavaScript", lines = 2 },
-]
-
 [answer.mezura.content]
-real            = { lines = 6, code = 5, comments = 1, extra = 0 }
-real-regions    = [
-    { language = "JavaScript", lines = 2, code = 1, comments = 1, extra = 0 },
-]
 counted         = { lines = 6, code = 5, comments = 1, extra = 0 }
 counted-regions = [
     { language = "JavaScript", lines = 2, code = 1, comments = 1, extra = 0 },
 ]
 
 [answer.mezura.region]
-real            = { lines = 6, code = 5, comments = 1, blanks = 0 }
-real-regions    = [
-    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
 counted         = { lines = 6, code = 5, comments = 1, blanks = 0 }
 counted-regions = [
     { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
 ]
 
 [answer.scc.default]
-real            = { lines = 6, code = 5, comments = 1, blanks = 0 }
-real-regions    = [
-    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
 counted         = { lines = 6, code = 6, comments = 0, blanks = 0 }
 counted-regions = []
 note            = """
 the tag is not recognised, so the block is not found and the comment inside it counts as markup"""
 
 [answer.tokei.default]
-real            = { lines = 6, code = 5, comments = 1, blanks = 0 }
-real-regions    = [
-    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
 counted         = { lines = 6, code = 6, comments = 0, blanks = 0 }
 counted-regions = []
 note            = """

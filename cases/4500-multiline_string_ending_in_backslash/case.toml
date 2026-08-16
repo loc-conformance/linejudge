@@ -3,17 +3,13 @@ a raw string whose last byte is a backslash, written with the same symbol at bot
 backtick string in Odin escapes nothing, so the second backtick closes it whatever precedes it"""
 
 [answer.mezura.content]
-real    = { lines = 6, code = 2, comments = 2, extra = 2 }
 counted = { lines = 6, code = 2, comments = 2, extra = 2 }
 
 [answer.mezura.region]
-real    = { lines = 6, code = 2, comments = 4, blanks = 0 }
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 6, code = 2, comments = 4, blanks = 0 }
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 
 [answer.tokei.default]
-real    = { lines = 6, code = 2, comments = 4, blanks = 0 }
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }

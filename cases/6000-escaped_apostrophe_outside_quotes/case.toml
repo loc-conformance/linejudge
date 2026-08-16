@@ -3,17 +3,13 @@ a backslash before an apostrophe in unquoted shell text, which is how one writes
 without quoting it. Shell escapes with the backslash outside a string and not inside"""
 
 [answer.mezura.content]
-real    = { lines = 4, code = 2, comments = 2, extra = 0 }
 counted = { lines = 4, code = 2, comments = 2, extra = 0 }
 
 [answer.mezura.region]
-real    = { lines = 4, code = 2, comments = 2, blanks = 0 }
 counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 4, code = 2, comments = 2, blanks = 0 }
 counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
 
 [answer.tokei.default]
-real    = { lines = 4, code = 2, comments = 2, blanks = 0 }
 counted = { lines = 4, code = 2, comments = 2, blanks = 0 }

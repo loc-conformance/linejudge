@@ -2,7 +2,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use linejudge::adapter::{Adapter, Dialect};
-use linejudge::corpus::{Corpus, Counts, RegionCounts};
+use linejudge::corpus::Corpus;
+use linejudge::answer::{Counts, RegionCounts};
 use linejudge::known_failures::KnownFailures;
 use linejudge::verdict::{Judged, Verdict};
 
@@ -95,21 +96,22 @@ fn describe(
     binary: &Path,
     one: &Judged,
 ) -> io::Result<()> {
-    match (&one.answer.given, &one.live) {
-        (Some(recorded), Some(live)) => {
-            match &recorded.note {
+    let real = &one.answer.real;
+    match (&one.answer.counted, &one.live) {
+        (Some(_), Some(live)) => {
+            match &one.answer.note {
                 Some(note) => writeln!(out, "      note    {}", format_as_one_line(note))?,
                 None => writeln!(out, "      trap    {}", format_as_one_line(&one.case.trap))?,
             }
-            writeln!(out, "      wants   {}", format_counts(&recorded.real))?;
+            writeln!(out, "      wants   {}", format_counts(&real.counts))?;
             writeln!(out, "      answers {}", format_counts(&live.counts))?;
-            if recorded.real_regions != live.regions {
-                writeln!(out, "      wants regions   {}", format_regions(&recorded.real_regions))?;
+            if real.regions != live.regions {
+                writeln!(out, "      wants regions   {}", format_regions(&real.regions))?;
                 writeln!(out, "      answers regions {}", format_regions(&live.regions))?;
             }
         }
-        (Some(recorded), None) => {
-            writeln!(out, "      wants   {}", format_counts(&recorded.real))?;
+        (Some(_), None) => {
+            writeln!(out, "      wants   {}", format_counts(&real.counts))?;
             writeln!(out, "      answers nothing, it claims no such file")?;
         }
         (None, Some(live)) => {
@@ -118,7 +120,7 @@ fn describe(
         }
         (None, None) => return Ok(()),
     }
-    writeln!(out, "      run     {}", adapter.format_command(dialect, binary, &one.case.input))
+    writeln!(out, "      run     {}", adapter.format_command(dialect, binary, &one.case.input_file))
 }
 
 fn format_summary(judged: &[Judged]) -> String {

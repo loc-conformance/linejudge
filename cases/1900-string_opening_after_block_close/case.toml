@@ -2,19 +2,15 @@ trap = """
 a string beginning at the byte straight after a block comment closes"""
 
 [answer.mezura.content]
-real    = { lines = 3, code = 1, comments = 2, extra = 0 }
 counted = { lines = 3, code = 1, comments = 2, extra = 0 }
 
 [answer.mezura.region]
-real    = { lines = 3, code = 1, comments = 2, blanks = 0 }
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 3, code = 1, comments = 2, blanks = 0 }
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.tokei.default]
-real    = { lines = 3, code = 1, comments = 2, blanks = 0 }
 counted = { lines = 3, code = 0, comments = 3, blanks = 0 }
 note    = """
 the code after the closing */ is not seen, so the file is reported as holding no code at all"""

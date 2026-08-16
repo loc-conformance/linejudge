@@ -2,15 +2,7 @@ trap = """
 the file switches language at a tag rather than at a file boundary, and switches back at another
 tag, so the markup between the two belongs to a language the extension does not name"""
 
-region.required = [
-    { language = "HTML", lines = 2 },
-]
-
 [answer.mezura.content]
-real            = { lines = 7, code = 4, comments = 1, extra = 2 }
-real-regions    = [
-    { language = "HTML", lines = 2, code = 1, comments = 1, extra = 0 },
-]
 counted         = { lines = 7, code = 5, comments = 0, extra = 2 }
 counted-regions = []
 note            = """
@@ -18,10 +10,6 @@ the file is read as php from beginning to end, so the html comment is counted wi
 which do not include it"""
 
 [answer.mezura.region]
-real            = { lines = 7, code = 6, comments = 1, blanks = 0 }
-real-regions    = [
-    { language = "HTML", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
 counted         = { lines = 7, code = 7, comments = 0, blanks = 0 }
 counted-regions = []
 note            = """
@@ -29,20 +17,12 @@ the file is read as php from beginning to end, so the html comment is counted wi
 which do not include it"""
 
 [answer.scc.default]
-real            = { lines = 7, code = 6, comments = 1, blanks = 0 }
-real-regions    = [
-    { language = "HTML", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
 counted         = { lines = 7, code = 7, comments = 0, blanks = 0 }
 counted-regions = []
 note            = """
 the file is read as php from beginning to end, so the html comment is counted as code"""
 
 [answer.tokei.default]
-real            = { lines = 7, code = 6, comments = 1, blanks = 0 }
-real-regions    = [
-    { language = "HTML", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
 counted         = { lines = 7, code = 7, comments = 0, blanks = 0 }
 counted-regions = []
 note            = """

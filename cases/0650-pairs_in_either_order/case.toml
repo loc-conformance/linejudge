@@ -6,17 +6,13 @@ order a counter's own classifier reads them in. The string pair is the witness t
 a comment do not outweigh a string on the same line in either direction"""
 
 [answer.mezura.content]
-real    = { lines = 8, code = 4, comments = 2, extra = 2 }
 counted = { lines = 8, code = 4, comments = 2, extra = 2 }
 
 [answer.mezura.region]
-real    = { lines = 8, code = 8, comments = 0, blanks = 0 }
 counted = { lines = 8, code = 8, comments = 0, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 8, code = 8, comments = 0, blanks = 0 }
 counted = { lines = 8, code = 8, comments = 0, blanks = 0 }
 
 [answer.tokei.default]
-real    = { lines = 8, code = 8, comments = 0, blanks = 0 }
 counted = { lines = 8, code = 8, comments = 0, blanks = 0 }

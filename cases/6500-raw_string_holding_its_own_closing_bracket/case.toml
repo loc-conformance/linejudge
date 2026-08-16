@@ -3,19 +3,15 @@ the opening line closes its quotes, so only the raw pair itself keeps the block 
 from starting a comment that never ends. A lone ) inside does not end the string"""
 
 [answer.mezura.content]
-real    = { lines = 5, code = 5, comments = 0, extra = 0 }
 counted = { lines = 5, code = 5, comments = 0, extra = 0 }
 
 [answer.mezura.region]
-real    = { lines = 5, code = 5, comments = 0, blanks = 0 }
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 5, code = 5, comments = 0, blanks = 0 }
 counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
 note    = """
 the raw string is not seen, so the block opener inside it starts a comment that never ends"""
 
 [answer.tokei.default]
-real    = { lines = 5, code = 5, comments = 0, blanks = 0 }
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }

@@ -437,7 +437,7 @@ mod tests {
 
         let truth = Truth::read(&golden, &input).unwrap_or_else(|f| panic!("{f:?}"));
         let language = |at: usize| {
-            truth.lines[at].region.as_ref().map(|claim| claim.language.as_str())
+            truth.lines[at].regions.last().map(|claim| claim.language.as_str())
         };
         assert_eq!(language(3), None, "the tag line stays with the page");
         assert_eq!(language(4), Some("TypeScript"));

@@ -2,7 +2,10 @@ const ALPHABET: &str = "SsZCcU.>< \t";
 pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
 const KINDS: [Marks; 2] = [STRING_MARKS, COMMENT_MARKS];
 const OPTIONAL_TAG: &str = "(optional)";
+pub const RESIDUE: char = '.';
 pub const STRING_MARKS: Marks = Marks { name: "string", opener: 'S', interior: 's', closer: 'Z' };
+pub const TAG_CLOSES: char = '<';
+pub const TAG_OPENS: char = '>';
 
 /// The hand-verified spans of one case, read from its `truth.txt`: under a copy of every source
 /// line, one marker character per byte, `S` `s` `Z` for a string's opening symbol, its bytes and
@@ -19,8 +22,22 @@ pub struct Truth {
 
 #[derive(Debug)]
 pub struct TruthLine {
+    /// Kept beside the marker because the rules need to know what a character is, a letter or a
+    /// space, and the marker only says which string or comment it belongs to.
+    pub source: String,
     pub marker: String,
-    pub region: Option<RegionClaim>,
+    /// Every region this line is inside, the outermost first. A counter that does not count an
+    /// optional region on its own still needs the region around it, so the whole stack is kept.
+    pub regions: Vec<RegionClaim>,
+}
+
+impl TruthLine {
+    /// Which region this line counts towards: the innermost one this counter counts on its own. A
+    /// counter that leaves the optional ones out gives the line to the region around them, and
+    /// `None` means the file itself.
+    pub fn find_region(&self, takes_optional: bool) -> Option<&RegionClaim> {
+        self.regions.iter().rev().find(|claim| takes_optional || !claim.optional)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,6 +57,10 @@ pub struct Marks {
 }
 
 impl Marks {
+    pub fn owns(&self, mark: char) -> bool {
+        self.find_role(mark).is_some()
+    }
+
     fn find_role(&self, mark: char) -> Option<Role> {
         match mark {
             _ if mark == self.opener => Some(Role::Opens),
@@ -103,7 +124,11 @@ impl Truth {
             lines: lines
                 .into_iter()
                 .zip(regions)
-                .map(|(raw, region)| TruthLine { marker: raw.marker, region })
+                .map(|(raw, regions)| TruthLine {
+                    source: raw.source,
+                    marker: raw.marker,
+                    regions,
+                })
                 .collect(),
         })
     }
@@ -179,7 +204,7 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
         return Err(format!("the marker under [{source}] runs past the end of the line"));
     }
     let opens_a_span = marker.chars().any(|ch| find_marks_of_opener(ch).is_some());
-    if !marker.contains('>') && !opens_a_span {
+    if !marker.contains(TAG_OPENS) && !opens_a_span {
         return Err(format!("[{}] labels a line that opens no tag and no span", excess.trim()));
     }
     let named = excess.trim();
@@ -194,40 +219,40 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
 // Regions nest, a php page holding markup that holds a script being the everyday file, and every
 // line belongs to the innermost one: the tags are a stack, and a tag's own lines belong to the
 // region that encloses the tag, which for a top-level tag is the file itself.
-fn assign_regions(lines: &[RawLine]) -> Result<Vec<Option<RegionClaim>>, Vec<String>> {
+fn assign_regions(lines: &[RawLine]) -> Result<Vec<Vec<RegionClaim>>, Vec<String>> {
     let mut faults = Vec::new();
-    let mut regions: Vec<Option<RegionClaim>> = lines.iter().map(|_| None).collect();
+    let mut regions: Vec<Vec<RegionClaim>> = lines.iter().map(|_| Vec::new()).collect();
 
     let mut stack: Vec<RegionClaim> = Vec::new();
     let mut group: Option<char> = None;
     for (index, line) in lines.iter().enumerate() {
-        let opens = line.marker.contains('>');
-        let closes = line.marker.contains('<');
+        let opens = line.marker.contains(TAG_OPENS);
+        let closes = line.marker.contains(TAG_CLOSES);
         if opens && closes {
             faults.push("a line both opens and closes a tag, which is not yet a shape".to_string());
             group = None;
         } else if opens {
-            if group != Some('>') {
+            if group != Some(TAG_OPENS) {
                 match &line.label {
                     Some(claim) => stack.push(claim.clone()),
                     None => faults.push("an opening tag names no language".to_string()),
                 }
-                group = Some('>');
+                group = Some(TAG_OPENS);
             } else if line.label.is_some() {
                 faults.push("a second label inside one opening tag".to_string());
             }
-            regions[index] = stack.get(stack.len().wrapping_sub(2)).cloned();
+            regions[index] = stack[..stack.len().saturating_sub(1)].to_vec();
         } else if closes {
-            if group != Some('<') {
+            if group != Some(TAG_CLOSES) {
                 if stack.pop().is_none() {
                     faults.push("a closing tag closes nothing".to_string());
                 }
-                group = Some('<');
+                group = Some(TAG_CLOSES);
             }
-            regions[index] = stack.last().cloned();
+            regions[index] = stack.clone();
         } else {
             group = None;
-            regions[index] = stack.last().cloned();
+            regions[index] = stack.clone();
         }
     }
     if !stack.is_empty() {
@@ -245,13 +270,13 @@ fn assign_regions(lines: &[RawLine]) -> Result<Vec<Option<RegionClaim>>, Vec<Str
 // each other have no meaning.
 fn claim_labeled_spans(
     lines: &[RawLine],
-    regions: &mut [Option<RegionClaim>],
+    regions: &mut [Vec<RegionClaim>],
     faults: &mut Vec<String>,
 ) {
     let mut labeled: Vec<bool> = lines.iter().map(|_| false).collect();
     for (index, line) in lines.iter().enumerate() {
         let Some(claim) = &line.label else { continue };
-        if line.marker.contains('>') {
+        if line.marker.contains(TAG_OPENS) {
             continue;
         }
         let Some(marks) = line.marker.chars().find_map(find_marks_of_opener) else {
@@ -269,7 +294,7 @@ fn claim_labeled_spans(
                 faults.push(format!("the {} label runs into another labeled span", claim.language));
                 break;
             }
-            regions[at] = Some(claim.clone());
+            regions[at].push(claim.clone());
             labeled[at] = true;
         }
     }
@@ -310,12 +335,13 @@ mod tests {
                       <p>x</p>\n........\n";
         let truth = Truth::read(marked, input).unwrap();
         assert_eq!(truth.lines.len(), 4);
-        let claim = truth.lines[1].region.as_ref().unwrap();
+        assert_eq!(truth.lines[1].source, "// inside");
+        let claim = &truth.lines[1].regions[0];
         assert_eq!(claim.language, "JavaScript");
         assert!(!claim.optional);
-        assert!(truth.lines[0].region.is_none(), "the tag line belongs to the parent");
-        assert!(truth.lines[2].region.is_none());
-        assert!(truth.lines[3].region.is_none());
+        assert!(truth.lines[0].regions.is_empty(), "the tag line belongs to the parent");
+        assert!(truth.lines[2].regions.is_empty());
+        assert!(truth.lines[3].regions.is_empty());
     }
 
     #[test]
@@ -323,7 +349,7 @@ mod tests {
         let input = "<script>\n</script>\n<p>after</p>\n";
         let marked = "<script>\n>>>>>>>> JavaScript\n</script>\n<<<<<<<<<\n<p>after</p>\n............\n";
         let truth = Truth::read(marked, input).unwrap();
-        assert!(truth.lines.iter().all(|line| line.region.is_none()));
+        assert!(truth.lines.iter().all(|line| line.regions.is_empty()));
     }
 
     #[test]
@@ -335,11 +361,11 @@ mod tests {
         assert!(refused.is_err());
         let marked = "/// a\nCCCcc Markdown (optional)\n///\nCCC\n// plain\nCCcccccc\nfn x() {}\n.. ... ..\n";
         let truth = Truth::read(marked, input).unwrap();
-        let markdown = |at: usize| truth.lines[at].region.as_ref().map(|c| c.language.as_str());
+        let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
         assert_eq!(markdown(0), Some("Markdown"));
         assert_eq!(markdown(1), Some("Markdown"));
         assert_eq!(markdown(2), None, "a plain // is not part of the /// block");
-        assert!(truth.lines[0].region.as_ref().unwrap().optional);
+        assert!(truth.lines[0].regions[0].optional);
     }
 
     #[test]
@@ -347,9 +373,9 @@ mod tests {
         let input = "\"\"\"\nnotes\n\"\"\"\nx = 1\n";
         let marked = "\"\"\"\nSSS Markdown (optional)\nnotes\nsssss\n\"\"\"\nZZZ\nx = 1\n. . .\n";
         let truth = Truth::read(marked, input).unwrap();
-        assert!(truth.lines[1].region.is_some());
-        assert!(truth.lines[2].region.is_some(), "the closing quotes match the opening bytes");
-        assert!(truth.lines[3].region.is_none());
+        assert!(!truth.lines[1].regions.is_empty());
+        assert!(!truth.lines[2].regions.is_empty(), "the closing quotes match the opening bytes");
+        assert!(truth.lines[3].regions.is_empty());
     }
 
     #[test]
@@ -372,14 +398,16 @@ mod tests {
         let marked = "?>\n>> HTML\n<div>\n.....\n<script>\n>>>>>>>> JavaScript\nx\n.\n\
                       </script>\n<<<<<<<<<\n</div>\n......\n<?php\n<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
-        let language = |at: usize| truth.lines[at].region.as_ref().map(|c| c.language.as_str());
-        assert_eq!(language(0), None, "the outer tag belongs to the file");
-        assert_eq!(language(1), Some("HTML"));
-        assert_eq!(language(2), Some("HTML"), "the inner tag belongs to what encloses it");
-        assert_eq!(language(3), Some("JavaScript"));
-        assert_eq!(language(4), Some("HTML"));
-        assert_eq!(language(5), Some("HTML"));
-        assert_eq!(language(6), None);
+        let stack = |at: usize| {
+            truth.lines[at].regions.iter().map(|c| c.language.as_str()).collect::<Vec<&str>>()
+        };
+        assert_eq!(stack(0), [] as [&str; 0], "the outer tag belongs to the file");
+        assert_eq!(stack(1), ["HTML"]);
+        assert_eq!(stack(2), ["HTML"], "the inner tag belongs to what encloses it");
+        assert_eq!(stack(3), ["HTML", "JavaScript"]);
+        assert_eq!(stack(4), ["HTML"]);
+        assert_eq!(stack(5), ["HTML"]);
+        assert_eq!(stack(6), [] as [&str; 0]);
     }
 
     #[test]
@@ -388,9 +416,25 @@ mod tests {
         let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccUU Markdown (optional)\n\
                       </script>\n<<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
-        let claim = truth.lines[1].region.as_ref().unwrap();
-        assert_eq!(claim.language, "Markdown");
-        assert!(claim.optional);
+        let claims: Vec<&str> =
+            truth.lines[1].regions.iter().map(|c| c.language.as_str()).collect();
+        assert_eq!(claims, ["TypeScript", "Markdown"]);
+        assert!(truth.lines[1].regions[1].optional);
+    }
+
+    #[test]
+    fn a_dialect_that_declines_an_optional_region_is_given_the_one_around_it() {
+        let input = "<script>\n/** doc */\n</script>\n";
+        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccUU Markdown (optional)\n\
+                      </script>\n<<<<<<<<<\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let charged = |at: usize, takes_optional| {
+            truth.lines[at].find_region(takes_optional).map(|claim| claim.language.as_str())
+        };
+        assert_eq!(charged(1, true), Some("Markdown"));
+        assert_eq!(charged(1, false), Some("TypeScript"));
+        assert_eq!(charged(0, true), None, "and the tag line is charged to the file either way");
+        assert_eq!(charged(0, false), None);
     }
 
     #[test]
@@ -443,7 +487,12 @@ mod tests {
         for marks in KINDS {
             for mark in [marks.opener, marks.interior, marks.closer] {
                 assert!(ALPHABET.contains(mark), "{} of a {}", mark, marks.name);
+                assert!(marks.owns(mark));
             }
+        }
+        for mark in [RESIDUE, TAG_OPENS, TAG_CLOSES] {
+            assert!(ALPHABET.contains(mark), "{mark}");
+            assert!(KINDS.iter().all(|marks| !marks.owns(mark)), "{mark} belongs to no span");
         }
     }
 

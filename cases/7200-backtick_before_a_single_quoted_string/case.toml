@@ -3,19 +3,15 @@ the other PowerShell string form escapes nothing inside itself, so the backtick 
 outside it, where it stops the apostrophe from opening anything"""
 
 [answer.mezura.content]
-real    = { lines = 3, code = 2, comments = 1, extra = 0 }
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.mezura.region]
-real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.tokei.default]
-real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
 note    = """
 the apostrophe opens a string, and that form crosses lines, so everything below it is string"""

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use crate::adapter::{Adapter, Dialect};
-use crate::corpus::{Answer, Case, Corpus};
-use crate::measurement::Measurement;
+use crate::answer::Answer;
+use crate::corpus::{AnswerBlock, Case, Corpus};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Verdict {
@@ -44,8 +44,8 @@ impl Verdict {
 pub struct Judged<'a> {
     pub verdict: Verdict,
     pub case: &'a Case,
-    pub answer: &'a Answer,
-    pub live: Option<Measurement>,
+    pub answer: &'a AnswerBlock,
+    pub live: Option<Answer>,
 }
 
 /// Runs the counter once per case, so this is as slow as the counter is, times the corpus. A case
@@ -58,30 +58,26 @@ pub fn measure_and_judge_every_case<'a>(
 ) -> Result<Vec<Judged<'a>>, String> {
     let mut judged = Vec::new();
     for case in &corpus.cases {
-        let Some(answer) = case.find_answer(&adapter.name_of_counter, &dialect.name) else {
+        let Some(answer) = case.find_answer_block(&adapter.name_of_counter, &dialect.name) else {
             continue;
         };
-        let live = adapter.measure(dialect, binary, &case.input)?;
+        let live = adapter.measure(dialect, binary, &case.input_file)?;
         judged.push(Judged { verdict: judge(answer, live.as_ref()), case, answer, live });
     }
     Ok(judged)
 }
 
-pub fn judge(answer: &Answer, live: Option<&Measurement>) -> Verdict {
-    match (&answer.given, live) {
+pub fn judge(answer: &AnswerBlock, live: Option<&Answer>) -> Verdict {
+    match (&answer.counted, live) {
         (None, None) => Verdict::Unclaimed,
         (None, Some(_)) => Verdict::NowClaimed,
         (Some(_), None) => Verdict::NoLongerClaimed,
-        (Some(given), Some(live)) => {
-            let agrees = given.real == live.counts && given.real_regions == live.regions;
-            let recorded = given.counted == live.counts && given.counted_regions == live.regions;
-            match (agrees, recorded) {
-                (true, true) => Verdict::Agrees,
-                (true, false) => Verdict::Fixed,
-                (false, true) => Verdict::KnownFailure,
-                (false, false) => Verdict::NewFailure,
-            }
-        }
+        (Some(counted), Some(live)) => match (answer.real == *live, counted == live) {
+            (true, true) => Verdict::Agrees,
+            (true, false) => Verdict::Fixed,
+            (false, true) => Verdict::KnownFailure,
+            (false, false) => Verdict::NewFailure,
+        },
     }
 }
 
@@ -90,7 +86,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
-    use crate::corpus::{Counts, Recorded};
+    use crate::answer::Counts;
 
     #[test]
     fn a_counter_that_answers_what_the_case_expects_of_it_agrees() {
@@ -134,33 +130,30 @@ mod tests {
     #[test]
     fn claiming_and_not_claiming_are_answers_of_their_own() {
         let claimed = an_answer(2, 2);
-        let unclaimed = Answer {
+        let unclaimed = AnswerBlock {
             name_of_counter: "tokei".to_string(),
             dialect: "default".to_string(),
-            given: None,
+            real: a_measurement(2),
+            counted: None,
+            note: None,
         };
         assert_eq!(judge(&unclaimed, None), Verdict::Unclaimed);
         assert_eq!(judge(&claimed, None), Verdict::NoLongerClaimed);
         assert_eq!(judge(&unclaimed, Some(&a_measurement(2))), Verdict::NowClaimed);
     }
 
-    fn an_answer(real_code: u32, counted_code: u32) -> Answer {
-        Answer {
+    fn an_answer(real_code: u32, counted_code: u32) -> AnswerBlock {
+        AnswerBlock {
             name_of_counter: "tokei".to_string(),
             dialect: "default".to_string(),
-            given: Some(Recorded {
-                real: counts(real_code),
-                real_regions: Vec::new(),
-                counted: counts(counted_code),
-                counted_regions: Vec::new(),
-                note: None,
-                states_regions: false,
-            }),
+            real: a_measurement(real_code),
+            counted: Some(a_measurement(counted_code)),
+            note: None,
         }
     }
 
-    fn a_measurement(code: u32) -> Measurement {
-        Measurement { counts: counts(code), regions: Vec::new() }
+    fn a_measurement(code: u32) -> Answer {
+        Answer { counts: counts(code), regions: Vec::new() }
     }
 
     fn counts(code: u32) -> Counts {

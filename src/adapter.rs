@@ -4,8 +4,9 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use crate::buckets::find_buckets;
-use crate::measurement::{Measurement, OutputFormat, read_output};
+use crate::dialects::find_buckets;
+use crate::answer::Answer;
+use crate::measurement::{OutputFormat, read_output};
 
 const ADAPTER_EXTENSION: &str = "toml";
 const FILE_PLACEHOLDER: &str = "{file}";
@@ -20,7 +21,7 @@ const UNKNOWN_VERSION: &str = "unknown version";
 pub struct Adapter {
     // a 'counter' is a loc counting tool, like mezura or tokei
     pub name_of_counter: String,
-    pub output: OutputFormat,
+    pub output_format: OutputFormat,
     pub args: Vec<String>,
     pub version_flag: Option<String>,
     pub acquisition: Acquisition,
@@ -81,7 +82,7 @@ impl Adapter {
                     name
                 ));
             }
-            dialects.push(Dialect { name, args: dialect.args, third_bucket: buckets[2] });
+            dialects.push(Dialect { name, args: dialect.args, buckets });
         }
         if dialects.is_empty() {
             return Err(format!("{} names no way of counting to run", path.display()));
@@ -89,7 +90,7 @@ impl Adapter {
         dialects.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(Adapter {
             name_of_counter: raw.name,
-            output: raw.output,
+            output_format: raw.output,
             args: raw.args,
             version_flag: match raw.version_flag {
                 Some(flag) if flag.is_empty() => None,
@@ -106,10 +107,10 @@ impl Adapter {
         dialect: &Dialect,
         binary: &Path,
         file: &Path,
-    ) -> Result<Option<Measurement>, String> {
+    ) -> Result<Option<Answer>, String> {
         let args = self.build_args(dialect, file);
         let printed = run_counter(binary, &args)?;
-        read_output(self.output, dialect.third_bucket, &printed)
+        read_output(self.output_format, dialect.buckets, &printed)
             .map_err(|e| format!("{} on {}: {e}", self.name_of_counter, file.display()))
     }
 
@@ -142,7 +143,7 @@ impl Adapter {
 pub struct Dialect {
     pub name: String,
     pub args: Vec<String>,
-    pub third_bucket: &'static str,
+    pub buckets: &'static [&'static str],
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,8 +199,8 @@ mod tests {
         let mezura = &adapters[0];
         let dialects: Vec<&str> = mezura.dialects.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(dialects, ["content", "region"]);
-        assert_eq!(mezura.dialects[0].third_bucket, "extra");
-        assert_eq!(mezura.dialects[1].third_bucket, "blanks");
+        assert_eq!(mezura.dialects[0].buckets, ["code", "comments", "extra"]);
+        assert_eq!(mezura.dialects[1].buckets, ["code", "comments", "blanks"]);
         assert_eq!(adapters[2].acquisition.channel, "crates-io");
     }
 

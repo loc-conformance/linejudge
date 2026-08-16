@@ -2,17 +2,13 @@ trap = """
 a quote written as a character with a backslash opens no string"""
 
 [answer.mezura.content]
-real    = { lines = 3, code = 2, comments = 1, extra = 0 }
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.mezura.region]
-real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.scc.default]
-real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.tokei.default]
-real    = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
