@@ -1,0 +1,4 @@
+/* outer /* inner */
+CCccccccccccccccccCC
+int x = 1;
+... . . ..

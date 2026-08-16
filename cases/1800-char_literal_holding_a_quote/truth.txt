@@ -1,0 +1,6 @@
+let quote: char = '"';
+... ...... .... . SsS.
+// a real comment
+CCccccccccccccccc
+// a second real comment
+CCcccccccccccccccccccccc

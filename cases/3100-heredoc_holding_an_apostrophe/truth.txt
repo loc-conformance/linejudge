@@ -1,0 +1,10 @@
+cat <<TEXT
+... SSSSSS
+it's fine in here
+sssssssssssssssss
+TEXT
+SSSS
+# a real comment
+Cccccccccccccccc
+# a second real comment
+Ccccccccccccccccccccccc

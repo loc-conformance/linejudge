@@ -1,0 +1,10 @@
+<p>before</p>
+.............
+<script>
+>>>>>>>> JavaScript
+var s = "</script>";
+... . . .<<<<<<<<<..
+// not a comment: the script element ended on the line above
+.. ... . ........ ... ...... ....... ..... .. ... .... .....
+<p>after</p>
+............

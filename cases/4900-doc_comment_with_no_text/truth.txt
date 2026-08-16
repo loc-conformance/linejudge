@@ -1,0 +1,8 @@
+/// A documented function.
+CCCccccccccccccccccccccccc Markdown (optional)
+///
+CCC
+/// The paragraph after the empty doc line.
+CCCcccccccccccccccccccccccccccccccccccccccc
+fn documented() {}
+.. ............ ..

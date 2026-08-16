@@ -1,0 +1,25 @@
+<template>
+>>>>>>>>>> HTML (optional)
+  <p class="a">it's fine</p>
+  .. ......SsS..... ........
+  <!-- a template comment -->
+  CCCCccccccccccccccccccccCCC
+</template>
+<<<<<<<<<<<
+<script>
+>>>>>>>> JavaScript
+// a js comment
+CCccccccccccccc
+
+var x = "</p>";
+... . . SssssS.
+</script>
+<<<<<<<<<
+<style>
+>>>>>>> CSS
+/* a css comment */
+CCcccccccccccccccCC
+.a { color: red; }
+.. . ...... .... .
+</style>
+<<<<<<<<

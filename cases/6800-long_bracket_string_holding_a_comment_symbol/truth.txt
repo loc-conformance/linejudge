@@ -1,0 +1,6 @@
+local s = [[a string
+..... . . SSssssssss
+-- not a comment, it is inside the string
+sssssssssssssssssssssssssssssssssssssssss
+]]
+SS

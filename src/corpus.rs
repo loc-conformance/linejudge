@@ -1,14 +1,17 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
 use crate::buckets::{check_buckets, find_buckets};
+use crate::truth::Truth;
 
 const CASE_FILE: &str = "case.toml";
 const INPUT_STEM: &str = "input.";
+const TRUTH_FILE: &str = "truth.txt";
 
 pub struct Corpus {
     pub cases: Vec<Case>,
@@ -57,6 +60,7 @@ pub struct Case {
     pub required_regions: Vec<RegionExtent>,
     pub optional_regions: Vec<RegionExtent>,
     pub answers: Vec<Answer>,
+    pub truth: Truth,
 }
 
 impl Case {
@@ -95,6 +99,25 @@ impl Case {
 
         let mut answers = Vec::new();
         let mut faults = Vec::new();
+        let marked = match fs::read_to_string(dir.join(TRUTH_FILE)) {
+            Ok(marked) => marked,
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                return Err(one(format!("{TRUTH_FILE} is not there, and a case is its spans")));
+            }
+            Err(error) => return Err(one(format!("{TRUTH_FILE} could not be read: {error}"))),
+        };
+        let truth = match Truth::read(&marked, &text) {
+            Ok(truth) => truth,
+            Err(messages) => {
+                return Err(messages
+                    .into_iter()
+                    .map(|message| Fault {
+                        case: name.clone(),
+                        message: format!("{TRUTH_FILE}: {message}"),
+                    })
+                    .collect());
+            }
+        };
         for (counter, dialects) in raw.answer {
             for (dialect, raw) in dialects {
                 match Answer::of(counter.clone(), dialect, raw) {
@@ -116,6 +139,7 @@ impl Case {
             required_regions,
             optional_regions,
             answers,
+            truth,
         };
         faults.extend(case.find_faults());
         if faults.is_empty() { Ok(case) } else { Err(faults) }
@@ -467,12 +491,25 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
     fn every_case_of_the_corpus_is_read_without_a_fault() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
         match Corpus::read(&dir) {
-            Ok(corpus) => assert_eq!(corpus.cases.len(), 79),
+            Ok(corpus) => assert_eq!(corpus.cases.len(), 80),
             Err(faults) => {
                 let report: Vec<String> = faults.iter().map(|f| f.to_string()).collect();
                 panic!("{}", report.join("\n"));
             }
         }
+    }
+
+    #[test]
+    fn a_case_that_carries_no_truth_is_refused() {
+        let root = env::temp_dir().join("linejudge-a_case_with_no_truth");
+        let dir = root.join("0400-a_case_built_by_a_test");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
+        fs::write(dir.join(CASE_FILE), ONE_CASE).unwrap();
+        let faults = Corpus::read(&root).err().unwrap_or_else(|| panic!("it was read anyway"));
+        fs::remove_dir_all(&root).unwrap();
+        assert!(faults[0].message.contains("is not there"), "{faults:?}");
     }
 
     #[test]
@@ -568,6 +605,8 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
+        fs::write(dir.join(TRUTH_FILE), "/* a block\nCCcccccccc\n*/ int x = 1;\nCC ... . . ..\n")
+            .unwrap();
         fs::write(dir.join(CASE_FILE), declaration).unwrap();
         let read = Corpus::read(&root);
         fs::remove_dir_all(&root).unwrap();

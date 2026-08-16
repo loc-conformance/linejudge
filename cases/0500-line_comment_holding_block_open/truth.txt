@@ -1,0 +1,4 @@
+// this /* opens nothing
+CCcccccccccccccccccccccc
+int x = 1;
+... . . ..

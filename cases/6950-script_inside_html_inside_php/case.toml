@@ -1,0 +1,57 @@
+trap = """
+three languages deep, the everyday shape of a page: the php file holds html between its blocks,
+and the html holds a script. Every line belongs to the innermost language, and a tag's own line
+to the language that encloses the tag, so the script tags are html and the html sits between the
+php blocks"""
+
+region.required = [
+    { language = "HTML", lines = 4 },
+    { language = "JavaScript", lines = 2 },
+]
+
+[answer.mezura.content]
+real            = { lines = 11, code = 8, comments = 1, extra = 2 }
+real-regions    = [
+    { language = "HTML", lines = 4, code = 4, comments = 0, extra = 0 },
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, extra = 0 },
+]
+counted         = { lines = 11, code = 8, comments = 1, extra = 2 }
+counted-regions = []
+note            = """
+the file is read as php from beginning to end, so neither block is found; the totals survive
+because php happens to bucket every line the same way the three languages do"""
+
+[answer.mezura.region]
+real            = { lines = 11, code = 10, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "HTML", lines = 4, code = 4, comments = 0, blanks = 0 },
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 11, code = 10, comments = 1, blanks = 0 }
+counted-regions = []
+note            = """
+the file is read as php from beginning to end, so neither block is found"""
+
+[answer.scc.default]
+real            = { lines = 11, code = 10, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "HTML", lines = 4, code = 4, comments = 0, blanks = 0 },
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 11, code = 10, comments = 1, blanks = 0 }
+counted-regions = []
+note            = """
+it has no notion of a file holding a second language, and the js comment survives only because
+php spells its line comment the same way"""
+
+[answer.tokei.default]
+real            = { lines = 11, code = 10, comments = 1, blanks = 0 }
+real-regions    = [
+    { language = "HTML", lines = 4, code = 4, comments = 0, blanks = 0 },
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
+counted         = { lines = 11, code = 10, comments = 1, blanks = 0 }
+counted-regions = []
+note            = """
+a php file never yields children, so the page that nests two levels deep in a markdown fence is
+counted flat here, everything php"""

@@ -1,0 +1,6 @@
+{ a brace comment holding a *) token as text }
+CccccccccccccccccccccccccccccccccccccccccccccC
+(* a parenthesis comment holding a } token as text *)
+CCcccccccccccccccccccccccccccccccccccccccccccccccccCC
+x := 1;
+. .. ..

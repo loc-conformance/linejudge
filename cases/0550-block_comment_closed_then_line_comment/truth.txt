@@ -1,0 +1,4 @@
+/* block */ // trailing
+CCcccccccCC CCccccccccc
+int x = 1;
+... . . ..

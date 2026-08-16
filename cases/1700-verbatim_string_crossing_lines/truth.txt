@@ -1,0 +1,6 @@
+var path = @"C:\one
+... .... . SSssssss
+C:\two";
+ssssssS.
+// a real comment
+CCccccccccccccccc

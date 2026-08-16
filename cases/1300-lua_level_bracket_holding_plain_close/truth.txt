@@ -1,0 +1,8 @@
+--[==[ a long comment
+CCCCCCccccccccccccccc
+]] this is text, not the end
+cccccccccccccccccccccccccccc
+]==]
+CCCC
+x = 1
+. . .

@@ -1,0 +1,12 @@
+package main
+....... ....
+/* outer
+CCcccccc
+   /* inner */
+cccCCcccccccCC
+   still a comment
+cccccccccccccccccc
+*/
+CC
+x := 1
+. .. .

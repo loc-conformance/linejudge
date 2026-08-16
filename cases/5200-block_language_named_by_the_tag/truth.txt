@@ -1,0 +1,22 @@
+<template>
+>>>>>>>>>> HTML (optional)
+  <p>x</p>
+  ........
+</template>
+<<<<<<<<<<<
+<script lang="ts">
+>>>>>>> .....SssS> TypeScript
+// a ts comment
+CCccccccccccccc
+interface Point { x: number }
+......... ..... . .. ...... .
+</script>
+<<<<<<<<<
+<style lang="scss">
+>>>>>> .....SssssS> SCSS
+// an scss line comment, which plain css does not have
+CCcccccccccccccccccccccccccccccccccccccccccccccccccccc
+.a { .b { color: red; } }
+.. . .. . ...... .... . .
+</style>
+<<<<<<<<

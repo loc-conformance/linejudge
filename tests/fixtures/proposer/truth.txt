@@ -1,0 +1,40 @@
+<!-- a page comment -->
+CCCCccccccccccccccccCCC
+<div title="<!-- text in an attribute">
+.... ......SsssssssssssssssssssssssssS.
+<p>it's fine, an apostrophe opens nothing</p>
+....... ..... .. .......... ..... ...........
+<script type="text/typescript">
+>>>>>>> .....SsssssssssssssssS> TypeScript
+// a line comment
+CCccccccccccccccc
+/** A documented function.
+CCCccccccccccccccccccccccc Markdown (optional)
+ *
+cc
+ * The paragraph after the empty line.
+cccccccccccccccccccccccccccccccccccccc
+ */
+cCC
+function f() {
+........ ... .
+  var s = "a string";
+  ... . . SssssssssS.
+  var t = `a template
+  ... . . Sssssssssss
+still the template`;
+ssssssssssssssssssS.
+  return s + t;
+  ...... . . ..
+}
+.
+</script>
+<<<<<<<<<
+<style lang="scss">
+>>>>>> .....SssssS> SCSS
+/* a css comment */ .a { color: red; }
+CCcccccccccccccccCC .. . ...... .... .
+</style>
+<<<<<<<<
+</div>
+......

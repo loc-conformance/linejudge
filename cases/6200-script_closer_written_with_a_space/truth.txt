@@ -1,0 +1,8 @@
+<script>
+>>>>>>>> JavaScript
+var x = 1;
+... . . ..
+</script >
+<<<<<<<< <
+<p>hi</p>
+.........

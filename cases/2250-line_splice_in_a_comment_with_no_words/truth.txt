@@ -1,0 +1,8 @@
+int a = 1;
+... . . ..
+// ---- \
+CCccccccc
+int b = 2;
+cccccccccc
+int c = 3;
+... . . ..

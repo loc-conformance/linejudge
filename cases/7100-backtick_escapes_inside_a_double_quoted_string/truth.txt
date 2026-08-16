@@ -1,0 +1,6 @@
+Write-Host "a `" b"
+.......... SssssssS
+# a real comment
+Cccccccccccccccc
+$x = 1
+.. . .

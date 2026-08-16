@@ -1,0 +1,22 @@
+<?php
+.....
+?>
+>> HTML
+<div>
+.....
+<script>
+>>>>>>>> JavaScript
+// a js comment
+CCccccccccccccc
+var x = 1;
+... . . ..
+</script>
+<<<<<<<<<
+</div>
+......
+<?php
+<<<<<
+echo "hi";
+.... SssS.
+?>
+..

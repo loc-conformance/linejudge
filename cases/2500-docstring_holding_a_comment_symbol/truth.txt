@@ -1,0 +1,10 @@
+def f():
+... ....
+    """
+    SSS
+    # this is not a comment, it is inside the docstring
+sssssssssssssssssssssssssssssssssssssssssssssssssssssss
+    """
+ssssSSS
+    return 1
+    ...... .

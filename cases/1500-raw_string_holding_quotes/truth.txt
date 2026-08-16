@@ -1,0 +1,4 @@
+let a = r#"say "hi" and stay code"#;
+... . . SSSssssssssssssssssssssssSS.
+// a real comment
+CCccccccccccccccc

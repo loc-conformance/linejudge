@@ -1,0 +1,8 @@
+char *s = "line one\
+.... .. . Ssssssssss
+	// not a real comment\
+sssssssssssssssssssssss
+	line three";
+sssssssssssS.
+int x = 1;
+... . . ..

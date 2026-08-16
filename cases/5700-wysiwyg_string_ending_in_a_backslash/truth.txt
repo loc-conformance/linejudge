@@ -1,0 +1,6 @@
+auto s = r"C:\temp\";
+.... . . SSssssssssS.
+// a real comment
+CCccccccccccccccc
+int x = 1;
+... . . ..

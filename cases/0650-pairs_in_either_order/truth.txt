@@ -1,0 +1,16 @@
+int a = 1; /* note */
+... . . .. CCccccccCC
+/* note */ int b = 2;
+CCccccccCC ... . . ..
+"s" /* words */
+SsS CCcccccccCC
+/* words */ "s"
+CCcccccccCC SsS
+} /* words */
+. CCcccccccCC
+/* words */ }
+CCcccccccCC .
+; /* ---- */
+. CCccccccCC
+/* ---- */ ;
+CCccccccCC .

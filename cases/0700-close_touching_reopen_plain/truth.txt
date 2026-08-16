@@ -1,0 +1,8 @@
+/* first block
+CCcccccccccccc
+*//* second block opens where the first closed
+CCCCcccccccccccccccccccccccccccccccccccccccccc
+*/
+CC
+int x = 1;
+... . . ..

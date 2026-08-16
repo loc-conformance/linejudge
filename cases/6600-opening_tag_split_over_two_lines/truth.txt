@@ -1,0 +1,10 @@
+<script
+>>>>>>> JavaScript
+  type="text/javascript">
+  .....SsssssssssssssssS>
+// a comment inside the script
+CCcccccccccccccccccccccccccccc
+var x = 1;
+... . . ..
+</script>
+<<<<<<<<<

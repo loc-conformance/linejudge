@@ -1,0 +1,8 @@
+const char *raw = R"xy(a lone " quote and
+..... .... .... . SSSSSssssssssssssssssss
+/* this opens nothing, it is inside the raw string
+ssssssssssssssssssssssssssssssssssssssssssssssssss
+)xy";
+SSSS.
+printf("done");
+.......SssssS..

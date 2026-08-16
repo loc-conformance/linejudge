@@ -1,0 +1,12 @@
+<p>before</p>
+.............
+<SCRIPT>
+>>>>>>>> JavaScript
+// a js comment
+CCccccccccccccc
+var x = 1;
+... . . ..
+</SCRIPT>
+<<<<<<<<<
+<p>after</p>
+............

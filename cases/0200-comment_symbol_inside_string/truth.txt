@@ -1,0 +1,4 @@
+url = "http://example.com/#anchor"
+... . SssssssssssssssssssssssssssS
+value = 1
+..... . .

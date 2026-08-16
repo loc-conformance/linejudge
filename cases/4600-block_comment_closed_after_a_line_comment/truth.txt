@@ -1,0 +1,14 @@
+class Kept
+..... ....
+{
+.
+    /* Keep it for reference
+    CCcccccccccccccccccccccc
+    int old = 1;
+cccccccccccccccc
+    //*/
+ccccccCC
+    int kept = 2;
+    ... .... . ..
+}
+.

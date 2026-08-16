@@ -1,0 +1,6 @@
+/// A documented function.
+CCCccccccccccccccccccccccc Markdown (optional)
+///
+CCC
+fn documented() {}
+.. ............ ..

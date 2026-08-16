@@ -1,0 +1,4 @@
+/* 00 */ int first = 1; /* a note */
+CCccccCC ... ..... . .. CCccccccccCC
+int second = 2;
+... ...... . ..

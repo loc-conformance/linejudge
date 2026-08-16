@@ -1,0 +1,10 @@
+$s = @'
+.. . SS
+it is a here string with an apostrophe: don't
+sssssssssssssssssssssssssssssssssssssssssssss
+'@
+SS
+# a real comment
+Cccccccccccccccc
+$x = 1
+.. . .

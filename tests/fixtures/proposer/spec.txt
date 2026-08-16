@@ -1,0 +1,21 @@
+// The spec of the proposer's golden. Every shape in it is one the corpus already proved, put
+// together in one file so that the interactions are covered too: two spans on a line, spans
+// crossing lines, a tag pair, a tag carrying an attribute string, a label on a tag, a labeled
+// span nested inside a tagged region, and a line of punctuation alone.
+
+== golden
+1 C <!--| a page comment |-->
+2 S "|<!-- text in an attribute|"
+4 > (TypeScript) <script
+4 S "|text/typescript|"
+4 > >
+5 C //| a line comment
+6-9 C (Markdown optional) /**| ... |*/
+11 S "|a string|"
+12-13 S `| ... |`
+16 < </script>
+17 > (SCSS) <style
+17 S "|scss|"
+17 > >
+18 C /*| a css comment |*/
+19 < </style>

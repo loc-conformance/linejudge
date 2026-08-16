@@ -1,0 +1,4 @@
+a = "an apostrophe ' inside a double quoted string"
+. . SsssssssssssssssssssssssssssssssssssssssssssssS
+b = 'a quote " inside a single quoted string'
+. . SsssssssssssssssssssssssssssssssssssssssS

@@ -1,0 +1,14 @@
+<?php
+.....
+?>
+>> HTML
+<p>hello</p>
+............
+<!-- an html comment, which php has no symbol for -->
+CCCCccccccccccccccccccccccccccccccccccccccccccccccCCC
+<?php
+<<<<<
+echo "hi";
+.... SssS.
+?>
+..

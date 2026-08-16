@@ -1,0 +1,6 @@
+// this comment continues \
+CCccccccccccccccccccccccccc
+   onto the next line in C
+cccccccccccccccccccccccccc
+int x = 1;
+... . . ..

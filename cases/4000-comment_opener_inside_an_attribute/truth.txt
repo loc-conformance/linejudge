@@ -1,0 +1,6 @@
+<div title="<!-- this is text in an attribute">
+.... ......SsssssssssssssssssssssssssssssssssS.
+<p>first</p>
+............
+<p>second</p>
+.............

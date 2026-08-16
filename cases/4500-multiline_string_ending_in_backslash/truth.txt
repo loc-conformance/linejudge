@@ -1,0 +1,12 @@
+package main
+....... ....
+Separators :: `/\`
+.......... .. SssS
+/*
+CC
+a block comment that must be seen
+ccccccccccccccccccccccccccccccccc
+*/
+CC
+// a real comment
+CCccccccccccccccc

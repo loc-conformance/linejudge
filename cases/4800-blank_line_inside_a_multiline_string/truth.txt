@@ -1,0 +1,12 @@
+value = """
+..... . SSS
+first line of the string
+ssssssssssssssssssssssss
+
+s
+third line after a blank one
+ssssssssssssssssssssssssssss
+"""
+SSS
+print(value)
+............

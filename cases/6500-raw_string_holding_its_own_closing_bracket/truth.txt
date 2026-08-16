@@ -1,0 +1,10 @@
+const char *raw = R"(a lone " quote and
+..... .... .... . SSSssssssssssssssssss
+/* this opens nothing, it is inside the raw string
+ssssssssssssssssssssssssssssssssssssssssssssssssss
+still inside, and a lone ) is not the end
+sssssssssssssssssssssssssssssssssssssssss
+)";
+SS.
+printf(")");
+.......SsS..

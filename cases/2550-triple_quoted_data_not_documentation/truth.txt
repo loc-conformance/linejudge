@@ -1,0 +1,12 @@
+data = (
+.... . .
+"""
+SSS
+alpha
+sssss
+"""
+SSS
+)
+.
+print(data)
+...........

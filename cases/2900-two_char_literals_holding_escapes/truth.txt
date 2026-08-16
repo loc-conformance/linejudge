@@ -1,0 +1,12 @@
+fn js_escape(s: &str) -> String {
+.. ............ ..... .. ...... .
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+    ..........SssS. SssssS..........SsS. SssssS.
+}
+.
+// one
+CCcccc
+// two
+CCcccc
+// three
+CCcccccc

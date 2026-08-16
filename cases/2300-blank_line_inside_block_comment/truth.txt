@@ -1,0 +1,8 @@
+/* a block comment with a blank line inside it
+CCcccccccccccccccccccccccccccccccccccccccccccc
+
+c
+and text after the blank */
+cccccccccccccccccccccccccCC
+int x = 1;
+... . . ..

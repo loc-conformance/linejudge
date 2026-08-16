@@ -1,0 +1,8 @@
+/* block opens
+CCcccccccccccc
+// this line comment is inside the block
+cccccccccccccccccccccccccccccccccccccccc
+end of block */
+cccccccccccccCC
+int x = 1;
+... . . ..

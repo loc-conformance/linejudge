@@ -96,26 +96,26 @@ fn read_tokei(third_bucket: &str, text: &str) -> Result<Option<Measurement>, Str
     if languages.is_empty() {
         return Ok(None);
     }
-    let mut regions = Vec::new();
+    let mut summed: BTreeMap<String, (u64, u64, u64)> = BTreeMap::new();
     for language in languages.values() {
         for (name, reports) in &language.children {
-            let (mut code, mut comments, mut third) = (0u64, 0u64, 0u64);
             for report in reports {
-                code += u64::from(report.stats.code);
-                comments += u64::from(report.stats.comments);
-                third += u64::from(report.stats.blanks);
+                sum_nested_languages(name, &report.stats, &mut summed);
             }
-            regions.push(RegionCounts {
-                language: name.clone(),
-                lines: count_lines(code + comments + third, name)?,
-                buckets: buckets_of(
-                    count_lines(code, name)?,
-                    count_lines(comments, name)?,
-                    count_lines(third, name)?,
-                    third_bucket,
-                ),
-            });
         }
+    }
+    let mut regions = Vec::new();
+    for (name, (code, comments, third)) in summed {
+        regions.push(RegionCounts {
+            lines: count_lines(code + comments + third, &name)?,
+            buckets: buckets_of(
+                count_lines(code, &name)?,
+                count_lines(comments, &name)?,
+                count_lines(third, &name)?,
+                third_bucket,
+            ),
+            language: name,
+        });
     }
     let whole = u64::from(total.code) + u64::from(total.comments) + u64::from(total.blanks);
     Ok(Some(Measurement {
@@ -237,11 +237,29 @@ struct TokeiReport {
     stats: TokeiStats,
 }
 
+fn sum_nested_languages(
+    name: &str,
+    stats: &TokeiStats,
+    summed: &mut BTreeMap<String, (u64, u64, u64)>,
+) {
+    let entry = summed.entry(name.to_string()).or_default();
+    entry.0 += u64::from(stats.code);
+    entry.1 += u64::from(stats.comments);
+    entry.2 += u64::from(stats.blanks);
+    for (child, deeper) in &stats.blobs {
+        sum_nested_languages(child, deeper, summed);
+    }
+}
+
+// The blobs are how tokei nests: a report's stats carry the deeper languages, each excluding its
+// own children, so a page's script inside a fence sits two levels down and is summed from there.
 #[derive(Deserialize)]
 struct TokeiStats {
     blanks: u32,
     code: u32,
     comments: u32,
+    #[serde(default)]
+    blobs: BTreeMap<String, TokeiStats>,
 }
 
 #[derive(Deserialize)]
@@ -263,6 +281,7 @@ mod tests {
     const MEZURA: &str = include_str!("../tests/fixtures/output/mezura-nested.json");
     const TOKEI: &str = include_str!("../tests/fixtures/output/tokei-nested.json");
     const SCC: &str = include_str!("../tests/fixtures/output/scc-nested.json");
+    const TOKEI_DEEP: &str = include_str!("../tests/fixtures/output/tokei-three-levels.json");
 
     #[test]
     fn the_three_formats_agree_on_the_file_they_all_counted() {
@@ -291,6 +310,19 @@ mod tests {
         assert_eq!(as_numbers_of_region(&tokei.regions[1], "blanks"), (2, 2, 0, 0));
 
         assert!(measure(OutputFormat::SccJson, "blanks", SCC).regions.is_empty());
+    }
+
+    // Captured from a readme whose html fence holds a script: Markdown 6, HTML 4, JavaScript 2.
+    // The JavaScript sits two levels down, inside the HTML child's own blobs, which is where a
+    // reader that stops at the first level silently loses it.
+    #[test]
+    fn a_language_two_levels_down_is_read_out_of_the_blobs_and_not_lost() {
+        let tokei = measure(OutputFormat::TokeiJson, "blanks", TOKEI_DEEP);
+        assert_eq!(as_numbers(&tokei.counts, "blanks"), (12, 5, 5, 2));
+        let names: Vec<&str> = tokei.regions.iter().map(|r| r.language.as_str()).collect();
+        assert_eq!(names, ["HTML", "JavaScript"]);
+        assert_eq!(as_numbers_of_region(&tokei.regions[0], "blanks"), (4, 4, 0, 0));
+        assert_eq!(as_numbers_of_region(&tokei.regions[1], "blanks"), (2, 1, 1, 0));
     }
 
     #[test]

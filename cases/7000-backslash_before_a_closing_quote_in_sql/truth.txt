@@ -1,0 +1,6 @@
+UPDATE t SET path = 'C:\';
+...... . ... .... . SsssS.
+-- a real comment
+CCccccccccccccccc
+SELECT 2;
+...... ..

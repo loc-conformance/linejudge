@@ -1,0 +1,8 @@
+let t = `a template
+... . . Sssssssssss
+// not a comment, it is inside the template
+sssssssssssssssssssssssssssssssssssssssssss
+still the template`;
+ssssssssssssssssssS.
+let x = 1;
+... . . ..

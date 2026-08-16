@@ -1,0 +1,6 @@
+char *s = "/*";
+.... .. . SssS.
+int x = 1;
+... . . ..
+// a real comment
+CCccccccccccccccc

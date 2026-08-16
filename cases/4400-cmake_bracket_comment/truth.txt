@@ -1,0 +1,8 @@
+#[==[ a bracket comment
+CCCCCcccccccccccccccccc
+]] not the end
+cccccccccccccc
+]==]
+CCCC
+set(X 1)
+..... ..

@@ -1,0 +1,6 @@
+let msg: &'static str = "don't panic";
+... .... ........ ... . SsssssssssssS.
+// a real comment
+CCccccccccccccccc
+// a second real comment
+CCcccccccccccccccccccccc

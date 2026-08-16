@@ -1,0 +1,4 @@
+// an unmatched quote " lives here
+CCcccccccccccccccccccccccccccccccc
+let x = 1;
+... . . ..
