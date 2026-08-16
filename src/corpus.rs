@@ -467,7 +467,7 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
     fn every_case_of_the_corpus_is_read_without_a_fault() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
         match Corpus::read(&dir) {
-            Ok(corpus) => assert_eq!(corpus.cases.len(), 78),
+            Ok(corpus) => assert_eq!(corpus.cases.len(), 79),
             Err(faults) => {
                 let report: Vec<String> = faults.iter().map(|f| f.to_string()).collect();
                 panic!("{}", report.join("\n"));
