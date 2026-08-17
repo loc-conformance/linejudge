@@ -1,0 +1,6 @@
+const NAME: &str = "mezura"; /// A documented function.
+..... ..... .... . SssssssZ. CCCccccccccccccccccccccccc Markdown (optional)
+/// The paragraph after it.
+CCCcccccccccccccccccccccccc
+fn documented() {}
+.. ............ ..
