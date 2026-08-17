@@ -47,9 +47,15 @@ pub fn find_rules(counter: &str, dialect: &str) -> Option<&'static [Rule]> {
     find_dialect(counter, dialect).map(|found| found.rules)
 }
 
-/// A counter or a way of counting this suite does not know answers false, and has no rules either.
-pub fn takes_optional_regions(counter: &str, dialect: &str) -> bool {
-    find_dialect(counter, dialect).is_some_and(|found| found.takes_optional_regions)
+/// What this way of counting says about each reading a case can mark as optional: `true` where it
+/// counts that stretch as a language of its own, `false` where it leaves those lines to the code
+/// around them. A reading missing from the list is a question this dialect has not answered, which
+/// is refused rather than read as either answer.
+pub fn find_optional_readings(
+    counter: &str,
+    dialect: &str,
+) -> Option<&'static [(&'static str, bool)]> {
+    find_dialect(counter, dialect).map(|found| found.optional_readings)
 }
 
 pub fn find_every_dialect() -> impl Iterator<Item = (&'static str, &'static str)> {
@@ -78,41 +84,45 @@ struct Dialect {
     name: &'static str,
     buckets: &'static [&'static str],
     rules: &'static [Rule],
-    takes_optional_regions: bool,
+    optional_readings: &'static [(&'static str, bool)],
 }
 
 /// Every counter this suite knows and every way it has of counting: the names it gives its
-/// buckets, the rules that put each line in one of them, and whether a stretch of another language
-/// that a case marks as optional is counted on its own or left to the code around it. Case files,
-/// adapter files and what a counter prints are all checked against this table.
+/// buckets, the rules that put each line in one of them, and its answer to each reading a case can
+/// mark as optional. Case files, adapter files and what a counter prints are all checked against
+/// this table.
+///
+/// Every dialect answers every reading for itself, three of them saying the same thing today. A
+/// shared list would let one edit answer a new question on behalf of four counters, and the answer
+/// is a measurement of each.
 const DIALECTS: [Dialect; 4] = [
     Dialect {
         counter: "mezura",
         name: "content",
         buckets: &["code", "comments", "extra"],
         rules: CONTENT_RULES,
-        takes_optional_regions: false,
+        optional_readings: &[("rust-doc-comment", false), ("vue-template", false)],
     },
     Dialect {
         counter: "mezura",
         name: "region",
         buckets: &["code", "comments", "blanks"],
         rules: SHARED_RULES,
-        takes_optional_regions: false,
+        optional_readings: &[("rust-doc-comment", false), ("vue-template", false)],
     },
     Dialect {
         counter: "scc",
         name: "default",
         buckets: &["code", "comments", "blanks"],
         rules: SCC_RULES,
-        takes_optional_regions: false,
+        optional_readings: &[("rust-doc-comment", false), ("vue-template", false)],
     },
     Dialect {
         counter: "tokei",
         name: "default",
         buckets: &["code", "comments", "blanks"],
         rules: SHARED_RULES,
-        takes_optional_regions: true,
+        optional_readings: &[("rust-doc-comment", true), ("vue-template", true)],
     },
 ];
 
@@ -169,13 +179,24 @@ mod tests {
         assert_eq!(find_every_dialect().count(), 4);
     }
 
+    // Every dialect answers every reading, whatever the answer is, because a question left out is
+    // a case this suite cannot work out an answer for.
     #[test]
-    fn the_optional_regions_of_a_truth_are_tokeis_alone() {
-        assert!(takes_optional_regions("tokei", "default"));
-        for (counter, dialect) in find_every_dialect().filter(|(counter, _)| *counter != "tokei") {
-            assert!(!takes_optional_regions(counter, dialect), "{counter}.{dialect}");
+    fn every_dialect_answers_every_reading_and_tokei_is_the_one_that_counts_them() {
+        let asked: Vec<&str> = find_optional_readings("tokei", "default")
+            .unwrap()
+            .iter()
+            .map(|(reading, _)| *reading)
+            .collect();
+        assert_eq!(asked, ["rust-doc-comment", "vue-template"]);
+        for (counter, dialect) in find_every_dialect() {
+            let answers = find_optional_readings(counter, dialect).unwrap();
+            let named: Vec<&str> = answers.iter().map(|(reading, _)| *reading).collect();
+            assert_eq!(named, asked, "{counter}.{dialect}");
+            let counted = answers.iter().all(|(_, counts)| *counts);
+            assert_eq!(counted, counter == "tokei", "{counter}.{dialect}");
         }
-        assert!(!takes_optional_regions("cloc", "default"));
+        assert!(find_optional_readings("cloc", "default").is_none());
     }
 
     // Both directions matter. A rule naming a bucket that is not in the list would count lines

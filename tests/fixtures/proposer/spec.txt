@@ -10,7 +10,7 @@
 4 S "|text/typescript|"
 4 > >
 5 C //| a line comment
-6-9 C (Markdown optional) /**| ... |*/
+6-9 C (Markdown optional ts-doc-comment) /**| ... |*/
 11 S "|a string|"
 12-13 S `| ... |`
 16 < </script>

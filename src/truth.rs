@@ -1,7 +1,7 @@
 const ALPHABET: &str = "SsZCcU.>< \t";
 pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
 const KINDS: [Marks; 2] = [STRING_MARKS, COMMENT_MARKS];
-const OPTIONAL_TAG: &str = "(optional)";
+const OPTIONAL_WORD: &str = "optional";
 pub const RESIDUE: char = '.';
 pub const STRING_MARKS: Marks = Marks { name: "string", opener: 'S', interior: 's', closer: 'Z' };
 pub const TAG_CLOSES: char = '<';
@@ -103,18 +103,25 @@ pub struct TruthLine {
 }
 
 impl TruthLine {
-    /// Which region this line counts towards: the innermost one this counter counts on its own. A
-    /// counter that leaves the optional ones out gives the line to the region around them, and
-    /// `None` means the file itself.
-    pub fn find_region(&self, takes_optional: bool) -> Option<&RegionClaim> {
-        self.regions.iter().rev().find(|claim| takes_optional || !claim.optional)
+    /// Which region this line counts towards: the innermost one this counter counts on its own,
+    /// where `counted_readings` names the readings it does count. A counter that leaves one out
+    /// gives the line to the region around it, and `None` means the file itself.
+    pub fn find_region(&self, counted_readings: &[&str]) -> Option<&RegionClaim> {
+        self.regions.iter().rev().find(|claim| match &claim.reading {
+            None => true,
+            Some(reading) => counted_readings.contains(&reading.as_str()),
+        })
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegionClaim {
     pub language: String,
-    pub optional: bool,
+    /// The reading under which this stretch is a language of its own, where counting it apart and
+    /// leaving it to the code around it are both fair, and `None` where it is not in question. It
+    /// names the question a counter answers, `rust-doc-comment` rather than `Markdown`, because two
+    /// counters can answer differently about a doc comment and the same about a Vue template.
+    pub reading: Option<String>,
 }
 
 /// The three marker characters of one kind of span, so that whoever writes a marker line and
@@ -175,12 +182,11 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
         return Err(format!("[{}] labels a line that opens no tag and no span", excess.trim()));
     }
     let named = excess.trim();
-    let optional = named.ends_with(OPTIONAL_TAG);
-    let language = named.trim_end_matches(OPTIONAL_TAG).trim();
+    let (language, reading) = split_reading_off(named)?;
     if language.is_empty() || !language.chars().next().is_some_and(char::is_alphanumeric) {
         return Err(format!("[{named}] does not name a language"));
     }
-    Ok((marker, Some(RegionClaim { language: language.to_string(), optional })))
+    Ok((marker, Some(RegionClaim { language: language.to_string(), reading })))
 }
 
 // A span ends at its closing symbol where it has one, and where it has none, a line comment or a
@@ -222,6 +228,27 @@ fn check_span_structure(lines: &[RawLine], faults: &mut Vec<String>) {
             }
         }
     }
+}
+
+/// A label is `HTML` where the region is not in question and `HTML (optional vue-template)` where
+/// it is. The reading is demanded rather than defaulted: a bare `(optional)` would leave every
+/// dialect answering one question for two different ones.
+fn split_reading_off(named: &str) -> Result<(&str, Option<String>), String> {
+    let Some((language, bracketed)) = named.split_once('(') else { return Ok((named, None)) };
+    let Some(inside) = bracketed.strip_suffix(')') else {
+        return Err(format!("[{named}] leaves its bracket unclosed"));
+    };
+    let Some(reading) = inside.trim().strip_prefix(OPTIONAL_WORD) else {
+        return Err(format!("[{named}] says something other than {OPTIONAL_WORD} in its bracket"));
+    };
+    let reading = reading.trim();
+    if reading.is_empty() {
+        return Err(format!(
+            "[{named}] does not name the reading it is optional under, such as \
+             (optional vue-template)"
+        ));
+    }
+    Ok((language.trim(), Some(reading.to_string())))
 }
 
 // Regions nest, a php page holding markup that holds a script being the everyday file, and every
@@ -374,7 +401,7 @@ mod tests {
         assert_eq!(truth.lines[1].source, "// inside");
         let claim = &truth.lines[1].regions[0];
         assert_eq!(claim.language, "JavaScript");
-        assert!(!claim.optional);
+        assert_eq!(claim.reading, None, "a tagged region is not in question");
         assert!(truth.lines[0].regions.is_empty(), "the tag line belongs to the parent");
         assert!(truth.lines[2].regions.is_empty());
         assert!(truth.lines[3].regions.is_empty());
@@ -391,23 +418,26 @@ mod tests {
     #[test]
     fn a_labeled_doc_comment_covers_its_own_lines_and_stops_at_a_plain_one() {
         let input = "/// a\n///\n// plain\nfn x() {}\n";
-        let marked = "/// a\nCCCcc Markdown (optional)\n///\nCCC\n// plain\nCCcccccc\nfn x() {}\n.. . ..\n";
+        let marked = "/// a\nCCCcc Markdown (optional rust-doc-comment)\n///\nCCC\n\
+                      // plain\nCCcccccc\nfn x() {}\n.. . ..\n";
         let refused = Truth::read(marked, input);
         // The last marker above is deliberately short, so first prove the length gate still runs.
         assert!(refused.is_err());
-        let marked = "/// a\nCCCcc Markdown (optional)\n///\nCCC\n// plain\nCCcccccc\nfn x() {}\n.. ... ..\n";
+        let marked = "/// a\nCCCcc Markdown (optional rust-doc-comment)\n///\nCCC\n\
+                      // plain\nCCcccccc\nfn x() {}\n.. ... ..\n";
         let truth = Truth::read(marked, input).unwrap();
         let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
         assert_eq!(markdown(0), Some("Markdown"));
         assert_eq!(markdown(1), Some("Markdown"));
         assert_eq!(markdown(2), None, "a plain // is not part of the /// block");
-        assert!(truth.lines[0].regions[0].optional);
+        assert_eq!(truth.lines[0].regions[0].reading.as_deref(), Some("rust-doc-comment"));
     }
 
     #[test]
     fn a_labeled_multiline_span_carries_its_interior_and_its_closing_line() {
         let input = "\"\"\"\nnotes\n\"\"\"\nx = 1\n";
-        let marked = "\"\"\"\nSSS Markdown (optional)\nnotes\nsssss\n\"\"\"\nZZZ\nx = 1\n. . .\n";
+        let marked = "\"\"\"\nSSS Markdown (optional rust-doc-comment)\nnotes\nsssss\n\
+                      \"\"\"\nZZZ\nx = 1\n. . .\n";
         let truth = Truth::read(marked, input).unwrap();
         assert!(!truth.lines[1].regions.is_empty());
         assert!(!truth.lines[2].regions.is_empty(), "the closing quotes match the opening bytes");
@@ -417,8 +447,8 @@ mod tests {
     #[test]
     fn a_label_belongs_to_the_last_span_its_line_opens_and_not_to_an_earlier_one() {
         let input = "x = \"a\" /** doc\n * more\n */\n";
-        let marked = "x = \"a\" /** doc\n. . SsZ CCCcccc Markdown (optional)\n\x20* more\n\
-                      ccccccc\n\x20*/\ncUU\n";
+        let marked = "x = \"a\" /** doc\n. . SsZ CCCcccc Markdown (optional rust-doc-comment)\n\
+                      \x20* more\nccccccc\n\x20*/\ncUU\n";
         let truth = Truth::read(marked, input).unwrap();
         let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
         assert_eq!(markdown(0), Some("Markdown"));
@@ -467,7 +497,7 @@ mod tests {
         let refused = Truth::read(&unnamed, input).unwrap_err();
         assert!(refused[0].contains("names no language"), "{refused:?}");
 
-        let disagreeing = marked.replace("Z> JavaScript", "Z> JavaScript (optional)");
+        let disagreeing = marked.replace("Z> JavaScript", "Z> JavaScript (optional vue-template)");
         let refused = Truth::read(&disagreeing, input).unwrap_err();
         assert!(refused[0].contains("optional on one of its lines"), "{refused:?}");
     }
@@ -507,28 +537,29 @@ mod tests {
     #[test]
     fn a_labeled_span_inside_a_tagged_region_is_the_inner_region_of_the_two() {
         let input = "<script>\n/** doc */\n</script>\n";
-        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccUU Markdown (optional)\n\
-                      </script>\n<<<<<<<<<\n";
+        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\n\
+                      CCCcccccUU Markdown (optional rust-doc-comment)\n</script>\n<<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
         let claims: Vec<&str> =
             truth.lines[1].regions.iter().map(|c| c.language.as_str()).collect();
         assert_eq!(claims, ["TypeScript", "Markdown"]);
-        assert!(truth.lines[1].regions[1].optional);
+        assert_eq!(truth.lines[1].regions[1].reading.as_deref(), Some("rust-doc-comment"));
     }
 
     #[test]
     fn a_dialect_that_declines_an_optional_region_is_given_the_one_around_it() {
         let input = "<script>\n/** doc */\n</script>\n";
-        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccUU Markdown (optional)\n\
-                      </script>\n<<<<<<<<<\n";
+        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\n\
+                      CCCcccccUU Markdown (optional rust-doc-comment)\n</script>\n<<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
-        let charged = |at: usize, takes_optional| {
-            truth.lines[at].find_region(takes_optional).map(|claim| claim.language.as_str())
+        let charged = |at: usize, counted: &[&str]| {
+            truth.lines[at].find_region(counted).map(|claim| claim.language.as_str())
         };
-        assert_eq!(charged(1, true), Some("Markdown"));
-        assert_eq!(charged(1, false), Some("TypeScript"));
-        assert_eq!(charged(0, true), None, "and the tag line is charged to the file either way");
-        assert_eq!(charged(0, false), None);
+        assert_eq!(charged(1, &["rust-doc-comment"]), Some("Markdown"));
+        assert_eq!(charged(1, &[]), Some("TypeScript"));
+        assert_eq!(charged(1, &["vue-template"]), Some("TypeScript"), "another reading is not it");
+        assert_eq!(charged(0, &["rust-doc-comment"]), None, "the tag line is the file's anyway");
+        assert_eq!(charged(0, &[]), None);
     }
 
     #[test]

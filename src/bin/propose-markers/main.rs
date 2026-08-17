@@ -57,7 +57,11 @@ const USAGE: &str = r#"propose-markers <spec>
 
         2 > (JavaScript) <SCRIPT>
         5 < </SCRIPT>
-        1 C (Markdown optional) ///| A documented function.
+        1 C (Markdown optional rust-doc-comment) ///| A documented function.
+
+    A region that is fair to count either way says so with the word optional and the name of the
+    reading a counter answers, `rust-doc-comment` rather than `Markdown`, since one counter can
+    read a Rust doc comment as Markdown and not a Java one.
 
     A tag written over two lines is two > rows, and each of them names the language: the same
     language twice is one tag opening one region, and two different ones are two regions nested.
@@ -209,9 +213,18 @@ fn split_label(text: &str) -> Result<(Option<String>, &str), String> {
     if named.contains('|') {
         return Ok((None, text));
     }
-    let label = match named.strip_suffix(OPTIONAL_WORD) {
-        Some(language) => format!("{} ({OPTIONAL_WORD})", language.trim()),
-        None => named.trim().to_string(),
+    let named = named.trim();
+    let label = match named.rsplit_once(OPTIONAL_WORD) {
+        Some((_, reading)) if reading.trim().is_empty() => {
+            return Err(format!(
+                "[{named}] says {OPTIONAL_WORD} and does not name the reading, such as \
+                 (HTML optional vue-template)"
+            ));
+        }
+        Some((language, reading)) => {
+            format!("{} ({OPTIONAL_WORD} {})", language.trim(), reading.trim())
+        }
+        None => named.to_string(),
     };
     Ok((Some(label), inside[end + 1..].trim_start()))
 }
@@ -514,8 +527,14 @@ mod tests {
 
     #[test]
     fn a_label_on_a_span_row_names_the_region_that_span_carries() {
-        let truth = propose(&["/// a doc line"], &["1 C (Markdown optional) ///| a doc line"]);
-        assert_eq!(truth, "/// a doc line\nCCCccccccccccc Markdown (optional)\n");
+        let spec = ["1 C (Markdown optional rust-doc-comment) ///| a doc line"];
+        let truth = propose(&["/// a doc line"], &spec);
+        assert_eq!(truth, "/// a doc line\nCCCccccccccccc Markdown (optional rust-doc-comment)\n");
+
+        let unnamed = parse_row("1 C (Markdown optional) ///| a doc line")
+            .err()
+            .unwrap_or_else(|| panic!("a label with no reading was read anyway"));
+        assert!(unnamed.contains("does not name the reading"), "{unnamed}");
     }
 
     // 6400's second line, where the closer is there twice: once ending the comment above and once

@@ -1,5 +1,5 @@
 <template>
->>>>>>>>>> HTML (optional)
+>>>>>>>>>> HTML (optional vue-template)
   <p>x</p>
   ........
 </template>

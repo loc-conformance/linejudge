@@ -9,7 +9,7 @@ CCCCccccccccccccccccUUU
 // a line comment
 CCccccccccccccccc
 /** A documented function.
-CCCccccccccccccccccccccccc Markdown (optional)
+CCCccccccccccccccccccccccc Markdown (optional ts-doc-comment)
  *
 cc
  * The paragraph after the empty line.

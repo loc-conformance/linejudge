@@ -1,5 +1,5 @@
 /// A documented function.
-CCCccccccccccccccccccccccc Markdown (optional)
+CCCccccccccccccccccccccccc Markdown (optional rust-doc-comment)
 ///
 CCC
 fn documented() {}

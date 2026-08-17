@@ -1,5 +1,5 @@
 const NAME: &str = "mezura"; /// A documented function.
-..... ..... .... . SssssssZ. CCCccccccccccccccccccccccc Markdown (optional)
+..... ..... .... . SssssssZ. CCCccccccccccccccccccccccc Markdown (optional rust-doc-comment)
 /// The paragraph after it.
 CCCcccccccccccccccccccccccc
 fn documented() {}

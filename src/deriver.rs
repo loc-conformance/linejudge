@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
 use crate::answer::{Answer, Counts, RegionCounts};
-use crate::dialects::{Condition, Predicate, Rule, find_rules, takes_optional_regions};
+use crate::dialects::{Condition, Predicate, Rule, find_optional_readings, find_rules};
 use crate::truth::{Truth, TruthLine};
 use crate::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
 
 const DOC_STRING_SYMBOLS: [&str; 2] = ["\"\"\"", "'''"];
+/// The section a dialect answers its optional readings in. The dialect files themselves arrive with
+/// M7; the name is decided, and a refusal that names the section is worth more than one that does
+/// not, so it is written here until there is a file to write it in.
+const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
 
 /// The answer, and one true or false per rule of that counter saying whether the rule decided a
 /// line of this file. The second is here because "is this rule ever used" is a question about all
@@ -28,9 +32,24 @@ pub fn derive_answer(
     let Some(rules) = find_rules(counter, dialect) else {
         return Err(vec![format!("{key} is a dialect this suite has no rules for")]);
     };
-    let takes_optional = takes_optional_regions(counter, dialect);
+    let answers = find_optional_readings(counter, dialect).unwrap_or_default();
 
     let mut faults = Vec::new();
+    for reading in find_readings_of(truth) {
+        if !answers.iter().any(|(named, _)| *named == reading) {
+            faults.push(format!(
+                "{key} does not say whether it counts {reading} as a language of its own, which \
+                 this case marks as optional. Declare {reading} in the [{OPTIONAL_SECTION}] \
+                 section of this dialect file and say how you want those lines counted"
+            ));
+        }
+    }
+    if !faults.is_empty() {
+        return Err(faults);
+    }
+    let counted: Vec<&str> =
+        answers.iter().filter(|(_, counts)| *counts).map(|(named, _)| *named).collect();
+
     let mut counts = create_empty_counts(rules);
     let mut regions: BTreeMap<&str, Counts> = BTreeMap::new();
     let mut rules_that_fired = vec![false; rules.len()];
@@ -44,7 +63,7 @@ pub fn derive_answer(
             }
         };
         add_one_line(&mut counts, bucket);
-        if let Some(claim) = line.find_region(takes_optional) {
+        if let Some(claim) = line.find_region(&counted) {
             let region = regions
                 .entry(claim.language.as_str())
                 .or_insert_with(|| create_empty_counts(rules));
@@ -137,6 +156,20 @@ fn judge_line<'r>(
 /// True or false for every line of the file. A doc string is a string that opens with three quotes
 /// at the start of a line and lasts until that string closes, so a line in the middle of one holds
 /// nothing that says so, and the only way to answer is to read the file from the top.
+/// Every reading this file marks as optional, each named once, which is the set of questions a
+/// dialect has to have answered before its answer for this file can be worked out.
+fn find_readings_of(truth: &Truth) -> Vec<&str> {
+    let mut found: Vec<&str> = truth
+        .lines
+        .iter()
+        .flat_map(|line| line.regions.iter())
+        .filter_map(|claim| claim.reading.as_deref())
+        .collect();
+    found.sort_unstable();
+    found.dedup();
+    found
+}
+
 fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<bool> {
     let mut open = false;
     let mut lines = Vec::with_capacity(truth.lines.len());
@@ -252,10 +285,25 @@ mod tests {
         assert!(facts("{ x ;", ". . .").word_in_residue);
     }
 
+    // The reading a dialect has never answered is the one a new kind of case brings, and the
+    // answer cannot be guessed: reading it as a no would blame the counter for our omission.
+    #[test]
+    fn a_reading_no_dialect_has_answered_is_refused_and_says_what_to_do_about_it() {
+        let input = "/** doc */\nlet x = 1\n";
+        let marked = "/** doc */\nCCCcccccUU Markdown (optional js-jsdoc)\nlet x = 1\n... . . .\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let refused = derive_answer(&truth, "tokei", "default")
+            .err()
+            .unwrap_or_else(|| panic!("an unanswered reading was worked out anyway"));
+        assert!(refused[0].contains("js-jsdoc"), "{refused:?}");
+        assert!(refused[0].contains("[counts-as-its-own-language] section"), "{refused:?}");
+    }
+
     #[test]
     fn a_dialect_that_declines_an_optional_region_charges_its_lines_to_the_one_around_it() {
         let input = "<script>\n/** doc */\nlet x = 1\n</script>\n";
-        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\nCCCcccccUU Markdown (optional)\n\
+        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\n\
+                      CCCcccccUU Markdown (optional rust-doc-comment)\n\
                       let x = 1\n... . . .\n</script>\n<<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
         let charged = |counter, dialect| {
