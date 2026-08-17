@@ -49,7 +49,9 @@ pub struct Judged<'a> {
 }
 
 /// Runs the counter once per case, so this is as slow as the counter is, times the corpus. A case
-/// that records no answer for this way of counting is passed over rather than judged.
+/// that records no answer for this way of counting is passed over; a corpus where no case records
+/// one is refused, since a counter nobody has written an answer for would otherwise be measured
+/// against nothing and reported as agreeing on everything.
 pub fn measure_and_judge_every_case<'a>(
     adapter: &Adapter,
     dialect: &Dialect,
@@ -63,6 +65,12 @@ pub fn measure_and_judge_every_case<'a>(
         };
         let live = adapter.measure(dialect, binary, &case.input_file)?;
         judged.push(Judged { verdict: judge(answer, live.as_ref()), case, answer, live });
+    }
+    if judged.is_empty() {
+        return Err(format!(
+            "no case writes down an answer for {}.{}, so there was nothing to measure it against",
+            adapter.name_of_counter, dialect.name
+        ));
     }
     Ok(judged)
 }
@@ -86,7 +94,41 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::*;
+    use crate::adapter::Acquisition;
     use crate::answer::Counts;
+    use crate::measurement::OutputFormat;
+
+    // Every case answers all four ways of counting this suite knows, so the counter nobody has
+    // answered is invented here, and nothing runs its binary because there is no case to run it on.
+    #[test]
+    fn a_way_of_counting_no_case_answers_is_refused_instead_of_agreeing_on_nothing() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
+        let corpus = Corpus::read(&dir).unwrap_or_else(|faults| panic!("{faults:?}"));
+        let unrecorded = Adapter {
+            name_of_counter: "cloc".to_string(),
+            output_format: OutputFormat::LinejudgeJson,
+            args: vec!["{file}".to_string()],
+            version_flag: None,
+            acquisition: Acquisition {
+                channel: "crates-io".to_string(),
+                name: "cloc".to_string(),
+            },
+            dialects: vec![Dialect {
+                name: "default".to_string(),
+                args: Vec::new(),
+                buckets: &["code", "comments", "blanks"],
+            }],
+        };
+        let refused = measure_and_judge_every_case(
+            &unrecorded,
+            &unrecorded.dialects[0],
+            Path::new("a-binary-that-is-never-run"),
+            &corpus,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("a counter no case answers was reported on all the same"));
+        assert!(refused.contains("cloc.default"), "{refused}");
+    }
 
     #[test]
     fn a_counter_that_answers_what_the_case_expects_of_it_agrees() {

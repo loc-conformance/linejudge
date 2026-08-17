@@ -8,16 +8,87 @@ pub const TAG_CLOSES: char = '<';
 pub const TAG_OPENS: char = '>';
 
 /// The hand-verified spans of one case, read from its `truth.txt`: under a copy of every source
-/// line, one marker character per byte, `S` `s` `Z` for a string's opening symbol, its bytes and
-/// its closing symbol, `C` `c` `U` for a comment's, `.` for a byte outside every span, whitespace
-/// outside spans kept as it stands, and a blank line that a span is open across carrying a lone
-/// `s` or `c`. A tag that opens a stretch of another language is marked `>` and the tag that
-/// closes it `<`, the language named after the markers of the opening line; a region with no tag
-/// is the same name on the line where its span opens. Which lines belong to a region is computed,
-/// never declared.
+/// line, one marker character per character, `S` `s` `Z` for a string's opening symbol, its bytes
+/// and its closing symbol, `C` `c` `U` for a comment's, `.` for a byte outside every span,
+/// whitespace outside spans kept as it stands, and a blank line that a span is open across carrying
+/// a lone `s` or `c`. A tag that opens a stretch of another language is marked `>` and the tag that
+/// closes it `<`, with the language named after the markers of every line the opening tag covers; a
+/// region with no tag is the same name on the line where its span opens. Which lines belong to a
+/// region is computed, never declared.
 #[derive(Debug)]
 pub struct Truth {
     pub lines: Vec<TruthLine>,
+}
+
+impl Truth {
+    /// The input is the one file the truth describes, and every refusal names what went stale:
+    /// a copy that no longer matches the input is the loud failure the copies exist for.
+    pub fn read(marked: &str, input: &str) -> Result<Truth, Vec<String>> {
+        let mut faults = Vec::new();
+        let mut lines = Vec::new();
+        let mut rows = marked.lines().peekable();
+
+        for source in input.lines() {
+            let Some(copy) = rows.next() else {
+                faults.push("the truth ends before its input does".to_string());
+                return Err(faults);
+            };
+            if copy != source {
+                faults.push(format!("a copy differs from the input: [{source}] against [{copy}]"));
+                return Err(faults);
+            }
+            if !source.is_ascii() {
+                faults.push(format!(
+                    "[{source}] holds a character above ASCII, and a case input has to be ASCII: \
+                     markers are written one to a byte and read one to a character, and the two \
+                     agree only there"
+                ));
+                return Err(faults);
+            }
+            if source.is_empty() {
+                let marker = match rows.peek() {
+                    Some(&"s") | Some(&"c") => rows.next().unwrap_or_default().to_string(),
+                    _ => String::new(),
+                };
+                lines.push(RawLine { source: source.to_string(), marker, label: None });
+                continue;
+            }
+            let Some(row) = rows.next() else {
+                faults.push(format!("no marker line under [{source}]"));
+                return Err(faults);
+            };
+            match split_marker(row, source) {
+                Ok((marker, label)) => {
+                    lines.push(RawLine { source: source.to_string(), marker, label })
+                }
+                Err(message) => faults.push(message),
+            }
+        }
+        if let Some(extra) = rows.next() {
+            faults.push(format!("the truth holds [{extra}] past the end of its input"));
+        }
+        // A marker that did not parse leaves no line behind, so the walk below would be reading
+        // one file's markers against another file's lines.
+        if faults.is_empty() {
+            check_span_structure(&lines, &mut faults);
+        }
+        if !faults.is_empty() {
+            return Err(faults);
+        }
+
+        let regions = assign_regions(&lines)?;
+        Ok(Truth {
+            lines: lines
+                .into_iter()
+                .zip(regions)
+                .map(|(raw, regions)| TruthLine {
+                    source: raw.source,
+                    marker: raw.marker,
+                    regions,
+                })
+                .collect(),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -71,69 +142,6 @@ impl Marks {
     }
 }
 
-impl Truth {
-    /// The input is the one file the truth describes, and every refusal names what went stale:
-    /// a copy that no longer matches the input is the loud failure the copies exist for.
-    pub fn read(marked: &str, input: &str) -> Result<Truth, Vec<String>> {
-        let mut faults = Vec::new();
-        let mut lines = Vec::new();
-        let mut rows = marked.lines().peekable();
-
-        for source in input.lines() {
-            let Some(copy) = rows.next() else {
-                faults.push("the truth ends before its input does".to_string());
-                return Err(faults);
-            };
-            if copy != source {
-                faults.push(format!("a copy differs from the input: [{source}] against [{copy}]"));
-                return Err(faults);
-            }
-            if source.is_empty() {
-                let marker = match rows.peek() {
-                    Some(&"s") | Some(&"c") => rows.next().unwrap_or_default().to_string(),
-                    _ => String::new(),
-                };
-                lines.push(RawLine { source: source.to_string(), marker, label: None });
-                continue;
-            }
-            let Some(row) = rows.next() else {
-                faults.push(format!("no marker line under [{source}]"));
-                return Err(faults);
-            };
-            match split_marker(row, source) {
-                Ok((marker, label)) => {
-                    lines.push(RawLine { source: source.to_string(), marker, label })
-                }
-                Err(message) => faults.push(message),
-            }
-        }
-        if let Some(extra) = rows.next() {
-            faults.push(format!("the truth holds [{extra}] past the end of its input"));
-        }
-        // A marker that did not parse leaves no line behind, so the walk below would be reading
-        // one file's markers against another file's lines.
-        if faults.is_empty() {
-            check_span_structure(&lines, &mut faults);
-        }
-        if !faults.is_empty() {
-            return Err(faults);
-        }
-
-        let regions = assign_regions(&lines)?;
-        Ok(Truth {
-            lines: lines
-                .into_iter()
-                .zip(regions)
-                .map(|(raw, regions)| TruthLine {
-                    source: raw.source,
-                    marker: raw.marker,
-                    regions,
-                })
-                .collect(),
-        })
-    }
-}
-
 struct RawLine {
     source: String,
     marker: String,
@@ -144,6 +152,35 @@ enum Role {
     Opens,
     Inside,
     Closes,
+}
+
+fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>), String> {
+    let width = source.chars().count();
+    let marker: String = row.chars().take(width).collect();
+    if marker.chars().count() < width {
+        return Err(format!("the marker under [{source}] is not as long as it"));
+    }
+    if let Some(wrong) = marker.chars().find(|ch| !ALPHABET.contains(*ch)) {
+        return Err(format!("'{wrong}' under [{source}] is not on the alphabet"));
+    }
+    let excess: String = row.chars().skip(width).collect();
+    if excess.is_empty() {
+        return Ok((marker, None));
+    }
+    if !excess.starts_with(' ') {
+        return Err(format!("the marker under [{source}] runs past the end of the line"));
+    }
+    let opens_a_span = marker.chars().any(|ch| find_marks_of_opener(ch).is_some());
+    if !marker.contains(TAG_OPENS) && !opens_a_span {
+        return Err(format!("[{}] labels a line that opens no tag and no span", excess.trim()));
+    }
+    let named = excess.trim();
+    let optional = named.ends_with(OPTIONAL_TAG);
+    let language = named.trim_end_matches(OPTIONAL_TAG).trim();
+    if language.is_empty() || !language.chars().next().is_some_and(char::is_alphanumeric) {
+        return Err(format!("[{named}] does not name a language"));
+    }
+    Ok((marker, Some(RegionClaim { language: language.to_string(), optional })))
 }
 
 // A span ends at its closing symbol where it has one, and where it has none, a line comment or a
@@ -187,73 +224,52 @@ fn check_span_structure(lines: &[RawLine], faults: &mut Vec<String>) {
     }
 }
 
-fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>), String> {
-    let width = source.chars().count();
-    let marker: String = row.chars().take(width).collect();
-    if marker.chars().count() < width {
-        return Err(format!("the marker under [{source}] is not as long as it"));
-    }
-    if let Some(wrong) = marker.chars().find(|ch| !ALPHABET.contains(*ch)) {
-        return Err(format!("'{wrong}' under [{source}] is not on the alphabet"));
-    }
-    let excess: String = row.chars().skip(width).collect();
-    if excess.is_empty() {
-        return Ok((marker, None));
-    }
-    if !excess.starts_with(' ') {
-        return Err(format!("the marker under [{source}] runs past the end of the line"));
-    }
-    let opens_a_span = marker.chars().any(|ch| find_marks_of_opener(ch).is_some());
-    if !marker.contains(TAG_OPENS) && !opens_a_span {
-        return Err(format!("[{}] labels a line that opens no tag and no span", excess.trim()));
-    }
-    let named = excess.trim();
-    let optional = named.ends_with(OPTIONAL_TAG);
-    let language = named.trim_end_matches(OPTIONAL_TAG).trim();
-    if language.is_empty() || !language.chars().next().is_some_and(char::is_alphanumeric) {
-        return Err(format!("[{named}] does not name a language"));
-    }
-    Ok((marker, Some(RegionClaim { language: language.to_string(), optional })))
-}
-
 // Regions nest, a php page holding markup that holds a script being the everyday file, and every
 // line belongs to the innermost one: the tags are a stack, and a tag's own lines belong to the
 // region that encloses the tag, which for a top-level tag is the file itself.
+//
+// Every line of a tag that opens names its language, a tag written over two lines naming it twice,
+// so nothing here is worked out from where a line sits: the same language again is the tag above
+// carrying on, a different one is a region opening inside it, and no language at all is refused.
+// Two regions of one language cannot nest, since a boundary from a language to itself is not one.
 fn assign_regions(lines: &[RawLine]) -> Result<Vec<Vec<RegionClaim>>, Vec<String>> {
     let mut faults = Vec::new();
     let mut regions: Vec<Vec<RegionClaim>> = lines.iter().map(|_| Vec::new()).collect();
 
     let mut stack: Vec<RegionClaim> = Vec::new();
-    let mut group: Option<char> = None;
+    let mut named_above: Option<&RegionClaim> = None;
     for (index, line) in lines.iter().enumerate() {
         let opens = line.marker.contains(TAG_OPENS);
         let closes = line.marker.contains(TAG_CLOSES);
+        let mut named_here = None;
         if opens && closes {
             faults.push("a line both opens and closes a tag, which is not yet a shape".to_string());
-            group = None;
         } else if opens {
-            if group != Some(TAG_OPENS) {
-                match &line.label {
-                    Some(claim) => stack.push(claim.clone()),
-                    None => faults.push("an opening tag names no language".to_string()),
+            match &line.label {
+                Some(claim) => {
+                    match named_above {
+                        Some(above) if above == claim => {}
+                        Some(above) if above.language == claim.language => faults.push(format!(
+                            "one opening tag calls {} optional on one of its lines and not on the \
+                             other",
+                            claim.language
+                        )),
+                        _ => stack.push(claim.clone()),
+                    }
+                    named_here = Some(claim);
                 }
-                group = Some(TAG_OPENS);
-            } else if line.label.is_some() {
-                faults.push("a second label inside one opening tag".to_string());
+                None => faults.push("an opening tag names no language".to_string()),
             }
             regions[index] = stack[..stack.len().saturating_sub(1)].to_vec();
         } else if closes {
-            if group != Some(TAG_CLOSES) {
-                if stack.pop().is_none() {
-                    faults.push("a closing tag closes nothing".to_string());
-                }
-                group = Some(TAG_CLOSES);
+            if stack.pop().is_none() {
+                faults.push("a closing tag closes nothing".to_string());
             }
             regions[index] = stack.clone();
         } else {
-            group = None;
             regions[index] = stack.clone();
         }
+        named_above = named_here;
     }
     if !stack.is_empty() {
         faults.push("an opening tag is never closed".to_string());
@@ -279,10 +295,9 @@ fn claim_labeled_spans(
         if line.marker.contains(TAG_OPENS) {
             continue;
         }
-        let Some(marks) = line.marker.chars().find_map(find_marks_of_opener) else {
+        let Some((marks, signature)) = read_last_opener(line) else {
             continue;
         };
-        let signature = read_opening_bytes(line, marks);
         for (at, this) in lines.iter().enumerate().skip(index) {
             let belongs = at == index
                 || (is_wholly_covered(this, marks)
@@ -310,6 +325,27 @@ fn is_wholly_covered(line: &RawLine, marks: Marks) -> bool {
 
 fn begins_inside(line: &RawLine, marks: Marks) -> bool {
     line.marker.starts_with([marks.interior, marks.closer])
+}
+
+/// The kind and the opening bytes of the last span the line opens. Only the last one can still be
+/// open on the next line, so a line holding a string and then a doc comment carries its region with
+/// the comment, and a line holding two comments is signed by the second of them.
+fn read_last_opener(line: &RawLine) -> Option<(Marks, String)> {
+    let mut last: Option<(Marks, String)> = None;
+    let mut running = false;
+    for (byte, mark) in line.source.chars().zip(line.marker.chars()) {
+        match find_marks_of_opener(mark) {
+            Some(marks) => {
+                match &mut last {
+                    Some((already, bytes)) if running && *already == marks => bytes.push(byte),
+                    _ => last = Some((marks, byte.to_string())),
+                }
+                running = true;
+            }
+            None => running = false,
+        }
+    }
+    last
 }
 
 /// The source bytes under the line's first run of opening marks of this kind: `///` under `CCC`,
@@ -376,6 +412,64 @@ mod tests {
         assert!(!truth.lines[1].regions.is_empty());
         assert!(!truth.lines[2].regions.is_empty(), "the closing quotes match the opening bytes");
         assert!(truth.lines[3].regions.is_empty());
+    }
+
+    #[test]
+    fn a_label_belongs_to_the_last_span_its_line_opens_and_not_to_an_earlier_one() {
+        let input = "x = \"a\" /** doc\n * more\n */\n";
+        let marked = "x = \"a\" /** doc\n. . SsZ CCCcccc Markdown (optional)\n\x20* more\n\
+                      ccccccc\n\x20*/\ncUU\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
+        assert_eq!(markdown(0), Some("Markdown"));
+        assert_eq!(markdown(1), Some("Markdown"), "the comment carries the region, not the string");
+        assert_eq!(markdown(2), Some("Markdown"), "and its closing line with it");
+
+        let input = "/* plain */ /// doc\n/// more\n";
+        let marked = "/* plain */ /// doc\nCCcccccccUU CCCcccc Markdown\n/// more\nCCCccccc\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
+        assert_eq!(markdown(0), Some("Markdown"));
+        assert_eq!(markdown(1), Some("Markdown"), "the block is signed by /// and not by /*");
+    }
+
+    // A php page whose markup opens where the php stops and whose script opens on the very next
+    // line, so both boundaries touch, and so do both closers.
+    #[test]
+    fn tags_that_touch_open_and_close_a_region_each() {
+        let input = "?>\n<script>\nvar x = 1;\n</script>\n<?php\n";
+        let marked = "?>\n>> HTML\n<script>\n>>>>>>>> JavaScript\nvar x = 1;\n... . . ..\n\
+                      </script>\n<<<<<<<<<\n<?php\n<<<<<\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let stack = |at: usize| {
+            truth.lines[at].regions.iter().map(|c| c.language.as_str()).collect::<Vec<&str>>()
+        };
+        assert_eq!(stack(0), [] as [&str; 0]);
+        assert_eq!(stack(1), ["HTML"], "the script tag belongs to the page around it");
+        assert_eq!(stack(2), ["HTML", "JavaScript"]);
+        assert_eq!(stack(3), ["HTML"], "the first of the two closers gives its line back");
+        assert_eq!(stack(4), [] as [&str; 0]);
+    }
+
+    #[test]
+    fn a_tag_written_over_two_lines_names_its_language_on_both_and_opens_one_region() {
+        let input = "<script\n  type=\"text/javascript\">\nvar x = 1;\n</script>\n";
+        let marked = "<script\n>>>>>>> JavaScript\n  type=\"text/javascript\">\n  \
+                      .....SsssssssssssssssZ> JavaScript\nvar x = 1;\n... . . ..\n</script>\n\
+                      <<<<<<<<<\n";
+        let truth = Truth::read(marked, input).unwrap();
+        assert!(truth.lines[0].regions.is_empty());
+        assert!(truth.lines[1].regions.is_empty(), "both lines of the tag belong to the file");
+        assert_eq!(truth.lines[2].regions.len(), 1, "and one region was opened, not two");
+        assert_eq!(truth.lines[2].regions[0].language, "JavaScript");
+
+        let unnamed = marked.replace("Z> JavaScript", "Z>");
+        let refused = Truth::read(&unnamed, input).unwrap_err();
+        assert!(refused[0].contains("names no language"), "{refused:?}");
+
+        let disagreeing = marked.replace("Z> JavaScript", "Z> JavaScript (optional)");
+        let refused = Truth::read(&disagreeing, input).unwrap_err();
+        assert!(refused[0].contains("optional on one of its lines"), "{refused:?}");
     }
 
     #[test]
@@ -449,6 +543,15 @@ mod tests {
     fn a_label_on_a_line_that_opens_nothing_is_refused() {
         let refused = Truth::read("int x = 1;\n... . . .. CSS\n", "int x = 1;\n").unwrap_err();
         assert!(refused[0].contains("opens no tag and no span"), "{refused:?}");
+    }
+
+    // The refusal is what a case author meets, and before it existed they met a marker reported as
+    // running past the end of a line they had not touched.
+    #[test]
+    fn an_input_holding_a_character_above_ascii_is_refused_and_says_so() {
+        let input = "let x = 1; // καλά\n";
+        let refused = Truth::read("let x = 1; // καλά\n... . . .. CCcccccc\n", input).unwrap_err();
+        assert!(refused[0].contains("above ASCII"), "{refused:?}");
     }
 
     #[test]

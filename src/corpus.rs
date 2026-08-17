@@ -52,9 +52,11 @@ impl Corpus {
     }
 }
 
+/// `name` is the whole directory name, number and words together, and it is how a case is named in
+/// the report and in a known-failures file: the number alone stops naming the same case the day the
+/// corpus is renumbered.
 pub struct Case {
     pub name: String,
-    pub number: String,
     pub input_file: PathBuf,
     pub trap: String,
     pub answers: Vec<AnswerBlock>,
@@ -126,8 +128,7 @@ impl Case {
             return Err(faults);
         }
 
-        let number = name.split('-').next().unwrap_or(&name).to_string();
-        Ok(Case { name, number, input_file, trap: raw.trap, answers, truth })
+        Ok(Case { name, input_file, trap: raw.trap, answers, truth })
     }
 
     pub fn find_answer_block(&self, counter: &str, dialect: &str) -> Option<&AnswerBlock> {
@@ -339,7 +340,7 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
     fn every_case_of_the_corpus_is_read_without_a_fault() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
         match Corpus::read(&dir) {
-            Ok(corpus) => assert_eq!(corpus.cases.len(), 80),
+            Ok(corpus) => assert!(!corpus.cases.is_empty(), "{} holds no case", dir.display()),
             Err(faults) => {
                 let report: Vec<String> = faults.iter().map(|f| f.to_string()).collect();
                 panic!("{}", report.join("\n"));

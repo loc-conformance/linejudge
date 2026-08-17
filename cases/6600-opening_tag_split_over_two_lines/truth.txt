@@ -1,7 +1,7 @@
 <script
 >>>>>>> JavaScript
   type="text/javascript">
-  .....SsssssssssssssssZ>
+  .....SsssssssssssssssZ> JavaScript
 // a comment inside the script
 CCcccccccccccccccccccccccccccc
 var x = 1;

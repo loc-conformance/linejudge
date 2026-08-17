@@ -5,76 +5,6 @@ use self::Predicate::{
     Blank, HasResidue, InComment, InDocString, InString, WordInComment, WordInResidue,
 };
 
-const CONTENT_RULES: &[Rule] = &[
-    Rule { when: &[Holds(WordInResidue)], bucket: "code" },
-    Rule { when: &[Holds(InString), Fails(Blank), Fails(WordInResidue)], bucket: "code" },
-    // The last condition is what keeps a line like `"s" /* words */` from matching this rule and
-    // the string rule above it with two different buckets. mezura looks at a line's string before
-    // its comment, and since rules have no order, that preference has to be written as a condition.
-    Rule {
-        when: &[Holds(WordInComment), Fails(WordInResidue), Fails(InString)],
-        bucket: "comments",
-    },
-    Rule { when: &[Holds(Blank)], bucket: "extra" },
-    Rule {
-        when: &[Fails(Blank), Fails(InString), Fails(WordInResidue), Fails(WordInComment)],
-        bucket: "extra",
-    },
-];
-
-/// Every counter this suite knows and every way it has of counting: the names it gives its three
-/// buckets, the rules that put each line in one of them, and whether a stretch of another language
-/// that a case marks as optional is counted on its own or left to the code around it. Case files,
-/// adapter files and what a counter prints are all checked against this table.
-const DIALECTS: [Dialect; 4] = [
-    Dialect {
-        counter: "mezura",
-        name: "content",
-        buckets: &["code", "comments", "extra"],
-        rules: CONTENT_RULES,
-        takes_optional_regions: false,
-    },
-    Dialect {
-        counter: "mezura",
-        name: "region",
-        buckets: &["code", "comments", "blanks"],
-        rules: SHARED_RULES,
-        takes_optional_regions: false,
-    },
-    Dialect {
-        counter: "scc",
-        name: "default",
-        buckets: &["code", "comments", "blanks"],
-        rules: SCC_RULES,
-        takes_optional_regions: false,
-    },
-    Dialect {
-        counter: "tokei",
-        name: "default",
-        buckets: &["code", "comments", "blanks"],
-        rules: SHARED_RULES,
-        takes_optional_regions: true,
-    },
-];
-
-const SCC_RULES: &[Rule] = &[
-    Rule { when: &[Holds(HasResidue)], bucket: "code" },
-    Rule { when: &[Holds(InString), Fails(InDocString)], bucket: "code" },
-    // scc calls the last line of a doc string code when something else sits on it, `""" + x`, so
-    // that line has to fall through to the first rule. That is why this rule asks for nothing
-    // outside the string, and why the first rule does not have to ask about doc strings at all.
-    Rule { when: &[Holds(InDocString), Fails(HasResidue)], bucket: "comments" },
-    Rule { when: &[Holds(InComment), Fails(HasResidue), Fails(InString)], bucket: "comments" },
-    Rule { when: &[Holds(Blank), Fails(InComment), Fails(InString)], bucket: "blanks" },
-];
-
-const SHARED_RULES: &[Rule] = &[
-    Rule { when: &[Holds(HasResidue)], bucket: "code" },
-    Rule { when: &[Holds(InString)], bucket: "code" },
-    Rule { when: &[Holds(InComment), Fails(HasResidue), Fails(InString)], bucket: "comments" },
-    Rule { when: &[Holds(Blank), Fails(InComment), Fails(InString)], bucket: "blanks" },
-];
-
 /// A rule takes a line when all of its conditions hold, and puts that line in its bucket. The
 /// rules are not tried in order and neither are the conditions: a rule's conditions say everything
 /// about when it applies, and two rules taking the same line is allowed only where they name the
@@ -150,6 +80,76 @@ struct Dialect {
     rules: &'static [Rule],
     takes_optional_regions: bool,
 }
+
+/// Every counter this suite knows and every way it has of counting: the names it gives its
+/// buckets, the rules that put each line in one of them, and whether a stretch of another language
+/// that a case marks as optional is counted on its own or left to the code around it. Case files,
+/// adapter files and what a counter prints are all checked against this table.
+const DIALECTS: [Dialect; 4] = [
+    Dialect {
+        counter: "mezura",
+        name: "content",
+        buckets: &["code", "comments", "extra"],
+        rules: CONTENT_RULES,
+        takes_optional_regions: false,
+    },
+    Dialect {
+        counter: "mezura",
+        name: "region",
+        buckets: &["code", "comments", "blanks"],
+        rules: SHARED_RULES,
+        takes_optional_regions: false,
+    },
+    Dialect {
+        counter: "scc",
+        name: "default",
+        buckets: &["code", "comments", "blanks"],
+        rules: SCC_RULES,
+        takes_optional_regions: false,
+    },
+    Dialect {
+        counter: "tokei",
+        name: "default",
+        buckets: &["code", "comments", "blanks"],
+        rules: SHARED_RULES,
+        takes_optional_regions: true,
+    },
+];
+
+const CONTENT_RULES: &[Rule] = &[
+    Rule { when: &[Holds(WordInResidue)], bucket: "code" },
+    Rule { when: &[Holds(InString), Fails(Blank), Fails(WordInResidue)], bucket: "code" },
+    // The last condition is what keeps a line like `"s" /* words */` from matching this rule and
+    // the string rule above it with two different buckets. mezura looks at a line's string before
+    // its comment, and since rules have no order, that preference has to be written as a condition.
+    Rule {
+        when: &[Holds(WordInComment), Fails(WordInResidue), Fails(InString)],
+        bucket: "comments",
+    },
+    Rule { when: &[Holds(Blank)], bucket: "extra" },
+    Rule {
+        when: &[Fails(Blank), Fails(InString), Fails(WordInResidue), Fails(WordInComment)],
+        bucket: "extra",
+    },
+];
+
+const SCC_RULES: &[Rule] = &[
+    Rule { when: &[Holds(HasResidue)], bucket: "code" },
+    Rule { when: &[Holds(InString), Fails(InDocString)], bucket: "code" },
+    // scc calls the last line of a doc string code when something else sits on it, `""" + x`, so
+    // that line has to fall through to the first rule. That is why this rule asks for nothing
+    // outside the string, and why the first rule does not have to ask about doc strings at all.
+    Rule { when: &[Holds(InDocString), Fails(HasResidue)], bucket: "comments" },
+    Rule { when: &[Holds(InComment), Fails(HasResidue), Fails(InString)], bucket: "comments" },
+    Rule { when: &[Holds(Blank), Fails(InComment), Fails(InString)], bucket: "blanks" },
+];
+
+const SHARED_RULES: &[Rule] = &[
+    Rule { when: &[Holds(HasResidue)], bucket: "code" },
+    Rule { when: &[Holds(InString)], bucket: "code" },
+    Rule { when: &[Holds(InComment), Fails(HasResidue), Fails(InString)], bucket: "comments" },
+    Rule { when: &[Holds(Blank), Fails(InComment), Fails(InString)], bucket: "blanks" },
+];
 
 fn find_dialect(counter: &str, dialect: &str) -> Option<&'static Dialect> {
     DIALECTS.iter().find(|found| found.counter == counter && found.name == dialect)

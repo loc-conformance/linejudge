@@ -50,7 +50,7 @@ pub fn report_the_verdicts_of_one_dialect(
 
     let mut unnamed = 0;
     for one in judged {
-        let named = known_failures.names(&dialect.name, &one.case.number);
+        let named = known_failures.names(&dialect.name, &one.case.name);
         match (one.verdict.is_a_failure(), named) {
             (true, false) => {
                 unnamed += 1;
@@ -74,14 +74,14 @@ pub fn report_entries_that_name_nothing(
     corpus: &Corpus,
     known_failures: &KnownFailures,
 ) -> io::Result<()> {
-    for (dialect, number) in known_failures.entries() {
+    for (dialect, case_name) in known_failures.entries() {
         let dialect_is_real =
             dialect.is_none_or(|d| adapter.dialects.iter().any(|one| one.name == d));
-        let case_is_real = corpus.cases.iter().any(|case| case.number == number);
+        let case_is_real = corpus.cases.iter().any(|case| case.name == case_name);
         if !dialect_is_real || !case_is_real {
             let entry = match dialect {
-                Some(dialect) => format!("{dialect}:{number}"),
-                None => number.to_string(),
+                Some(dialect) => format!("{dialect}:{case_name}"),
+                None => case_name.to_string(),
             };
             writeln!(out, "  names nothing, take it off the list   {entry}")?;
         }

@@ -24,12 +24,16 @@ linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--c
                 [--adapters <dir>]
 
     Runs every counter it has a binary for over every case, and says for each of them whether it
-    answers what its own rules ask for. Binaries are named in linejudge-counters.toml beside this
-    command, or with --bin, which needs --counter to say whose binary it is.
+    answers what its own rules ask for. Binaries are named in linejudge-counters.toml in the
+    directory it is run from, or with --bin, which needs --counter to say whose binary it is.
+
+    The cases and the adapters are looked for in that same directory, so run it from a checkout of
+    the linejudge repository or point it at one with --corpus and --adapters.
 
     With --known-failures, the run breaks on a failing case the file does not name, and on nothing
-    else. One case per line, by number, '#' starts a comment, and 'region:2400' names one dialect
-    of the counter where naming the case alone would name them all. It needs --counter.
+    else. One case per line, named the way this report names it, '#' starts a comment, and
+    'region:2400-punctuation_only_line' names one way of counting where naming the case alone
+    names them all. It needs --counter.
 ";
 
 fn main() -> ExitCode {

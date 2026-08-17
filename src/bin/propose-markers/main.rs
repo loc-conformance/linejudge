@@ -51,13 +51,21 @@ const USAGE: &str = r#"propose-markers <spec>
         3-5 C /*| ... |*/
 
     A tag that opens a stretch of another language is a row of kind >, the language in
-    parentheses on the first row of the tag, and the tag that closes it a row of kind <; the
-    same parentheses on an S or C row label the span itself as the region, a doc comment read
-    as Markdown being the one in the corpus:
+    parentheses, and the tag that closes it a row of kind <; the same parentheses on an S or C
+    row label the span itself as the region, a doc comment read as Markdown being the one in the
+    corpus:
 
         2 > (JavaScript) <SCRIPT>
         5 < </SCRIPT>
         1 C (Markdown optional) ///| A documented function.
+
+    A tag written over two lines is two > rows, and each of them names the language: the same
+    language twice is one tag opening one region, and two different ones are two regions nested.
+    A row that leaves it out is refused when the truth is read.
+
+        1 > (JavaScript) <script
+        2 S "|text/javascript|"
+        2 > (JavaScript) >
 
     Tags nest, and every line belongs to the innermost of them, so a php file whose page holds a
     script is written as two pairs one inside the other:
@@ -488,14 +496,19 @@ mod tests {
     }
 
     #[test]
-    fn a_tag_that_spans_lines_keeps_its_attribute_string_and_takes_one_label() {
+    fn a_tag_that_spans_lines_keeps_its_attribute_string_and_names_its_language_on_both_rows() {
         let source = ["<script", "  type=\"text/javascript\">", "</script>"];
-        let spec = ["1 > (JavaScript) <script", "2 S \"|text/javascript|\"", "2 > >", "3 < </script>"];
+        let spec = [
+            "1 > (JavaScript) <script",
+            "2 S \"|text/javascript|\"",
+            "2 > (JavaScript) >",
+            "3 < </script>",
+        ];
         let truth = propose(&source, &spec);
         assert_eq!(
             truth,
             "<script\n>>>>>>> JavaScript\n  type=\"text/javascript\">\n\
-             \x20 .....SsssssssssssssssZ>\n</script>\n<<<<<<<<<\n"
+             \x20 .....SsssssssssssssssZ> JavaScript\n</script>\n<<<<<<<<<\n"
         );
     }
 
