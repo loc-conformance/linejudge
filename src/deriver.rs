@@ -1,15 +1,12 @@
 use std::collections::BTreeMap;
 
 use crate::answer::{Answer, Counts, RegionCounts};
-use crate::dialects::{Condition, Predicate, Rule, find_optional_readings, find_rules};
+use crate::dialects::{Condition, Dialect, OPTIONAL_SECTION, Predicate, Rule};
+use crate::readings::Readings;
 use crate::truth::{Truth, TruthLine};
 use crate::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
 
 const DOC_STRING_SYMBOLS: [&str; 2] = ["\"\"\"", "'''"];
-/// The section a dialect answers its optional readings in. The dialect files themselves arrive with
-/// M7; the name is decided, and a refusal that names the section is worth more than one that does
-/// not, so it is written here until there is a file to write it in.
-const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
 
 /// The answer, and one true or false per rule of that counter saying whether the rule decided a
 /// line of this file. The second is here because "is this rule ever used" is a question about all
@@ -25,31 +22,37 @@ pub struct Derivation {
 /// so there is no first one to win, and either case means the rules are wrong, not the file.
 pub fn derive_answer(
     truth: &Truth,
-    counter: &str,
-    dialect: &str,
+    dialect: &Dialect,
+    readings: &Readings,
 ) -> Result<Derivation, Vec<String>> {
-    let key = format!("{counter}.{dialect}");
-    let Some(rules) = find_rules(counter, dialect) else {
-        return Err(vec![format!("{key} is a dialect this suite has no rules for")]);
-    };
-    let answers = find_optional_readings(counter, dialect).unwrap_or_default();
+    let key = format!("{}.{}", dialect.counter, dialect.name);
 
     let mut faults = Vec::new();
-    for reading in find_readings_of(truth) {
-        if !answers.iter().any(|(named, _)| *named == reading) {
+    for reading in truth.find_optional_readings() {
+        if !dialect.optional_readings.contains_key(reading) {
+            let explained = readings
+                .find(reading)
+                .map(|found| format!(". {reading} is {}", found.sentence))
+                .unwrap_or_default();
             faults.push(format!(
                 "{key} does not say whether it counts {reading} as a language of its own, which \
                  this case marks as optional. Declare {reading} in the [{OPTIONAL_SECTION}] \
-                 section of this dialect file and say how you want those lines counted"
+                 section of {} and say how you want those lines counted{explained}",
+                dialect.file.display()
             ));
         }
     }
     if !faults.is_empty() {
         return Err(faults);
     }
-    let counted: Vec<&str> =
-        answers.iter().filter(|(_, counts)| *counts).map(|(named, _)| *named).collect();
+    let counted: Vec<&str> = dialect
+        .optional_readings
+        .iter()
+        .filter(|(_, counts)| **counts)
+        .map(|(named, _)| named.as_str())
+        .collect();
 
+    let rules = &dialect.rules;
     let mut counts = create_empty_counts(rules);
     let mut regions: BTreeMap<&str, Counts> = BTreeMap::new();
     let mut rules_that_fired = vec![false; rules.len()];
@@ -136,40 +139,29 @@ fn judge_line<'r>(
     rules: &'r [Rule],
     rules_that_fired: &mut [bool],
 ) -> Result<&'r str, String> {
-    let mut bucket: Option<&'r str> = None;
+    let mut took: Option<&'r Rule> = None;
     for (index, rule) in rules.iter().enumerate() {
         if !rule.when.iter().all(|condition| facts.meets(condition)) {
             continue;
         }
         rules_that_fired[index] = true;
-        match bucket {
-            None => bucket = Some(rule.bucket),
-            Some(already) if already == rule.bucket => {}
+        match took {
+            None => took = Some(rule),
+            Some(already) if already.bucket == rule.bucket => {}
             Some(already) => {
-                return Err(format!("two rules disagree, {already} against {}, on", rule.bucket));
+                return Err(format!(
+                    "two rules disagree, {} ({}) against {} ({}), on",
+                    already.bucket, already.name, rule.bucket, rule.name
+                ));
             }
         }
     }
-    bucket.ok_or_else(|| "no rule decides".to_string())
+    took.map(|rule| rule.bucket.as_str()).ok_or_else(|| "no rule decides".to_string())
 }
 
 /// True or false for every line of the file. A doc string is a string that opens with three quotes
 /// at the start of a line and lasts until that string closes, so a line in the middle of one holds
 /// nothing that says so, and the only way to answer is to read the file from the top.
-/// Every reading this file marks as optional, each named once, which is the set of questions a
-/// dialect has to have answered before its answer for this file can be worked out.
-fn find_readings_of(truth: &Truth) -> Vec<&str> {
-    let mut found: Vec<&str> = truth
-        .lines
-        .iter()
-        .flat_map(|line| line.regions.iter())
-        .filter_map(|claim| claim.reading.as_deref())
-        .collect();
-    found.sort_unstable();
-    found.dedup();
-    found
-}
-
 fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<bool> {
     let mut open = false;
     let mut lines = Vec::with_capacity(truth.lines.len());
@@ -205,7 +197,7 @@ fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<bool> {
 }
 
 fn create_empty_counts(rules: &[Rule]) -> Counts {
-    Counts { lines: 0, buckets: rules.iter().map(|rule| (rule.bucket.to_string(), 0)).collect() }
+    Counts { lines: 0, buckets: rules.iter().map(|rule| (rule.bucket.clone(), 0)).collect() }
 }
 
 fn add_one_line(counts: &mut Counts, bucket: &str) {
@@ -226,32 +218,39 @@ fn is_word(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+    use std::fs;
     use std::path::Path;
 
     use crate::corpus::Corpus;
     use crate::dialects::Condition::{Fails, Holds};
     use crate::dialects::Predicate::{Blank, HasResidue};
-    use crate::dialects::find_every_dialect;
+    use crate::dialects::{Dialects, read_the_shipped_dialects};
+    use crate::readings::read_the_shipped_readings;
 
     use super::*;
 
     // A rule that no case reaches has never been checked against what the counter really does.
     #[test]
     fn every_rule_of_every_dialect_decides_a_line_of_the_corpus() {
-        let corpus = read_the_corpus();
+        let dialects = read_the_shipped_dialects();
+        let readings = read_the_shipped_readings();
+        let corpus = read_the_corpus(&dialects);
         let mut dead = Vec::new();
-        for (counter, dialect) in find_every_dialect() {
-            let rules = find_rules(counter, dialect).unwrap();
-            let mut ever_fired = vec![false; rules.len()];
+        for dialect in dialects.iter() {
+            let mut ever_fired = vec![false; dialect.rules.len()];
             for case in &corpus.cases {
-                let found = derive_answer(&case.truth, counter, dialect).unwrap();
+                let found = derive_answer(&case.truth, dialect, &readings).unwrap();
                 for (ever, here) in ever_fired.iter_mut().zip(found.rules_that_fired) {
                     *ever |= here;
                 }
             }
-            for (index, fired) in ever_fired.iter().enumerate() {
+            for (rule, fired) in dialect.rules.iter().zip(ever_fired) {
                 if !fired {
-                    dead.push(format!("{counter}.{dialect} rule {} decides no line", index + 1));
+                    dead.push(format!(
+                        "{}.{} rule {} decides no line",
+                        dialect.counter, dialect.name, rule.name
+                    ));
                 }
             }
         }
@@ -261,17 +260,22 @@ mod tests {
     #[test]
     fn a_line_no_rule_decides_and_two_rules_that_disagree_are_both_refused() {
         let facts = Facts::of(&create_a_line("x = 1", ". . ."), false);
+        let rule = |name: &str, when: Vec<Condition>, bucket: &str| Rule {
+            name: name.to_string(),
+            when,
+            bucket: bucket.to_string(),
+        };
 
-        let silent: &[Rule] = &[Rule { when: &[Holds(Blank)], bucket: "blanks" }];
-        let refused = judge_line(&facts, silent, &mut [false]).unwrap_err();
+        let silent = [rule("blank-line", vec![Holds(Blank)], "blanks")];
+        let refused = judge_line(&facts, &silent, &mut [false]).unwrap_err();
         assert!(refused.contains("no rule decides"), "{refused}");
 
-        let disagreeing: &[Rule] = &[
-            Rule { when: &[Holds(HasResidue)], bucket: "code" },
-            Rule { when: &[Fails(Blank)], bucket: "comments" },
+        let disagreeing = [
+            rule("residue", vec![Holds(HasResidue)], "code"),
+            rule("not-blank", vec![Fails(Blank)], "comments"),
         ];
-        let refused = judge_line(&facts, disagreeing, &mut [false, false]).unwrap_err();
-        assert!(refused.contains("code against comments"), "{refused}");
+        let refused = judge_line(&facts, &disagreeing, &mut [false, false]).unwrap_err();
+        assert!(refused.contains("code (residue) against comments (not-blank)"), "{refused}");
     }
 
     // No file in the corpus holds a character above ASCII, so this is the only place that tests
@@ -292,11 +296,17 @@ mod tests {
         let input = "/** doc */\nlet x = 1\n";
         let marked = "/** doc */\nCCCcccccUU Markdown (optional js-jsdoc)\nlet x = 1\n... . . .\n";
         let truth = Truth::read(marked, input).unwrap();
-        let refused = derive_answer(&truth, "tokei", "default")
+        let dialects = read_the_shipped_dialects();
+        let readings = create_readings_that_define(
+            "[js-jsdoc]\nsentence = \"the body of a JSDoc comment\"\nwitness = \"0100-a_case\"\n",
+        );
+        let refused = derive_answer(&truth, dialects.find("tokei", "default").unwrap(), &readings)
             .err()
             .unwrap_or_else(|| panic!("an unanswered reading was worked out anyway"));
         assert!(refused[0].contains("js-jsdoc"), "{refused:?}");
         assert!(refused[0].contains("[counts-as-its-own-language] section"), "{refused:?}");
+        assert!(refused[0].contains("default.toml"), "{refused:?}");
+        assert!(refused[0].contains("js-jsdoc is the body of a JSDoc comment"), "{refused:?}");
     }
 
     #[test]
@@ -306,8 +316,10 @@ mod tests {
                       CCCcccccUU Markdown (optional rust-doc-comment)\n\
                       let x = 1\n... . . .\n</script>\n<<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
+        let dialects = read_the_shipped_dialects();
+        let readings = read_the_shipped_readings();
         let charged = |counter, dialect| {
-            derive_answer(&truth, counter, dialect)
+            derive_answer(&truth, dialects.find(counter, dialect).unwrap(), &readings)
                 .unwrap()
                 .real
                 .regions
@@ -325,8 +337,14 @@ mod tests {
         let input = "\"\"\"\nnotes\n\"\"\"\nx = 1\n";
         let marked = "\"\"\"\nSSS\nnotes\nsssss\n\"\"\"\nZZZ\nx = 1\n. . .\n";
         let truth = Truth::read(marked, input).unwrap();
+        let dialects = read_the_shipped_dialects();
+        let readings = read_the_shipped_readings();
         let bucket = |counter, dialect, name: &str| {
-            derive_answer(&truth, counter, dialect).unwrap().real.counts.buckets[name]
+            derive_answer(&truth, dialects.find(counter, dialect).unwrap(), &readings)
+                .unwrap()
+                .real
+                .counts
+                .buckets[name]
         };
         assert_eq!(bucket("scc", "default", "comments"), 3);
         assert_eq!(bucket("scc", "default", "code"), 1);
@@ -334,9 +352,9 @@ mod tests {
         assert_eq!(bucket("tokei", "default", "code"), 4);
     }
 
-    fn read_the_corpus() -> Corpus {
+    fn read_the_corpus(dialects: &Dialects) -> Corpus {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
-        Corpus::read(&dir).unwrap_or_else(|faults| {
+        Corpus::read(&dir, dialects).unwrap_or_else(|faults| {
             let report: Vec<String> = faults.iter().map(|fault| fault.to_string()).collect();
             panic!("{}", report.join("\n"))
         })
@@ -344,5 +362,15 @@ mod tests {
 
     fn create_a_line(source: &str, marker: &str) -> TruthLine {
         TruthLine { source: source.to_string(), marker: marker.to_string(), regions: Vec::new() }
+    }
+
+    fn create_readings_that_define(text: &str) -> Readings {
+        let dir = env::temp_dir().join("linejudge-a_reading_with_a_sentence");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("readings.toml"), text).unwrap();
+        let readings = Readings::read(&dir).unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+        readings
     }
 }

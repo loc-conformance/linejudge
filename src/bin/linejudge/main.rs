@@ -12,6 +12,7 @@ use linejudge::adapter::Adapter;
 use linejudge::corpus::Corpus;
 use linejudge::counters::COUNTERS_FILE;
 use linejudge::counters::Counters;
+use linejudge::dialects::Dialects;
 use linejudge::known_failures::KnownFailures;
 use linejudge::verdict::measure_and_judge_every_case;
 
@@ -19,16 +20,18 @@ use crate::report::{report_entries_that_name_nothing, report_the_verdicts_of_one
 
 const ADAPTERS_DIR: &str = "adapters";
 const CASES_DIR: &str = "cases";
+const DIALECTS_DIR: &str = "dialects";
 const USAGE: &str = "\
 linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--corpus <dir>]
-                [--adapters <dir>]
+                [--adapters <dir>] [--dialects <dir>]
 
     Runs every counter it has a binary for over every case, and says for each of them whether it
     answers what its own rules ask for. Binaries are named in linejudge-counters.toml in the
     directory it is run from, or with --bin, which needs --counter to say whose binary it is.
 
-    The cases and the adapters are looked for in that same directory, so run it from a checkout of
-    the linejudge repository or point it at one with --corpus and --adapters.
+    The cases, the dialects and the adapters are looked for in that same directory, so run it from
+    a checkout of the linejudge repository or point it at one with --corpus, --dialects and
+    --adapters.
 
     With --known-failures, the run breaks on a failing case the file does not name, and on nothing
     else. One case per line, named the way this report names it, '#' starts a comment, and
@@ -80,10 +83,11 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         writeln!(out, "{USAGE}")?;
         return Ok(false);
     }
-    let corpus = read_the_corpus(&settings.corpus)?;
+    let dialects = Dialects::read(&settings.dialects).map_err(|faults| faults.join("\n"))?;
+    let corpus = read_the_corpus(&settings.corpus, &dialects)?;
     let adapters = match &settings.name_of_counter {
-        Some(name) => vec![Adapter::read_one(&settings.adapters, name)?],
-        None => Adapter::read_all(&settings.adapters)?,
+        Some(name) => vec![Adapter::read_one(&settings.adapters, name, &dialects)?],
+        None => Adapter::read_all(&settings.adapters, &dialects)?,
     };
     // With --bin there is no reason to open linejudge-counters.toml, the desired
     // counter tool has been named
@@ -139,6 +143,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
 struct Settings {
     corpus: PathBuf,
     adapters: PathBuf,
+    dialects: PathBuf,
     name_of_counter: Option<String>,
     binary: Option<PathBuf>,
     known_failures: Option<PathBuf>,
@@ -150,6 +155,7 @@ impl Settings {
         let mut settings = Settings {
             corpus: PathBuf::from(CASES_DIR),
             adapters: PathBuf::from(ADAPTERS_DIR),
+            dialects: PathBuf::from(DIALECTS_DIR),
             name_of_counter: None,
             binary: None,
             known_failures: None,
@@ -171,6 +177,7 @@ impl Settings {
                 "--help" | "-h" => settings.wants_help = true,
                 "--corpus" => settings.corpus = PathBuf::from(value_of(&flag, &mut args)?),
                 "--adapters" => settings.adapters = PathBuf::from(value_of(&flag, &mut args)?),
+                "--dialects" => settings.dialects = PathBuf::from(value_of(&flag, &mut args)?),
                 "--counter" => settings.name_of_counter = Some(value_of(&flag, &mut args)?),
                 "--bin" => settings.binary = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--known-failures" => {
@@ -196,8 +203,8 @@ fn value_of(flag: &str, args: &mut IntoIter<String>) -> Result<String, String> {
     args.next().ok_or_else(|| format!("{flag} was given nothing"))
 }
 
-fn read_the_corpus(dir: &Path) -> Result<Corpus, String> {
-    let corpus = Corpus::read(dir).map_err(|faults| {
+fn read_the_corpus(dir: &Path, dialects: &Dialects) -> Result<Corpus, String> {
+    let corpus = Corpus::read(dir, dialects).map_err(|faults| {
         let mut report = format!("{} cases could not be read:", faults.len());
         for fault in &faults {
             report.push_str(&format!("\n  {fault}"));

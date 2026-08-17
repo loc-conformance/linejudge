@@ -89,6 +89,20 @@ impl Truth {
                 .collect(),
         })
     }
+
+    /// Every reading this truth marks as optional, each named once, which is the set of questions
+    /// a dialect has to have answered before its answer for this file can be worked out.
+    pub fn find_optional_readings(&self) -> Vec<&str> {
+        let mut found: Vec<&str> = self
+            .lines
+            .iter()
+            .flat_map(|line| line.regions.iter())
+            .filter_map(|claim| claim.reading.as_deref())
+            .collect();
+        found.sort_unstable();
+        found.dedup();
+        found
+    }
 }
 
 #[derive(Debug)]

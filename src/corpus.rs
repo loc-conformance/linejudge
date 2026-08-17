@@ -8,7 +8,8 @@ use serde::Deserialize;
 
 use crate::answer::{Answer, Counts, RegionCounts};
 use crate::deriver::derive_answer;
-use crate::dialects::{check_buckets, find_buckets};
+use crate::dialects::{Dialects, check_buckets};
+use crate::readings::{READINGS_FILE, Readings};
 use crate::truth::Truth;
 
 const CASE_FILE: &str = "case.toml";
@@ -20,7 +21,13 @@ pub struct Corpus {
 }
 
 impl Corpus {
-    pub fn read(dir: &Path) -> Result<Corpus, Vec<Fault>> {
+    pub fn read(dir: &Path, dialects: &Dialects) -> Result<Corpus, Vec<Fault>> {
+        let readings = match Readings::read(dir) {
+            Ok(readings) => readings,
+            Err(message) => {
+                return Err(vec![Fault { case: READINGS_FILE.to_string(), message }]);
+            }
+        };
         let mut dirs = match fs::read_dir(dir) {
             Ok(entries) => entries
                 .filter_map(|e| e.ok())
@@ -39,10 +46,15 @@ impl Corpus {
         let mut cases = Vec::with_capacity(dirs.len());
         let mut faults = Vec::new();
         for path in dirs {
-            match Case::read(&path) {
+            match Case::read(&path, dialects, &readings) {
                 Ok(case) => cases.push(case),
                 Err(mut found) => faults.append(&mut found),
             }
+        }
+        // A witness that a broken case fails to be would be blamed twice, so the check waits for
+        // a corpus whose cases all read.
+        if faults.is_empty() {
+            check_witnesses(&readings, &cases, &mut faults);
         }
         if faults.is_empty() {
             Ok(Corpus { cases })
@@ -64,7 +76,7 @@ pub struct Case {
 }
 
 impl Case {
-    pub fn read(dir: &Path) -> Result<Case, Vec<Fault>> {
+    pub fn read(dir: &Path, dialects: &Dialects, readings: &Readings) -> Result<Case, Vec<Fault>> {
         let name = dir
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -110,9 +122,20 @@ impl Case {
                     .collect());
             }
         };
-        for (counter, dialects) in raw.answer {
-            for (dialect, raw) in dialects {
-                match AnswerBlock::of(counter.clone(), dialect, raw, &truth) {
+        for reading in truth.find_optional_readings() {
+            if readings.find(reading).is_none() {
+                faults.push(Fault {
+                    case: name.clone(),
+                    message: format!(
+                        "{TRUTH_FILE} marks the reading {reading}, which {READINGS_FILE} does \
+                         not define"
+                    ),
+                });
+            }
+        }
+        for (counter, blocks) in raw.answer {
+            for (dialect, raw) in blocks {
+                match AnswerBlock::of(counter.clone(), dialect, raw, &truth, dialects, readings) {
                     Ok(answer) => answers.push(answer),
                     Err(messages) => faults.extend(
                         messages.into_iter().map(|message| Fault { case: name.clone(), message }),
@@ -160,12 +183,14 @@ impl AnswerBlock {
         dialect: String,
         raw: RawAnswer,
         truth: &Truth,
+        dialects: &Dialects,
+        readings: &Readings,
     ) -> Result<AnswerBlock, Vec<String>> {
         let key = format!("{name_of_counter}.{dialect}");
-        let Some(buckets) = find_buckets(&name_of_counter, &dialect) else {
+        let Some(found) = dialects.find(&name_of_counter, &dialect) else {
             return Err(vec![format!("{key} is a block of no counter this suite knows")]);
         };
-        let real = derive_answer(truth, &name_of_counter, &dialect)?.real;
+        let real = derive_answer(truth, found, readings)?.real;
 
         if raw.unclaimed {
             if raw.counted.is_some() || raw.counted_regions.is_some() || raw.note.is_some() {
@@ -192,11 +217,11 @@ impl AnswerBlock {
         let counted =
             Answer { counts: counted.into(), regions: regions_of(raw.counted_regions) };
 
-        if let Err(wrong) = check_buckets(&counted.counts.buckets, buckets) {
+        if let Err(wrong) = check_buckets(&counted.counts.buckets, &found.buckets) {
             faults.push(format!("{key}.counted {wrong}"));
         }
         for region in &counted.regions {
-            if let Err(wrong) = check_buckets(&region.buckets, buckets) {
+            if let Err(wrong) = check_buckets(&region.buckets, &found.buckets) {
                 faults.push(format!("{key} region {} {wrong}", region.language));
             }
         }
@@ -266,6 +291,25 @@ fn find_input_file_in(dir: &Path) -> Result<PathBuf, String> {
     }
 }
 
+fn check_witnesses(readings: &Readings, cases: &[Case], faults: &mut Vec<Fault>) {
+    for (name, reading) in readings.iter() {
+        let one = |message: String| Fault { case: READINGS_FILE.to_string(), message };
+        match cases.iter().find(|case| case.name == reading.witness) {
+            None => faults.push(one(format!(
+                "{name} names {} as its witness, and there is no case of that name",
+                reading.witness
+            ))),
+            Some(case) if !case.truth.find_optional_readings().contains(&name.as_str()) => {
+                faults.push(one(format!(
+                    "{name} names {} as its witness, and that case marks no such reading",
+                    reading.witness
+                )));
+            }
+            Some(_) => {}
+        }
+    }
+}
+
 fn regions_of(raw: Option<Vec<RawRegionCounts>>) -> Vec<RegionCounts> {
     let mut regions: Vec<RegionCounts> =
         raw.unwrap_or_default().into_iter().map(RegionCounts::from).collect();
@@ -316,6 +360,8 @@ struct RawRegionCounts {
 mod tests {
     use std::env;
 
+    use crate::dialects::read_the_shipped_dialects;
+
     use super::*;
 
     // Two lines whose right answer the rules work out as one comment and one code line, so a
@@ -339,7 +385,7 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
     #[test]
     fn every_case_of_the_corpus_is_read_without_a_fault() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
-        match Corpus::read(&dir) {
+        match Corpus::read(&dir, &read_the_shipped_dialects()) {
             Ok(corpus) => assert!(!corpus.cases.is_empty(), "{} holds no case", dir.display()),
             Err(faults) => {
                 let report: Vec<String> = faults.iter().map(|f| f.to_string()).collect();
@@ -356,7 +402,9 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
         fs::write(dir.join(CASE_FILE), ONE_CASE).unwrap();
-        let faults = Corpus::read(&root).err().unwrap_or_else(|| panic!("it was read anyway"));
+        let faults = Corpus::read(&root, &read_the_shipped_dialects())
+            .err()
+            .unwrap_or_else(|| panic!("it was read anyway"));
         fs::remove_dir_all(&root).unwrap();
         assert!(faults[0].message.contains("is not there"), "{faults:?}");
     }
@@ -364,12 +412,17 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
     #[test]
     fn every_case_of_the_corpus_answers_every_counter_this_suite_knows() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
-        let corpus = Corpus::read(&dir).unwrap_or_else(|_| panic!("the corpus does not read"));
+        let dialects = read_the_shipped_dialects();
+        let corpus =
+            Corpus::read(&dir, &dialects).unwrap_or_else(|_| panic!("the corpus does not read"));
         let mut silent = Vec::new();
         for case in &corpus.cases {
-            for (counter, dialect) in crate::dialects::find_every_dialect() {
-                if case.find_answer_block(counter, dialect).is_none() {
-                    silent.push(format!("{} says nothing about {counter}.{dialect}", case.name));
+            for dialect in dialects.iter() {
+                if case.find_answer_block(&dialect.counter, &dialect.name).is_none() {
+                    silent.push(format!(
+                        "{} says nothing about {}.{}",
+                        case.name, dialect.counter, dialect.name
+                    ));
                 }
             }
         }
@@ -424,6 +477,53 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
     }
 
     #[test]
+    fn a_truth_marking_a_reading_the_corpus_does_not_define_is_refused() {
+        let case = "trap = \"\"\"\na doc comment read as its own language\"\"\"\n\n\
+                    [answer.tokei.default]\n\
+                    counted = { lines = 2, code = 1, comments = 1, blanks = 0 }\n";
+        let faults = build_and_read_the_case(
+            "a_reading_nobody_defined",
+            case,
+            "input.rs",
+            "/** doc */\nlet x = 1\n",
+            "/** doc */\nCCCcccccUU Markdown (optional js-jsdoc)\nlet x = 1\n... . . .\n",
+        )
+        .err()
+        .unwrap_or_else(|| panic!("the case was read anyway"));
+        let wanted = "marks the reading js-jsdoc, which readings.toml does not define";
+        assert!(faults.iter().any(|f| f.message.contains(wanted)), "{faults:?}");
+    }
+
+    #[test]
+    fn the_witness_of_a_reading_has_to_exist_and_to_mark_it() {
+        let root = env::temp_dir().join("linejudge-a_witness_that_is_not_there");
+        let dir = root.join("0400-a_case_built_by_a_test");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
+        let marked = "/* a block\nCCcccccccc\n*/ int x = 1;\nUU ... . . ..\n";
+        fs::write(dir.join(TRUTH_FILE), marked).unwrap();
+        fs::write(dir.join(CASE_FILE), ONE_CASE).unwrap();
+        let reading = |witness: &str| {
+            format!("[js-jsdoc]\nsentence = \"the body of a JSDoc comment\"\nwitness = \"{witness}\"\n")
+        };
+        let read_and_refuse = || {
+            Corpus::read(&root, &read_the_shipped_dialects())
+                .err()
+                .unwrap_or_else(|| panic!("it was read anyway"))
+        };
+
+        fs::write(root.join("readings.toml"), reading("0500-not_here")).unwrap();
+        let missing = read_and_refuse();
+        assert!(missing[0].message.contains("there is no case of that name"), "{missing:?}");
+
+        fs::write(root.join("readings.toml"), reading("0400-a_case_built_by_a_test")).unwrap();
+        let unmarked = read_and_refuse();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(unmarked[0].message.contains("marks no such reading"), "{unmarked:?}");
+    }
+
+    #[test]
     fn a_case_file_that_still_writes_down_the_right_answer_is_refused() {
         let case = ONE_CASE.replace(
             "[answer.tokei.default]",
@@ -467,7 +567,7 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
         fs::write(dir.join(input_file), input).unwrap();
         fs::write(dir.join(TRUTH_FILE), marked).unwrap();
         fs::write(dir.join(CASE_FILE), declaration).unwrap();
-        let read = Corpus::read(&root);
+        let read = Corpus::read(&root, &read_the_shipped_dialects());
         fs::remove_dir_all(&root).unwrap();
         read
     }

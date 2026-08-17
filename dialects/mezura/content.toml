@@ -1,0 +1,35 @@
+counter = "mezura"
+dialect = "content"
+buckets = ["code", "comments", "extra"]
+
+[counts-as-its-own-language]
+rust-doc-comment = false
+vue-template = false
+
+[[rule]]
+name   = "words-outside-spans-are-code"
+when   = ["word-in-residue"]
+bucket = "code"
+
+[[rule]]
+name   = "string-content-is-code"
+when   = ["in-string", "!blank", "!word-in-residue"]
+bucket = "code"
+
+# The !in-string is what keeps a line like `"s" /* words */` from matching this rule and the
+# string rule above with two different buckets: mezura reads a line's string before its comment,
+# and rules have no order here, so that preference has to be written as a condition.
+[[rule]]
+name   = "words-only-in-a-comment-are-comments"
+when   = ["word-in-comment", "!word-in-residue", "!in-string"]
+bucket = "comments"
+
+[[rule]]
+name   = "blank-is-extra-wherever-it-sits"
+when   = ["blank"]
+bucket = "extra"
+
+[[rule]]
+name   = "punctuation-alone-is-extra"
+when   = ["!blank", "!in-string", "!word-in-residue", "!word-in-comment"]
+bucket = "extra"

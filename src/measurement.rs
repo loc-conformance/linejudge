@@ -26,7 +26,7 @@ pub enum OutputFormat {
 /// answer as zeroes.
 pub fn read_output(
     output: OutputFormat,
-    buckets: &[&str],
+    buckets: &[String],
     text: &str,
 ) -> Result<Option<Answer>, String> {
     match output {
@@ -39,7 +39,7 @@ pub fn read_output(
 
 // The format an adapter outside this repository prints, already in the shape the checker wants,
 // with the buckets carrying the dialect's own names. `null` is a file the counter does not claim.
-fn read_linejudge(buckets: &[&str], text: &str) -> Result<Option<Answer>, String> {
+fn read_linejudge(buckets: &[String], text: &str) -> Result<Option<Answer>, String> {
     let raw: Option<LinejudgeAnswer> = parse(text)?;
     let Some(raw) = raw else { return Ok(None) };
     check_buckets(&raw.buckets, buckets)?;
@@ -59,7 +59,7 @@ fn read_linejudge(buckets: &[&str], text: &str) -> Result<Option<Answer>, String
     }))
 }
 
-fn read_mezura(buckets: &[&str], text: &str) -> Result<Option<Answer>, String> {
+fn read_mezura(buckets: &[String], text: &str) -> Result<Option<Answer>, String> {
     let run: MezuraRun = parse(text)?;
     let Some(language) = run.languages.first() else { return Ok(None) };
     let mut regions = Vec::new();
@@ -79,7 +79,7 @@ fn read_mezura(buckets: &[&str], text: &str) -> Result<Option<Answer>, String> {
     }))
 }
 
-fn read_tokei(buckets: &[&str], text: &str) -> Result<Option<Answer>, String> {
+fn read_tokei(buckets: &[String], text: &str) -> Result<Option<Answer>, String> {
     let mut languages: BTreeMap<String, TokeiLanguage> = parse(text)?;
     let Some(total) = languages.remove(TOKEI_TOTAL) else {
         return Err(format!("no {TOKEI_TOTAL} in what tokei printed"));
@@ -119,7 +119,7 @@ fn read_tokei(buckets: &[&str], text: &str) -> Result<Option<Answer>, String> {
     }))
 }
 
-fn read_scc(buckets: &[&str], text: &str) -> Result<Option<Answer>, String> {
+fn read_scc(buckets: &[String], text: &str) -> Result<Option<Answer>, String> {
     let rows: Vec<SccRow> = parse(text)?;
     if rows.is_empty() {
         return Ok(None);
@@ -150,12 +150,12 @@ fn count_lines(counted: u64, whose: &str) -> Result<u32, String> {
 
 fn read_buckets(
     printed: &BTreeMap<&str, u64>,
-    wanted: &[&str],
+    wanted: &[String],
     counter: &str,
 ) -> Result<BTreeMap<String, u32>, String> {
     let mut counts = BTreeMap::new();
     for bucket in wanted {
-        let Some(number) = printed.get(bucket) else {
+        let Some(number) = printed.get(bucket.as_str()) else {
             let named: Vec<&str> = printed.keys().copied().collect();
             return Err(format!(
                 "{counter} printed no {bucket} for this file, it printed {}",
@@ -163,7 +163,7 @@ fn read_buckets(
             ));
         };
         let whose = format!("{counter}'s {bucket}");
-        counts.insert((*bucket).to_string(), count_lines(*number, &whose)?);
+        counts.insert(bucket.clone(), count_lines(*number, &whose)?);
     }
     Ok(counts)
 }
@@ -324,7 +324,7 @@ mod tests {
         assert_eq!(as_numbers(&region.counts, "blanks"), (13, 9, 3, 1));
         assert_eq!(region.regions[1].buckets["blanks"], 1);
 
-        let wrong = read_output(OutputFormat::MezuraJson, &WITH_BLANKS, MEZURA).unwrap_err();
+        let wrong = read_output(OutputFormat::MezuraJson, &named(&WITH_BLANKS), MEZURA).unwrap_err();
         assert!(wrong.contains("printed no blanks"), "{wrong}");
     }
 
@@ -365,7 +365,7 @@ mod tests {
             (OutputFormat::SccJson, "[]"),
         ];
         for (output, text) in nothing {
-            assert!(read_output(output, &WITH_BLANKS, text).unwrap().is_none());
+            assert!(read_output(output, &named(&WITH_BLANKS), text).unwrap().is_none());
         }
     }
 
@@ -377,7 +377,7 @@ mod tests {
         let uniform = measure(OutputFormat::LinejudgeJson, &WITH_BLANKS, text);
         assert_eq!(as_numbers(&uniform.counts, "blanks"), (4, 2, 1, 1));
         assert_eq!(as_numbers_of_region(&uniform.regions[0], "blanks"), (2, 1, 1, 0));
-        let nothing = read_output(OutputFormat::LinejudgeJson, &WITH_BLANKS, "null");
+        let nothing = read_output(OutputFormat::LinejudgeJson, &named(&WITH_BLANKS), "null");
         assert!(nothing.unwrap().is_none());
     }
 
@@ -392,7 +392,7 @@ mod tests {
         let uniform = measure(OutputFormat::LinejudgeJson, &four, text);
         assert_eq!(uniform.counts.buckets["documentation"], 1);
 
-        let refused = read_output(OutputFormat::TokeiJson, &four, TOKEI).unwrap_err();
+        let refused = read_output(OutputFormat::TokeiJson, &named(&four), TOKEI).unwrap_err();
         assert!(refused.contains("printed no documentation"), "{refused}");
         assert!(refused.contains("blanks, code, comments"), "{refused}");
     }
@@ -411,18 +411,23 @@ mod tests {
     #[test]
     fn a_bucket_this_dialect_has_not_is_refused_by_its_name() {
         let text = r#"{"lines": 4, "buckets": {"code": 2, "comments": 1, "blank": 1}}"#;
-        let refused = read_output(OutputFormat::LinejudgeJson, &WITH_BLANKS, text).unwrap_err();
+        let refused =
+            read_output(OutputFormat::LinejudgeJson, &named(&WITH_BLANKS), text).unwrap_err();
         assert!(refused.contains("no blanks"), "{refused}");
     }
 
     #[test]
     fn output_that_does_not_parse_is_an_error_and_not_an_absent_answer() {
-        let broken = read_output(OutputFormat::TokeiJson, &WITH_BLANKS, "not json at all");
+        let broken = read_output(OutputFormat::TokeiJson, &named(&WITH_BLANKS), "not json at all");
         assert!(broken.unwrap_err().contains("does not parse"));
     }
 
     fn measure(output: OutputFormat, buckets: &[&str], text: &str) -> Answer {
-        read_output(output, buckets, text).unwrap().unwrap()
+        read_output(output, &named(buckets), text).unwrap().unwrap()
+    }
+
+    fn named(buckets: &[&str]) -> Vec<String> {
+        buckets.iter().map(|bucket| bucket.to_string()).collect()
     }
 
     fn as_numbers(counts: &Counts, third: &str) -> (u32, u32, u32, u32) {

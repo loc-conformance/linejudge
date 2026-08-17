@@ -1,0 +1,27 @@
+counter = "tokei"
+dialect = "default"
+buckets = ["code", "comments", "blanks"]
+
+[counts-as-its-own-language]
+rust-doc-comment = true
+vue-template = true
+
+[[rule]]
+name   = "anything-outside-spans-is-code"
+when   = ["has-residue"]
+bucket = "code"
+
+[[rule]]
+name   = "a-string-is-code"
+when   = ["in-string"]
+bucket = "code"
+
+[[rule]]
+name   = "a-comment-alone-is-comments"
+when   = ["in-comment", "!has-residue", "!in-string"]
+bucket = "comments"
+
+[[rule]]
+name   = "blank-outside-everything-is-blank"
+when   = ["blank", "!in-comment", "!in-string"]
+bucket = "blanks"

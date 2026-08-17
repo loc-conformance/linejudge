@@ -1,0 +1,37 @@
+counter = "scc"
+dialect = "default"
+buckets = ["code", "comments", "blanks"]
+
+[counts-as-its-own-language]
+rust-doc-comment = false
+vue-template = false
+
+[[rule]]
+name   = "anything-outside-spans-is-code"
+when   = ["has-residue"]
+bucket = "code"
+
+[[rule]]
+name   = "a-plain-string-is-code"
+when   = ["in-string", "!in-doc-string"]
+bucket = "code"
+
+# The closing line is the only line of a doc string that can hold anything outside the string:
+# the lines between the delimiters are string through and through, and the opening line has only
+# whitespace before its quotes. scc calls that closing line code when something sits on it
+# (`""" + x`), so it has to fall through to anything-outside-spans-is-code, which is why this
+# rule asks for nothing outside the string.
+[[rule]]
+name   = "a-doc-string-is-documentation"
+when   = ["in-doc-string", "!has-residue"]
+bucket = "comments"
+
+[[rule]]
+name   = "a-comment-alone-is-comments"
+when   = ["in-comment", "!has-residue", "!in-string"]
+bucket = "comments"
+
+[[rule]]
+name   = "blank-outside-everything-is-blank"
+when   = ["blank", "!in-comment", "!in-string"]
+bucket = "blanks"

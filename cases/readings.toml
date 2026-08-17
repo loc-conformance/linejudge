@@ -1,0 +1,12 @@
+# Every reading a truth may mark as `(optional <name>)`: a stretch of a file that a counter may
+# fairly count as a language of its own or leave to the code around it. Each entry says what the
+# reading is and names one case that marks it. Every dialect answers each of these in the
+# [counts-as-its-own-language] section of its own file.
+
+[rust-doc-comment]
+sentence = "the body of a doc comment, a Rust /// block, which a counter may read as a stretch of Markdown documentation of its own"
+witness = "4900-doc_comment_with_no_text"
+
+[vue-template]
+sentence = "the markup inside a Vue file's <template> block, which a counter may read as a stretch of HTML of its own"
+witness = "5100-vue_blocks_count_as_their_own_languages"

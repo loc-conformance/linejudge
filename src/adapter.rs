@@ -4,8 +4,8 @@ use std::process::Command;
 
 use serde::Deserialize;
 
-use crate::dialects::find_buckets;
 use crate::answer::Answer;
+use crate::dialects::Dialects;
 use crate::measurement::{OutputFormat, read_output};
 
 const ADAPTER_EXTENSION: &str = "toml";
@@ -29,15 +29,19 @@ pub struct Adapter {
 }
 
 impl Adapter {
-    pub fn read_one(dir: &Path, name_of_counter: &str) -> Result<Adapter, String> {
+    pub fn read_one(
+        dir: &Path,
+        name_of_counter: &str,
+        dialects: &Dialects,
+    ) -> Result<Adapter, String> {
         let path = dir.join(format!("{name_of_counter}.{ADAPTER_EXTENSION}"));
         if !path.is_file() {
             return Err(format!("{} does not exist, so {name_of_counter} is a counter this suite cannot run", path.display()));
         }
-        Adapter::read(&path)
+        Adapter::read(&path, dialects)
     }
 
-    pub fn read_all(dir: &Path) -> Result<Vec<Adapter>, String> {
+    pub fn read_all(dir: &Path, dialects: &Dialects) -> Result<Vec<Adapter>, String> {
         let entries =
             fs::read_dir(dir).map_err(|e| format!("{} could not be opened: {e}", dir.display()))?;
         let mut paths: Vec<PathBuf> = entries
@@ -48,12 +52,12 @@ impl Adapter {
         paths.sort();
         let mut adapters = Vec::new();
         for path in paths {
-            adapters.push(Adapter::read(&path)?);
+            adapters.push(Adapter::read(&path, dialects)?);
         }
         Ok(adapters)
     }
 
-    fn read(path: &Path) -> Result<Adapter, String> {
+    fn read(path: &Path, dialects: &Dialects) -> Result<Adapter, String> {
         let text = fs::read_to_string(path)
             .map_err(|e| format!("{} could not be read: {e}", path.display()))?;
         let raw: RawAdapter = toml::from_str(&text)
@@ -69,9 +73,9 @@ impl Adapter {
         if !raw.args.iter().any(|a| a == FILE_PLACEHOLDER) {
             return Err(format!("{} names no {FILE_PLACEHOLDER} to count", path.display()));
         }
-        let mut dialects = Vec::new();
+        let mut ways = Vec::new();
         for (name, dialect) in raw.dialect {
-            let Some(buckets) = find_buckets(&raw.name, &name) else {
+            let Some(found) = dialects.find(&raw.name, &name) else {
                 return Err(format!("{}: {} is a dialect this suite has no buckets for", path.display(), name));
             };
             if let Some(misplaced) = dialect.args.iter().find(|a| a.contains(FILE_PLACEHOLDER)) {
@@ -82,12 +86,12 @@ impl Adapter {
                     name
                 ));
             }
-            dialects.push(Dialect { name, args: dialect.args, buckets });
+            ways.push(Dialect { name, args: dialect.args, buckets: found.buckets.clone() });
         }
-        if dialects.is_empty() {
+        if ways.is_empty() {
             return Err(format!("{} names no way of counting to run", path.display()));
         }
-        dialects.sort_by(|a, b| a.name.cmp(&b.name));
+        ways.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(Adapter {
             name_of_counter: raw.name,
             output_format: raw.output,
@@ -98,7 +102,7 @@ impl Adapter {
                 None => Some(VERSION_FLAG.to_string()),
             },
             acquisition: raw.acquisition,
-            dialects,
+            dialects: ways,
         })
     }
 
@@ -110,7 +114,7 @@ impl Adapter {
     ) -> Result<Option<Answer>, String> {
         let args = self.build_args(dialect, file);
         let printed = run_counter(binary, &args)?;
-        read_output(self.output_format, dialect.buckets, &printed)
+        read_output(self.output_format, &dialect.buckets, &printed)
             .map_err(|e| format!("{} on {}: {e}", self.name_of_counter, file.display()))
     }
 
@@ -143,7 +147,7 @@ impl Adapter {
 pub struct Dialect {
     pub name: String,
     pub args: Vec<String>,
-    pub buckets: &'static [&'static str],
+    pub buckets: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -188,12 +192,14 @@ struct RawDialect {
 mod tests {
     use std::env;
 
+    use crate::dialects::read_the_shipped_dialects;
+
     use super::*;
 
     #[test]
     fn every_shipped_adapter_is_read_and_names_a_dialect_this_suite_knows() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let adapters = Adapter::read_all(&dir).unwrap();
+        let adapters = Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap();
         let names: Vec<&str> = adapters.iter().map(|a| a.name_of_counter.as_str()).collect();
         assert_eq!(names, ["mezura", "scc", "tokei"]);
         let mezura = &adapters[0];
@@ -207,8 +213,9 @@ mod tests {
     #[test]
     fn one_counter_named_opens_its_own_file_and_no_other() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        assert_eq!(Adapter::read_one(&dir, "scc").unwrap().name_of_counter, "scc");
-        let missing = Adapter::read_one(&dir, "cloc").unwrap_err();
+        let dialects = read_the_shipped_dialects();
+        assert_eq!(Adapter::read_one(&dir, "scc", &dialects).unwrap().name_of_counter, "scc");
+        let missing = Adapter::read_one(&dir, "cloc", &dialects).unwrap_err();
         assert!(missing.contains("cannot run"), "{missing}");
     }
 
@@ -219,7 +226,7 @@ mod tests {
             "name = \"scc\"\noutput = \"scc-json\"\nargs = [\"{file}\"]\n\
              [acquisition]\nchannel = \"crates-io\"\nname = \"scc\"\n[dialect.default]\nargs = []\n",
         );
-        let refused = Adapter::read(&path).unwrap_err();
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("the file named after it"), "{refused}");
     }
@@ -227,7 +234,7 @@ mod tests {
     #[test]
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let mezura = &Adapter::read_all(&dir).unwrap()[0];
+        let mezura = &Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap()[0];
         let args = mezura.build_args(&mezura.dialects[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
@@ -236,7 +243,7 @@ mod tests {
     #[test]
     fn a_version_nobody_answers_is_unknown_and_stops_nothing() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let tokei = &Adapter::read_all(&dir).unwrap()[2];
+        let tokei = &Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap()[2];
         assert_eq!(tokei.version_flag.as_deref(), Some("--version"));
         assert_eq!(tokei.read_version_or_unknown(Path::new("a-binary-that-does-not-exist")), "unknown version");
 
@@ -245,7 +252,7 @@ mod tests {
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\nversion-flag = \"\"\n\
              [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
         );
-        let unversioned = Adapter::read(&path).unwrap();
+        let unversioned = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert_eq!(unversioned.version_flag, None);
         assert_eq!(unversioned.read_version_or_unknown(Path::new("irrelevant")), "unknown version");
@@ -258,7 +265,7 @@ mod tests {
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect]\n",
         );
-        let refused = Adapter::read(&path).unwrap_err();
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("no way of counting"), "{refused}");
     }
@@ -271,7 +278,7 @@ mod tests {
              [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n\
              [dialect.default]\nargs = [\"{file}\"]\n",
         );
-        let refused = Adapter::read(&path).unwrap_err();
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("the arguments every dialect shares"), "{refused}");
     }
@@ -283,7 +290,7 @@ mod tests {
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"--output\", \"json\"]\n\
              [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
         );
-        let refused = Adapter::read(&path).unwrap_err();
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("{file}"), "{refused}");
     }
@@ -295,7 +302,7 @@ mod tests {
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.strict]\nargs = []\n",
         );
-        let refused = Adapter::read(&path).unwrap_err();
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("no buckets for"), "{refused}");
     }

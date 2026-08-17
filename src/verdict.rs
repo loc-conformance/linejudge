@@ -96,6 +96,7 @@ mod tests {
     use super::*;
     use crate::adapter::Acquisition;
     use crate::answer::Counts;
+    use crate::dialects::read_the_shipped_dialects;
     use crate::measurement::OutputFormat;
 
     // Every case answers all four ways of counting this suite knows, so the counter nobody has
@@ -103,7 +104,8 @@ mod tests {
     #[test]
     fn a_way_of_counting_no_case_answers_is_refused_instead_of_agreeing_on_nothing() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
-        let corpus = Corpus::read(&dir).unwrap_or_else(|faults| panic!("{faults:?}"));
+        let corpus =
+            Corpus::read(&dir, &read_the_shipped_dialects()).unwrap_or_else(|faults| panic!("{faults:?}"));
         let unrecorded = Adapter {
             name_of_counter: "cloc".to_string(),
             output_format: OutputFormat::LinejudgeJson,
@@ -116,7 +118,7 @@ mod tests {
             dialects: vec![Dialect {
                 name: "default".to_string(),
                 args: Vec::new(),
-                buckets: &["code", "comments", "blanks"],
+                buckets: vec!["code".to_string(), "comments".to_string(), "blanks".to_string()],
             }],
         };
         let refused = measure_and_judge_every_case(
