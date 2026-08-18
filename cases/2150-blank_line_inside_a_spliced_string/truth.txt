@@ -1,0 +1,8 @@
+char *s = "abc \
+.... .. . Ssssss
+
+s
+// a comment once the string has ended";
+CCcccccccccccccccccccccccccccccccccccccc
+int x = 1;
+... . . ..

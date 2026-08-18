@@ -1,0 +1,6 @@
+int a = 1; // comment \
+... . . .. CCcccccccccc
+   joined to the comment
+cccccccccccccccccccccccc
+int x = 1;
+... . . ..

@@ -3,14 +3,10 @@ Lua writes a string with the same long brackets its comments use, so the -- insi
 and the line holding the closing bracket is still the string"""
 
 [answer.mezura.content]
-counted = { lines = 3, code = 1, comments = 1, extra = 1 }
-note    = """
-the string form of the long bracket is not declared, so the -- inside it opens a comment"""
+counted = { lines = 3, code = 3, comments = 0, extra = 0 }
 
 [answer.mezura.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-note    = """
-the string form of the long bracket is not declared, so the -- inside it opens a comment"""
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
 
 [answer.scc.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
