@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 const DIALECT_EXTENSION: &str = "toml";
 pub const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
-const PREDICATES: [(&str, Predicate); 7] = [
+pub const PREDICATES: [(&str, Predicate); 7] = [
     ("blank", Predicate::Blank),
     ("has-residue", Predicate::HasResidue),
     ("in-comment", Predicate::InComment),

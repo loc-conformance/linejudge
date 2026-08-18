@@ -110,6 +110,8 @@ mod tests {
             name_of_counter: "cloc".to_string(),
             output_format: OutputFormat::LinejudgeJson,
             args: vec!["{file}".to_string()],
+            explain_args: None,
+            explain_keep_from: None,
             version_flag: None,
             acquisition: Acquisition {
                 channel: "crates-io".to_string(),

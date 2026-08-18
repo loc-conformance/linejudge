@@ -148,7 +148,7 @@ fn format_as_one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn format_counts(counts: &Counts) -> String {
+pub fn format_counts(counts: &Counts) -> String {
     let mut named = vec![format!("{} lines", counts.lines)];
     named.extend(counts.buckets.iter().map(|(name, value)| format!("{value} {name}")));
     named.join(", ")

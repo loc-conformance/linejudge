@@ -23,6 +23,14 @@ pub struct Adapter {
     pub name_of_counter: String,
     pub output_format: OutputFormat,
     pub args: Vec<String>,
+    /// The command line that asks the counter for its own analysis of a file line by line, in
+    /// place of `args`, with the dialect's arguments appended the same way. `None` is a counter
+    /// with no such command, which is not a failure of any kind.
+    pub explain_args: Option<Vec<String>>,
+    /// What of that analysis is worth showing: only the lines holding this text, each from the
+    /// text to its end. Chooses lines and never reads them, so it is not a parser; where nothing
+    /// matches, everything is shown and the report says so.
+    pub explain_keep_from: Option<String>,
     pub version_flag: Option<String>,
     pub acquisition: Acquisition,
     pub dialects: Vec<Dialect>,
@@ -73,6 +81,30 @@ impl Adapter {
         if !raw.args.iter().any(|a| a == FILE_PLACEHOLDER) {
             return Err(format!("{} names no {FILE_PLACEHOLDER} to count", path.display()));
         }
+        if let Some(explain) = &raw.explain_args
+            && !explain.iter().any(|a| a == FILE_PLACEHOLDER)
+        {
+            return Err(format!(
+                "{} names no {FILE_PLACEHOLDER} in its explain-args",
+                path.display()
+            ));
+        }
+        match &raw.explain_keep_from {
+            Some(_) if raw.explain_args.is_none() => {
+                return Err(format!(
+                    "{} declares explain-keep-from with no explain-args to trim",
+                    path.display()
+                ));
+            }
+            Some(keep) if keep.is_empty() => {
+                return Err(format!(
+                    "{} declares an empty explain-keep-from, which keeps everything, so leave \
+                     the field out",
+                    path.display()
+                ));
+            }
+            _ => {}
+        }
         let mut ways = Vec::new();
         for (name, dialect) in raw.dialect {
             let Some(found) = dialects.find(&raw.name, &name) else {
@@ -96,6 +128,8 @@ impl Adapter {
             name_of_counter: raw.name,
             output_format: raw.output,
             args: raw.args,
+            explain_args: raw.explain_args,
+            explain_keep_from: raw.explain_keep_from,
             version_flag: match raw.version_flag {
                 Some(flag) if flag.is_empty() => None,
                 Some(flag) => Some(flag),
@@ -128,18 +162,35 @@ impl Adapter {
         }
     }
 
+    /// Runs the counter's own per-line command and hands back what it printed, as it printed it.
+    /// `None` is an adapter that declares no such command, and an error is printed by the caller
+    /// rather than ending anything, since this output is a diagnostic for a person.
+    pub fn run_explain(
+        &self,
+        dialect: &Dialect,
+        binary: &Path,
+        file: &Path,
+    ) -> Option<Result<String, String>> {
+        let base = self.explain_args.as_ref()?;
+        Some(run_counter(binary, &build_command_args(base, dialect, file)))
+    }
+
     pub fn format_command(&self, dialect: &Dialect, binary: &Path, file: &Path) -> String {
         format!("{} {}", binary.display(), self.build_args(dialect, file).join(" "))
     }
 
+    pub fn format_explain_command(
+        &self,
+        dialect: &Dialect,
+        binary: &Path,
+        file: &Path,
+    ) -> Option<String> {
+        let base = self.explain_args.as_ref()?;
+        Some(format!("{} {}", binary.display(), build_command_args(base, dialect, file).join(" ")))
+    }
+
     fn build_args(&self, dialect: &Dialect, file: &Path) -> Vec<String> {
-        let mut args: Vec<String> = self
-            .args
-            .iter()
-            .map(|a| a.replace(FILE_PLACEHOLDER, &file.display().to_string()))
-            .collect();
-        args.extend(dialect.args.iter().cloned());
-        args
+        build_command_args(&self.args, dialect, file)
     }
 }
 
@@ -155,6 +206,15 @@ pub struct Dialect {
 pub struct Acquisition {
     pub channel: String,
     pub name: String,
+}
+
+fn build_command_args(base: &[String], dialect: &Dialect, file: &Path) -> Vec<String> {
+    let mut args: Vec<String> = base
+        .iter()
+        .map(|a| a.replace(FILE_PLACEHOLDER, &file.display().to_string()))
+        .collect();
+    args.extend(dialect.args.iter().cloned());
+    args
 }
 
 // Only stdout is read. mezura writes its warnings to stderr, and a counter that says something
@@ -176,6 +236,10 @@ struct RawAdapter {
     name: String,
     output: OutputFormat,
     args: Vec<String>,
+    #[serde(rename = "explain-args")]
+    explain_args: Option<Vec<String>>,
+    #[serde(rename = "explain-keep-from")]
+    explain_keep_from: Option<String>,
     #[serde(rename = "version-flag")]
     version_flag: Option<String>,
     acquisition: Acquisition,
@@ -238,6 +302,58 @@ mod tests {
         let args = mezura.build_args(&mezura.dialects[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
+    }
+
+    #[test]
+    fn the_per_line_command_is_declared_per_counter_and_has_to_name_the_file() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
+        let adapters = Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap();
+        let scc = &adapters[1];
+        let command = scc
+            .format_explain_command(&scc.dialects[0], Path::new("scc.exe"), Path::new("input.py"))
+            .unwrap();
+        assert_eq!(command, "scc.exe -t --no-cocomo -f csv input.py");
+        assert_eq!(scc.explain_keep_from.as_deref(), Some("line "));
+        let tokei = &adapters[2];
+        assert!(tokei.explain_args.is_none());
+        assert!(
+            tokei
+                .format_explain_command(&tokei.dialects[0], Path::new("t.exe"), Path::new("a.py"))
+                .is_none()
+        );
+
+        let path = write_an_adapter(
+            "an_explain_command_with_no_file",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-args = [\"-t\"]\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(refused.contains("no {file} in its explain-args"), "{refused}");
+    }
+
+    #[test]
+    fn a_keep_from_needs_a_command_to_trim_and_may_not_be_empty() {
+        let alone = write_an_adapter(
+            "a_keep_from_with_no_command",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-keep-from = \"line \"\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&alone, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(alone.parent().unwrap()).unwrap();
+        assert!(refused.contains("no explain-args to trim"), "{refused}");
+
+        let empty = write_an_adapter(
+            "an_empty_keep_from",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-args = [\"-t\", \"{file}\"]\nexplain-keep-from = \"\"\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&empty, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(empty.parent().unwrap()).unwrap();
+        assert!(refused.contains("keeps everything"), "{refused}");
     }
 
     #[test]

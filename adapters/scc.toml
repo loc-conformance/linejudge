@@ -1,6 +1,8 @@
 name   = "scc"
 output = "scc-json"
 args   = ["--format", "json", "{file}"]
+explain-args = ["-t", "--no-cocomo", "-f", "csv", "{file}"]
+explain-keep-from = "line "
 
 [acquisition]
 channel = "github-release-asset"

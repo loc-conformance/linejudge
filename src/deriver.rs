@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::answer::{Answer, Counts, RegionCounts};
-use crate::dialects::{Condition, Dialect, OPTIONAL_SECTION, Predicate, Rule};
+use crate::dialects::{Condition, Dialect, OPTIONAL_SECTION, PREDICATES, Predicate, Rule};
 use crate::readings::Readings;
 use crate::truth::{Truth, TruthLine};
 use crate::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
@@ -26,31 +26,11 @@ pub fn derive_answer(
     readings: &Readings,
 ) -> Result<Derivation, Vec<String>> {
     let key = format!("{}.{}", dialect.counter, dialect.name);
-
-    let mut faults = Vec::new();
-    for reading in truth.find_optional_readings() {
-        if !dialect.optional_readings.contains_key(reading) {
-            let explained = readings
-                .find(reading)
-                .map(|found| format!(". {reading} is {}", found.sentence))
-                .unwrap_or_default();
-            faults.push(format!(
-                "{key} does not say whether it counts {reading} as a language of its own, which \
-                 this case marks as optional. Declare {reading} in the [{OPTIONAL_SECTION}] \
-                 section of {} and say how you want those lines counted{explained}",
-                dialect.file.display()
-            ));
-        }
-    }
+    let mut faults = check_readings_are_answered(truth, dialect, readings);
     if !faults.is_empty() {
         return Err(faults);
     }
-    let counted: Vec<&str> = dialect
-        .optional_readings
-        .iter()
-        .filter(|(_, counts)| **counts)
-        .map(|(named, _)| named.as_str())
-        .collect();
+    let counted = collect_counted_readings(dialect);
 
     let rules = &dialect.rules;
     let mut counts = create_empty_counts(rules);
@@ -86,6 +66,60 @@ pub fn derive_answer(
         })
         .collect();
     Ok(Derivation { real: Answer { counts, regions }, rules_that_fired })
+}
+
+/// One line of the file as this dialect's rules read it, for a person asking why the counts came
+/// out the way they did.
+pub struct ExplainedLine {
+    pub bucket: String,
+    /// The rules that took the line, two names where two rules agree on it.
+    pub rules: Vec<String>,
+    /// The predicates that hold on the line; one that is not named does not hold.
+    pub holds: Vec<&'static str>,
+    /// The language this line counts towards, and `None` is the file itself.
+    pub region: Option<String>,
+}
+
+/// The same derivation as `derive_answer`, kept line by line instead of summed: every line goes
+/// through the same `judge_line`, so what this says and what the counts say cannot part.
+pub fn explain_every_line(
+    truth: &Truth,
+    dialect: &Dialect,
+    readings: &Readings,
+) -> Result<Vec<ExplainedLine>, Vec<String>> {
+    let key = format!("{}.{}", dialect.counter, dialect.name);
+    let faults = check_readings_are_answered(truth, dialect, readings);
+    if !faults.is_empty() {
+        return Err(faults);
+    }
+    let counted = collect_counted_readings(dialect);
+
+    let rules = &dialect.rules;
+    let mut lines = Vec::with_capacity(truth.lines.len());
+    let mut faults = Vec::new();
+    for (line, in_doc_string) in truth.lines.iter().zip(find_lines_in_a_doc_string(truth)) {
+        let facts = Facts::of(line, in_doc_string);
+        let mut fired = vec![false; rules.len()];
+        let bucket = match judge_line(&facts, rules, &mut fired) {
+            Ok(bucket) => bucket.to_string(),
+            Err(message) => {
+                faults.push(format!("{key}: {message} [{}]", line.source));
+                continue;
+            }
+        };
+        lines.push(ExplainedLine {
+            bucket,
+            rules: rules
+                .iter()
+                .zip(&fired)
+                .filter(|(_, fired)| **fired)
+                .map(|(rule, _)| rule.name.clone())
+                .collect(),
+            holds: facts.find_predicates_that_hold(),
+            region: line.find_region(&counted).map(|claim| claim.language.clone()),
+        });
+    }
+    if faults.is_empty() { Ok(lines) } else { Err(faults) }
 }
 
 /// One field per `Predicate`, answered for a single line by reading its characters together with
@@ -132,6 +166,14 @@ impl Facts {
             Predicate::WordInResidue => self.word_in_residue,
         }
     }
+
+    fn find_predicates_that_hold(&self) -> Vec<&'static str> {
+        PREDICATES
+            .iter()
+            .filter(|(_, predicate)| self.holds(*predicate))
+            .map(|(name, _)| *name)
+            .collect()
+    }
 }
 
 fn judge_line<'r>(
@@ -157,6 +199,39 @@ fn judge_line<'r>(
         }
     }
     took.map(|rule| rule.bucket.as_str()).ok_or_else(|| "no rule decides".to_string())
+}
+
+fn check_readings_are_answered(
+    truth: &Truth,
+    dialect: &Dialect,
+    readings: &Readings,
+) -> Vec<String> {
+    let key = format!("{}.{}", dialect.counter, dialect.name);
+    let mut faults = Vec::new();
+    for reading in truth.find_optional_readings() {
+        if !dialect.optional_readings.contains_key(reading) {
+            let explained = readings
+                .find(reading)
+                .map(|found| format!(". {reading} is {}", found.sentence))
+                .unwrap_or_default();
+            faults.push(format!(
+                "{key} does not say whether it counts {reading} as a language of its own, which \
+                 this case marks as optional. Declare {reading} in the [{OPTIONAL_SECTION}] \
+                 section of {} and say how you want those lines counted{explained}",
+                dialect.file.display()
+            ));
+        }
+    }
+    faults
+}
+
+fn collect_counted_readings(dialect: &Dialect) -> Vec<&str> {
+    dialect
+        .optional_readings
+        .iter()
+        .filter(|(_, counts)| **counts)
+        .map(|(named, _)| named.as_str())
+        .collect()
 }
 
 /// True or false for every line of the file. A doc string is a string that opens with three quotes
@@ -330,6 +405,41 @@ mod tests {
         let named = |language: &str, lines| (language.to_string(), lines);
         assert_eq!(charged("tokei", "default"), [named("Markdown", 1), named("TypeScript", 1)]);
         assert_eq!(charged("mezura", "region"), [named("TypeScript", 2)]);
+
+        let doc_line_of = |counter, dialect| {
+            explain_every_line(&truth, dialects.find(counter, dialect).unwrap(), &readings)
+                .unwrap()
+                .remove(1)
+                .region
+        };
+        assert_eq!(doc_line_of("tokei", "default").as_deref(), Some("Markdown"));
+        assert_eq!(doc_line_of("mezura", "region").as_deref(), Some("TypeScript"));
+    }
+
+    // The heading of an explanation and the counts of the derivation both come out of judge_line,
+    // and this is the assertion that they cannot part.
+    #[test]
+    fn every_line_is_explained_by_the_same_rules_that_count_it() {
+        let input = "\"\"\"\nnotes\n\"\"\"\nx = 1\n";
+        let marked = "\"\"\"\nSSS\nnotes\nsssss\n\"\"\"\nZZZ\nx = 1\n. . .\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let dialects = read_the_shipped_dialects();
+        let readings = read_the_shipped_readings();
+        let scc = dialects.find("scc", "default").unwrap();
+
+        let explained = explain_every_line(&truth, scc, &readings).unwrap();
+        assert_eq!(explained[0].bucket, "comments");
+        assert_eq!(explained[0].rules, ["a-doc-string-is-documentation"]);
+        assert!(explained[0].holds.contains(&"in-doc-string"), "{:?}", explained[0].holds);
+        assert_eq!(explained[3].bucket, "code");
+        assert_eq!(explained[3].rules, ["anything-outside-spans-is-code"]);
+        assert_eq!(explained[3].region, None);
+
+        let counted = derive_answer(&truth, scc, &readings).unwrap().real.counts;
+        for (name, value) in &counted.buckets {
+            let of = explained.iter().filter(|line| &line.bucket == name).count();
+            assert_eq!(of as u32, *value, "{name}");
+        }
     }
 
     #[test]

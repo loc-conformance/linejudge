@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod explain;
 mod report;
 
 use std::env;
@@ -16,6 +17,7 @@ use linejudge::dialects::Dialects;
 use linejudge::known_failures::KnownFailures;
 use linejudge::verdict::measure_and_judge_every_case;
 
+use crate::explain::{explain_one_counter, find_case};
 use crate::report::{report_entries_that_name_nothing, report_the_verdicts_of_one_dialect};
 
 const ADAPTERS_DIR: &str = "adapters";
@@ -37,6 +39,15 @@ linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--c
     else. One case per line, named the way this report names it, '#' starts a comment, and
     'region:2400-punctuation_only_line' names one way of counting where naming the case alone
     names them all. It needs --counter.
+
+linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--adapters <dir>]
+                [--dialects <dir>]
+
+    Prints, for one case, how each way of counting reads every line of it: the marked spans, the
+    rule that took the line and the predicates that hold on it, and under those whatever per-line
+    analysis the counter itself can print, run through the explain-args of its adapter. A case is
+    named the way check names it, or by any part of the name that fits exactly one case, and no
+    binary is needed for anything but the counter's own analysis.
 ";
 
 fn main() -> ExitCode {
@@ -104,6 +115,18 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         None => None,
     };
 
+    if let Command::Explain { case } = &settings.command {
+        let found = find_case(&corpus, case)?;
+        if found.name != *case {
+            writeln!(out, "no case is named {case}, so this is {}", found.name)?;
+        }
+        for adapter in &adapters {
+            let binary = counters.find_binary(&adapter.name_of_counter);
+            explain_one_counter(&mut out, adapter, binary, found, &dialects, &corpus.readings)?;
+        }
+        return Ok(false);
+    }
+
     let mut broken = false;
     let mut ran = 0;
     for adapter in &adapters {
@@ -141,6 +164,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
 
 #[derive(Debug)]
 struct Settings {
+    command: Command,
     corpus: PathBuf,
     adapters: PathBuf,
     dialects: PathBuf,
@@ -150,9 +174,16 @@ struct Settings {
     wants_help: bool,
 }
 
+#[derive(Debug)]
+enum Command {
+    Check,
+    Explain { case: String },
+}
+
 impl Settings {
     fn of(args: Vec<String>) -> Result<Settings, String> {
         let mut settings = Settings {
+            command: Command::Check,
             corpus: PathBuf::from(CASES_DIR),
             adapters: PathBuf::from(ADAPTERS_DIR),
             dialects: PathBuf::from(DIALECTS_DIR),
@@ -163,12 +194,14 @@ impl Settings {
         };
         let mut args = args.into_iter();
         let Some(command) = args.next() else { return Err(USAGE.to_string()) };
-        if command == "--help" || command == "-h" {
-            settings.wants_help = true;
-            return Ok(settings);
-        }
-        if command != "check" {
-            return Err(format!("{command} is not a command of this program\n\n{USAGE}"));
+        match command.as_str() {
+            "--help" | "-h" => {
+                settings.wants_help = true;
+                return Ok(settings);
+            }
+            "check" => {}
+            "explain" => settings.command = Command::Explain { case: String::new() },
+            _ => return Err(format!("{command} is not a command of this program\n\n{USAGE}")),
         }
         // The flag is recognised before its value is taken, so a misspelled last flag is told it is
         // misspelled instead of being told it was given nothing.
@@ -183,11 +216,26 @@ impl Settings {
                 "--known-failures" => {
                     settings.known_failures = Some(PathBuf::from(value_of(&flag, &mut args)?))
                 }
-                _ => return Err(format!("{flag} is not a flag of this command\n\n{USAGE}")),
+                _ => match &mut settings.command {
+                    Command::Explain { case }
+                        if case.is_empty() && !flag.starts_with('-') =>
+                    {
+                        *case = flag;
+                    }
+                    _ => return Err(format!("{flag} is not a flag of this command\n\n{USAGE}")),
+                },
             }
         }
         if settings.wants_help {
             return Ok(settings);
+        }
+        if let Command::Explain { case } = &settings.command {
+            if case.is_empty() {
+                return Err("explain needs the name of a case, the way check names one".to_string());
+            }
+            if settings.known_failures.is_some() {
+                return Err("--known-failures belongs to check".to_string());
+            }
         }
         if settings.binary.is_some() && settings.name_of_counter.is_none() {
             return Err("--bin needs --counter to say whose binary it is".to_string());
@@ -248,6 +296,21 @@ mod tests {
         for args in [vec!["--help"], vec!["check", "--help"], vec!["check", "-h"]] {
             assert!(settings_of(&args).unwrap().wants_help);
         }
+    }
+
+    #[test]
+    fn explain_takes_one_case_by_name_and_no_list_of_known_failures() {
+        let parsed = settings_of(&["explain", "0400-a_case", "--counter", "scc"]).unwrap();
+        match parsed.command {
+            Command::Explain { case } => assert_eq!(case, "0400-a_case"),
+            Command::Check => panic!("explain parsed as check"),
+        }
+        let empty = settings_of(&["explain"]).unwrap_err();
+        assert!(empty.contains("needs the name of a case"), "{empty}");
+        let second = settings_of(&["explain", "one-case", "another-case"]).unwrap_err();
+        assert!(second.contains("not a flag"), "{second}");
+        let with_list = settings_of(&["explain", "one-case", "--known-failures", "known.txt"]);
+        assert!(with_list.unwrap_err().contains("belongs to check"));
     }
 
     fn settings_of(args: &[&str]) -> Result<Settings, String> {

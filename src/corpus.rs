@@ -18,6 +18,7 @@ const TRUTH_FILE: &str = "truth.txt";
 
 pub struct Corpus {
     pub cases: Vec<Case>,
+    pub readings: Readings,
 }
 
 impl Corpus {
@@ -57,7 +58,7 @@ impl Corpus {
             check_witnesses(&readings, &cases, &mut faults);
         }
         if faults.is_empty() {
-            Ok(Corpus { cases })
+            Ok(Corpus { cases, readings })
         } else {
             Err(faults)
         }
