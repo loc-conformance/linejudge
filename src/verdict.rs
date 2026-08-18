@@ -111,6 +111,7 @@ mod tests {
             output_format: OutputFormat::LinejudgeJson,
             args: vec!["{file}".to_string()],
             explain_args: None,
+            explain_output: None,
             explain_keep_from: None,
             version_flag: None,
             acquisition: Acquisition {

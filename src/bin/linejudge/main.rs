@@ -2,6 +2,7 @@
 
 mod explain;
 mod report;
+mod style;
 
 use std::env;
 use std::io::{self, ErrorKind, Write};
@@ -48,6 +49,12 @@ linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--a
     analysis the counter itself can print, run through the explain-args of its adapter. A case is
     named the way check names it, or by any part of the name that fits exactly one case, and no
     binary is needed for anything but the counter's own analysis.
+
+    A counter whose analysis is the linejudge-per-line format is read rather than shown, and every
+    line it reads differently from these rules is named where that line is.
+
+Both commands print colour when they print to a terminal. NO_COLOR turns it off wherever it is set,
+and CLICOLOR_FORCE keeps it through a pipe.
 ";
 
 fn main() -> ExitCode {
@@ -60,11 +67,11 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(Trouble::Writing(trouble)) => {
-            eprintln!("{trouble}");
+            eprintln!("{}", style::DIFFERS.paint(&trouble.to_string()));
             ExitCode::FAILURE
         }
         Err(Trouble::Said(message)) => {
-            eprintln!("{message}");
+            eprintln!("{}", style::DIFFERS.paint(&message));
             ExitCode::FAILURE
         }
     }
@@ -118,7 +125,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
     if let Command::Explain { case } = &settings.command {
         let found = find_case(&corpus, case)?;
         if found.name != *case {
-            writeln!(out, "no case is named {case}, so this is {}", found.name)?;
+            writeln!(out, "{}", style::DETAIL.paint(&format!(
+                    "no case is named {case}, so this is {}", found.name)))?;
         }
         for adapter in &adapters {
             let binary = counters.find_binary(&adapter.name_of_counter);
@@ -131,7 +139,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
     let mut ran = 0;
     for adapter in &adapters {
         let Some(binary) = counters.find_binary(&adapter.name_of_counter) else {
-            writeln!(out, "{}: no binary named for it, nothing run", adapter.name_of_counter)?;
+            writeln!(out, "{}", style::RECORDED.paint(&format!(
+                    "{}: no binary named for it, nothing run", adapter.name_of_counter)))?;
             continue;
         };
         ran += 1;
@@ -231,7 +240,7 @@ impl Settings {
         }
         if let Command::Explain { case } = &settings.command {
             if case.is_empty() {
-                return Err("explain needs the name of a case, the way check names one".to_string());
+                return Err("explain needs the name of a case".to_string());
             }
             if settings.known_failures.is_some() {
                 return Err("--known-failures belongs to check".to_string());

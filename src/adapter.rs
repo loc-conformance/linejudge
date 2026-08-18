@@ -7,6 +7,7 @@ use serde::Deserialize;
 use crate::answer::Answer;
 use crate::dialects::Dialects;
 use crate::measurement::{OutputFormat, read_output};
+use crate::per_line::PerLineFormat;
 
 const ADAPTER_EXTENSION: &str = "toml";
 const FILE_PLACEHOLDER: &str = "{file}";
@@ -27,6 +28,9 @@ pub struct Adapter {
     /// place of `args`, with the dialect's arguments appended the same way. `None` is a counter
     /// with no such command, which is not a failure of any kind.
     pub explain_args: Option<Vec<String>>,
+    /// The format that analysis is printed in, where it is one this suite can read and compare
+    /// line by line. `None` is a counter whose analysis is text for a person and nothing more.
+    pub explain_output: Option<PerLineFormat>,
     /// What of that analysis is worth showing: only the lines holding this text, each from the
     /// text to its end. Chooses lines and never reads them, so it is not a parser; where nothing
     /// matches, everything is shown and the report says so.
@@ -103,7 +107,21 @@ impl Adapter {
                     path.display()
                 ));
             }
+            Some(_) if raw.explain_output.is_some() => {
+                return Err(format!(
+                    "{} declares both explain-output and explain-keep-from, and they are two ways \
+                     of taking the same output: one reads it as a document, the other picks lines \
+                     out of it for a person to read",
+                    path.display()
+                ));
+            }
             _ => {}
+        }
+        if raw.explain_output.is_some() && raw.explain_args.is_none() {
+            return Err(format!(
+                "{} declares explain-output with no explain-args to print it",
+                path.display()
+            ));
         }
         let mut ways = Vec::new();
         for (name, dialect) in raw.dialect {
@@ -129,6 +147,7 @@ impl Adapter {
             output_format: raw.output,
             args: raw.args,
             explain_args: raw.explain_args,
+            explain_output: raw.explain_output,
             explain_keep_from: raw.explain_keep_from,
             version_flag: match raw.version_flag {
                 Some(flag) if flag.is_empty() => None,
@@ -224,8 +243,17 @@ fn run_counter(binary: &Path, args: &[String]) -> Result<String, String> {
         .args(args)
         .output()
         .map_err(|e| format!("{} could not be run: {e}", binary.display()))?;
+    // What it said while failing is the whole of what is known about why, and a counter that wraps
+    // its refusal over the width of a terminal has one sentence in as many lines as it liked.
     if !output.status.success() {
-        return Err(format!("{} exited with {}", binary.display(), output.status));
+        let printed = String::from_utf8_lossy(&output.stderr);
+        let said: Vec<&str> =
+            printed.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
+        let exited = format!("{} exited with {}", binary.display(), output.status);
+        return Err(match said.is_empty() {
+            true => exited,
+            false => format!("{exited}: {}", said.join(" ")),
+        });
     }
     String::from_utf8(output.stdout).map_err(|e| format!("{} printed no text: {e}", binary.display()))
 }
@@ -238,6 +266,8 @@ struct RawAdapter {
     args: Vec<String>,
     #[serde(rename = "explain-args")]
     explain_args: Option<Vec<String>>,
+    #[serde(rename = "explain-output")]
+    explain_output: Option<PerLineFormat>,
     #[serde(rename = "explain-keep-from")]
     explain_keep_from: Option<String>,
     #[serde(rename = "version-flag")]
@@ -331,6 +361,47 @@ mod tests {
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("no {file} in its explain-args"), "{refused}");
+    }
+
+    #[test]
+    fn the_format_an_analysis_is_read_as_needs_a_command_and_rules_out_trimming_it_as_text() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
+        let adapters = Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap();
+        let mezura = &adapters[0];
+        assert_eq!(mezura.explain_output, Some(PerLineFormat::LinejudgePerLine));
+        assert_eq!(mezura.explain_keep_from, None);
+        assert_eq!(adapters[1].explain_output, None);
+
+        let alone = write_an_adapter(
+            "a_format_with_no_command",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-output = \"linejudge-per-line\"\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&alone, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(alone.parent().unwrap()).unwrap();
+        assert!(refused.contains("no explain-args to print it"), "{refused}");
+
+        let both = write_an_adapter(
+            "a_format_and_a_trim",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-args = [\"-t\", \"{file}\"]\nexplain-output = \"linejudge-per-line\"\n\
+             explain-keep-from = \"line \"\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&both, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(both.parent().unwrap()).unwrap();
+        assert!(refused.contains("two ways of taking the same output"), "{refused}");
+
+        let unknown = write_an_adapter(
+            "a_format_nobody_reads",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-args = [\"-t\", \"{file}\"]\nexplain-output = \"tokei-lines\"\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&unknown, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(unknown.parent().unwrap()).unwrap();
+        assert!(refused.contains("does not parse"), "{refused}");
     }
 
     #[test]
