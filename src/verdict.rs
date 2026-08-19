@@ -303,7 +303,7 @@ mod tests {
             Corpus::read(&cases).unwrap_or_else(|faults| panic!("{faults:?}")),
         ));
         let record = Box::leak(Box::new(
-            RecordedAnswers::read(&recorded_dir, "tokei", dialects)
+            RecordedAnswers::read(std::slice::from_ref(&recorded_dir), "tokei", dialects)
                 .unwrap_or_else(|faults| panic!("{faults:?}"))
                 .unwrap_or_else(|| panic!("no record was read")),
         ));

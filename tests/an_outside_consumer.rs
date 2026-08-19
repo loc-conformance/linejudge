@@ -9,7 +9,7 @@ use linejudge::verdict::{Conformance, judge_conformance};
 #[test]
 fn a_consumer_judges_a_counter_over_the_whole_corpus_without_any_binary() {
     let checkout = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let dialects = Dialects::read(&checkout.join("dialects"))
+    let dialects = Dialects::read(&[checkout.join("dialects")])
         .unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
     let corpus =
         Corpus::read(&checkout.join("cases")).unwrap_or_else(|faults| panic!("{faults:?}"));
@@ -33,9 +33,9 @@ fn a_consumer_judges_a_counter_over_the_whole_corpus_without_any_binary() {
 #[test]
 fn a_consumer_reads_what_was_recorded_about_a_counter_of_the_roster() {
     let checkout = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let dialects = Dialects::read(&checkout.join("dialects"))
+    let dialects = Dialects::read(&[checkout.join("dialects")])
         .unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
-    let record = RecordedAnswers::read(&checkout.join("recorded"), "tokei", &dialects)
+    let record = RecordedAnswers::read(&[checkout.join("recorded")], "tokei", &dialects)
         .unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
         .unwrap_or_else(|| panic!("tokei has no recorded answers"));
     assert_eq!(record.counter, "tokei");

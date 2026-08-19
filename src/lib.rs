@@ -13,5 +13,6 @@ pub mod measurement;
 pub mod per_line;
 pub mod readings;
 pub mod recorded;
+pub mod shipped;
 pub mod truth;
 pub mod verdict;

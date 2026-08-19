@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -44,32 +45,39 @@ pub struct Adapter {
 }
 
 impl Adapter {
+    /// The directories are layered the way the dialects are: a counter's adapter is the file named
+    /// after it, so the last directory holding that file is the one that describes the counter, and
+    /// somebody whose tool has moved a flag writes one file rather than a copy of every other.
     pub fn read_one(
-        dir: &Path,
+        dirs: &[PathBuf],
         name_of_counter: &str,
         dialects: &Dialects,
     ) -> Result<Adapter, String> {
-        let path = dir.join(format!("{name_of_counter}.{ADAPTER_EXTENSION}"));
-        if !path.is_file() {
-            return Err(format!("{} does not exist, so {name_of_counter} is a counter this suite cannot run", path.display()));
+        let named = format!("{name_of_counter}.{ADAPTER_EXTENSION}");
+        match dirs.iter().rev().map(|dir| dir.join(&named)).find(|path| path.is_file()) {
+            Some(path) => Adapter::read(&path, dialects),
+            None => Err(format!(
+                "no {named} in {}, so {name_of_counter} is a counter this suite cannot run",
+                name_every_one_of(dirs)
+            )),
         }
-        Adapter::read(&path, dialects)
     }
 
-    pub fn read_all(dir: &Path, dialects: &Dialects) -> Result<Vec<Adapter>, String> {
-        let entries =
-            fs::read_dir(dir).map_err(|e| format!("{} could not be opened: {e}", dir.display()))?;
-        let mut paths: Vec<PathBuf> = entries
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|e| e == ADAPTER_EXTENSION))
-            .collect();
-        paths.sort();
-        let mut adapters = Vec::new();
-        for path in paths {
-            adapters.push(Adapter::read(&path, dialects)?);
+    pub fn read_all(dirs: &[PathBuf], dialects: &Dialects) -> Result<Vec<Adapter>, String> {
+        let mut found: BTreeMap<String, PathBuf> = BTreeMap::new();
+        for dir in dirs {
+            let entries = fs::read_dir(dir)
+                .map_err(|e| format!("{} could not be opened: {e}", dir.display()))?;
+            for path in entries
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .filter(|path| path.extension().is_some_and(|e| e == ADAPTER_EXTENSION))
+            {
+                let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned());
+                found.insert(stem.unwrap_or_default(), path);
+            }
         }
-        Ok(adapters)
+        found.values().map(|path| Adapter::read(path, dialects)).collect()
     }
 
     fn read(path: &Path, dialects: &Dialects) -> Result<Adapter, String> {
@@ -269,6 +277,10 @@ pub struct Acquisition {
     pub name: String,
 }
 
+fn name_every_one_of(dirs: &[PathBuf]) -> String {
+    dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>().join(" or ")
+}
+
 fn build_command_args(base: &[String], dialect: &Dialect, file: &Path) -> Vec<String> {
     let mut args: Vec<String> = base
         .iter()
@@ -335,8 +347,8 @@ mod tests {
 
     #[test]
     fn every_shipped_adapter_is_read_and_names_a_dialect_this_suite_knows() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let adapters = Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap();
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
         let names: Vec<&str> = adapters.iter().map(|a| a.name_of_counter.as_str()).collect();
         assert_eq!(names, ["mezura", "scc", "tokei"]);
         let mezura = &adapters[0];
@@ -405,10 +417,10 @@ mod tests {
 
     #[test]
     fn one_counter_named_opens_its_own_file_and_no_other() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let dialects = read_the_shipped_dialects();
-        assert_eq!(Adapter::read_one(&dir, "scc", &dialects).unwrap().name_of_counter, "scc");
-        let missing = Adapter::read_one(&dir, "cloc", &dialects).unwrap_err();
+        assert_eq!(Adapter::read_one(&dirs, "scc", &dialects).unwrap().name_of_counter, "scc");
+        let missing = Adapter::read_one(&dirs, "cloc", &dialects).unwrap_err();
         assert!(missing.contains("cannot run"), "{missing}");
     }
 
@@ -426,8 +438,8 @@ mod tests {
 
     #[test]
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let mezura = &Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap()[0];
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let mezura = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[0];
         let args = mezura.build_args(&mezura.dialects[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
@@ -435,8 +447,8 @@ mod tests {
 
     #[test]
     fn the_per_line_command_is_declared_per_counter_and_has_to_name_the_file() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let adapters = Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap();
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
         let scc = &adapters[1];
         let command = scc
             .format_explain_command(&scc.dialects[0], Path::new("scc.exe"), Path::new("input.py"))
@@ -464,8 +476,8 @@ mod tests {
 
     #[test]
     fn the_format_an_analysis_is_read_as_needs_a_command_and_rules_out_trimming_it_as_text() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let adapters = Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap();
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
         let mezura = &adapters[0];
         assert_eq!(mezura.explain_output, Some(PerLineFormat::LinejudgePerLine));
         assert_eq!(mezura.explain_keep_from, None);
@@ -528,8 +540,8 @@ mod tests {
 
     #[test]
     fn a_version_nobody_answers_is_unknown_and_stops_nothing() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters");
-        let tokei = &Adapter::read_all(&dir, &read_the_shipped_dialects()).unwrap()[2];
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let tokei = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[2];
         assert_eq!(tokei.version_flag.as_deref(), Some("--version"));
         assert_eq!(tokei.read_version_or_unknown(Path::new("a-binary-that-does-not-exist")), "unknown version");
 

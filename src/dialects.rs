@@ -23,9 +23,29 @@ pub struct Dialects {
 }
 
 impl Dialects {
-    /// One folder per counter, one file per way it counts: `<counter>/<dialect>.toml`. The folder
-    /// is the unit a tool's own maintainer owns, however many dialects it grows.
-    pub fn read(dir: &Path) -> Result<Dialects, Vec<String>> {
+    /// The directories are layered, and a later one replaces every dialect an earlier one gave the
+    /// counters it names. The folder is the unit and not the file: it is what a tool's own
+    /// maintainer owns, and half of theirs beside half of ours would be a set of rules that neither
+    /// of them wrote.
+    pub fn read(dirs: &[PathBuf]) -> Result<Dialects, Vec<String>> {
+        let mut dialects: Vec<Dialect> = Vec::new();
+        let mut faults = Vec::new();
+        for dir in dirs {
+            match Dialects::read_one_directory(dir) {
+                Ok(read) => {
+                    let named: Vec<&String> = read.iter().map(|d| &d.counter).collect();
+                    dialects.retain(|held| !named.contains(&&held.counter));
+                    dialects.extend(read);
+                }
+                Err(mut found) => faults.append(&mut found),
+            }
+        }
+        dialects.sort_by(|a, b| (&a.counter, &a.name).cmp(&(&b.counter, &b.name)));
+        if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults) }
+    }
+
+    /// One folder per counter, one file per way it counts: `<counter>/<dialect>.toml`.
+    fn read_one_directory(dir: &Path) -> Result<Vec<Dialect>, Vec<String>> {
         let entries = match fs::read_dir(dir) {
             Ok(entries) => entries,
             Err(error) => {
@@ -72,7 +92,7 @@ impl Dialects {
         if dialects.is_empty() && faults.is_empty() {
             faults.push(format!("{} holds no dialect file", dir.display()));
         }
-        if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults) }
+        if faults.is_empty() { Ok(dialects) } else { Err(faults) }
     }
 
     pub fn find(&self, counter: &str, dialect: &str) -> Option<&Dialect> {
@@ -266,13 +286,14 @@ struct RawRule {
 
 #[cfg(test)]
 pub fn read_the_shipped_dialects() -> Dialects {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("dialects");
-    Dialects::read(&dir).unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
+    let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("dialects")];
+    Dialects::read(&dirs).unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
 }
 
 #[cfg(test)]
 mod tests {
     use std::env;
+    use std::slice;
 
     use super::*;
 
@@ -383,13 +404,13 @@ mod tests {
         let dir = env::temp_dir().join("linejudge-an_empty_dialects_dir");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        let refused = Dialects::read(&dir)
+        let refused = Dialects::read(slice::from_ref(&dir))
             .err()
             .unwrap_or_else(|| panic!("an empty directory was read anyway"));
         assert!(refused[0].contains("holds no dialect file"), "{refused:?}");
 
         fs::write(dir.join("default.toml"), ONE_DIALECT).unwrap();
-        let stray = Dialects::read(&dir)
+        let stray = Dialects::read(slice::from_ref(&dir))
             .err()
             .unwrap_or_else(|| panic!("a stray top-level file was read anyway"));
         fs::remove_dir_all(&dir).unwrap();

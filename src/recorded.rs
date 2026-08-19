@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -25,12 +25,19 @@ pub struct RecordedAnswers {
 impl RecordedAnswers {
     /// A file that is not there is a counter nobody here has photographed, which is the ordinary
     /// state of anybody else's counter and not an error.
+    /// Layered like the adapters and the dialects: the last directory holding a file for this
+    /// counter is the one read, and a counter no directory names has no record, which is the
+    /// ordinary state for anybody's tool but the ones measured here.
     pub fn read(
-        dir: &Path,
+        dirs: &[PathBuf],
         counter: &str,
         dialects: &Dialects,
     ) -> Result<Option<RecordedAnswers>, Vec<String>> {
-        let path = dir.join(format!("{counter}.{RECORDED_EXTENSION}"));
+        let named = format!("{counter}.{RECORDED_EXTENSION}");
+        let Some(path) = dirs.iter().rev().map(|dir| dir.join(&named)).find(|path| path.is_file())
+        else {
+            return Ok(None);
+        };
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
@@ -294,6 +301,8 @@ struct RawRegionCounts {
 #[cfg(test)]
 mod tests {
     use std::env;
+    use std::path::Path;
+    use std::slice;
 
     use crate::corpus::Corpus;
     use crate::deriver::derive_answer;
@@ -327,7 +336,7 @@ the line comment is swallowed by the block above it"""
             Corpus::read(&root.join("cases")).unwrap_or_else(|faults| panic!("{faults:?}"));
         let mut wrong = Vec::new();
         for counter in ["mezura", "scc", "tokei"] {
-            let record = RecordedAnswers::read(&root.join(RECORDED_DIR), counter, &dialects)
+            let record = RecordedAnswers::read(&[root.join(RECORDED_DIR)], counter, &dialects)
                 .unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
                 .unwrap_or_else(|| panic!("{counter} has no recorded answers"));
             let text = fs::read_to_string(root.join(RECORDED_DIR).join(format!("{counter}.toml")))
@@ -370,7 +379,9 @@ the line comment is swallowed by the block above it"""
         let dir = env::temp_dir().join("linejudge-no_record_here");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        let record = RecordedAnswers::read(&dir, "cloc", &read_the_shipped_dialects()).unwrap();
+        let record =
+            RecordedAnswers::read(slice::from_ref(&dir), "cloc", &read_the_shipped_dialects())
+                .unwrap();
         fs::remove_dir_all(&dir).unwrap();
         assert!(record.is_none());
     }
@@ -517,7 +528,8 @@ the line comment is swallowed by the block above it"""
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("tokei.toml"), text).unwrap();
-        let read = RecordedAnswers::read(&dir, "tokei", &read_the_shipped_dialects());
+        let read =
+            RecordedAnswers::read(slice::from_ref(&dir), "tokei", &read_the_shipped_dialects());
         fs::remove_dir_all(&dir).unwrap();
         read
     }

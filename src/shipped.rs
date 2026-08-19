@@ -1,0 +1,117 @@
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+include!(concat!(env!("OUT_DIR"), "/shipped.rs"));
+
+const APP_DIR: &str = "linejudge";
+const PARTIAL_SUFFIX: &str = ".partial";
+
+/// The corpus, the adapters, the dialects and the recorded answers this build carries, written out
+/// where the counters can be pointed at them. A counter is a separate program that takes a path, so
+/// a case has to be a real file by the time one runs, and the copy is kept rather than made afresh
+/// so that the command each report prints can still be run afterwards.
+///
+/// The directory is named after a hash of what is written into it, which is what keeps a build
+/// whose corpus changed from reading the copy an older one left behind.
+pub fn find_the_shipped_files() -> Result<PathBuf, String> {
+    let mut refused = Vec::new();
+    for root in [find_the_data_dir(), Some(env::temp_dir())].into_iter().flatten() {
+        let dir = root.join(APP_DIR).join(HASH);
+        if dir.is_dir() {
+            return Ok(dir);
+        }
+        match write_the_shipped_files_beside(&dir) {
+            Ok(()) => return Ok(dir),
+            Err(message) => refused.push(message),
+        }
+    }
+    Err(format!("what this build carries could not be written out: {}", refused.join("; ")))
+}
+
+pub fn write_the_shipped_files_into(dir: &Path) -> Result<(), String> {
+    for (relative, contents) in FILES {
+        let path = dir.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("{} could not be made: {e}", parent.display()))?;
+        }
+        fs::write(&path, contents)
+            .map_err(|e| format!("{} could not be written: {e}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// Written to one side and moved into place, so that a run stopped halfway through leaves no
+/// directory that the next one would find and trust.
+fn write_the_shipped_files_beside(dir: &Path) -> Result<(), String> {
+    let partial = dir.with_file_name(format!("{HASH}{PARTIAL_SUFFIX}"));
+    let _ = fs::remove_dir_all(&partial);
+    write_the_shipped_files_into(&partial)?;
+    fs::rename(&partial, dir).map_err(|e| format!("{} could not be made: {e}", dir.display()))
+}
+
+fn find_the_data_dir() -> Option<PathBuf> {
+    let named = |name: &str| env::var_os(name).map(PathBuf::from).filter(|path| path.is_absolute());
+    if cfg!(windows) {
+        return named("APPDATA");
+    }
+    if cfg!(target_os = "macos") {
+        return named("HOME").map(|home| home.join("Library").join("Application Support"));
+    }
+    named("XDG_DATA_HOME").or_else(|| named("HOME").map(|home| home.join(".local").join("share")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn what_is_written_out_is_what_the_repository_holds() {
+        let root = env::temp_dir().join("linejudge-what_this_build_carries");
+        let _ = fs::remove_dir_all(&root);
+        write_the_shipped_files_into(&root).unwrap();
+        let checkout = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut wrong = Vec::new();
+        for (relative, contents) in FILES {
+            let written = fs::read_to_string(root.join(relative)).unwrap();
+            if written != *contents {
+                wrong.push(format!("{relative} was written differently"));
+            }
+            let its_own = fs::read_to_string(checkout.join(relative)).unwrap();
+            if its_own.replace("\r\n", "\n") != contents.replace("\r\n", "\n") {
+                wrong.push(format!("{relative} is not what the checkout holds"));
+            }
+        }
+        let cases = FILES.iter().filter(|(name, _)| name.ends_with("case.toml")).count();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(wrong.is_empty(), "{wrong:?}");
+        assert_eq!(cases, 83, "the corpus that was carried holds {cases} cases");
+        assert_eq!(HASH.len(), 16);
+    }
+
+    #[test]
+    fn a_write_stopped_halfway_leaves_nothing_the_next_run_would_trust() {
+        let root = env::temp_dir().join("linejudge-a_write_stopped_halfway");
+        let dir = root.join(HASH);
+        let partial = root.join(format!("{HASH}{PARTIAL_SUFFIX}"));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(partial.join("cases")).unwrap();
+        fs::write(partial.join("cases").join("readings.toml"), "half a file").unwrap();
+
+        write_the_shipped_files_beside(&dir).unwrap();
+        let readings = fs::read_to_string(dir.join("cases").join("readings.toml")).unwrap();
+        let left = partial.exists();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(readings.contains("[rust-doc-comment]"), "{readings}");
+        assert!(!left, "the half-written directory is still there");
+    }
+
+    #[test]
+    fn the_data_directory_is_absolute_wherever_the_machine_keeps_it() {
+        match find_the_data_dir() {
+            Some(dir) => assert!(dir.is_absolute(), "{}", dir.display()),
+            None => assert!(env::var_os("HOME").is_none() && env::var_os("APPDATA").is_none()),
+        }
+    }
+}
