@@ -6,8 +6,7 @@ mod style;
 
 use std::env;
 use std::io::{self, ErrorKind, Write};
-use std::path;
-use std::path::{Path, PathBuf};
+use std::path::{self, Path, PathBuf};
 use std::process::ExitCode;
 use std::vec::IntoIter;
 
@@ -20,7 +19,7 @@ use linejudge::linejudge_folder::Folder;
 use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
-use linejudge::shipped::find_the_shipped_files;
+use linejudge::shipped::create_the_shipped_dir;
 use linejudge::verdict::measure_and_judge_every_case;
 
 use crate::explain::{explain_one_counter, find_case};
@@ -141,8 +140,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             format!("{} could not be moved into: {e}", folder.get_root().display())
         })?;
     }
-    let shipped = find_the_shipped_files()?;
-    let dirs = resolve_dirs(&settings, folder.as_ref(), &shipped);
+    let shipped = create_the_shipped_dir()?;
+    let dirs = resolve_dirs(&settings, folder.as_ref(), &shipped)?;
     let dialects = Dialects::read(&dirs.dialects).map_err(|faults| faults.join("\n"))?;
     let mut corpus = read_the_corpus(&dirs.corpus)?;
     set_aside_what_was_disabled(&mut corpus, &settings.disabled)?;
@@ -368,11 +367,8 @@ impl Settings {
     }
 }
 
-/// Where everything is read from: a flag wins over the `.linejudge` folder, and the folder wins
-/// over the defaults, which are the directories of a checkout.
 /// A corpus is replaced whole, since half of one corpus beside half of another is neither. The
-/// other three are layered over what this build carries, so that declaring one counter, or fixing
-/// one flag of one counter, does not mean copying every other declaration alongside it.
+/// other three are layered over what this build carries, the last directory winning per counter.
 struct Dirs {
     corpus: PathBuf,
     adapters: Vec<PathBuf>,
@@ -381,26 +377,36 @@ struct Dirs {
     known_failures: Option<PathBuf>,
 }
 
-fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) -> Dirs {
-    let layer = |flag: &Option<PathBuf>, named: Option<PathBuf>, under: &str| {
+fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) -> Result<Dirs, String> {
+    let corpus = settings.corpus.clone().or_else(|| folder.and_then(Folder::find_corpus));
+    let adapters = settings.adapters.clone().or_else(|| folder.and_then(Folder::find_adapters));
+    let dialects = settings.dialects.clone().or_else(|| folder.and_then(Folder::find_dialects));
+    let recorded = settings.recorded.clone().or_else(|| folder.and_then(Folder::find_recorded));
+    for dir in [&corpus, &adapters, &dialects, &recorded].into_iter().flatten() {
+        if !dir.is_dir() {
+            return Err(format!("{} is not a directory, so nothing can be read there", dir.display()));
+        }
+    }
+    let layer = |under: &str, named: Option<PathBuf>| {
         let mut dirs = vec![shipped.join(under)];
-        dirs.extend(flag.clone().or(named));
+        dirs.extend(named);
         dirs
     };
-    Dirs {
-        corpus: settings
-            .corpus
-            .clone()
-            .or_else(|| folder.and_then(Folder::find_corpus))
-            .unwrap_or_else(|| shipped.join(CASES_DIR)),
-        adapters: layer(&settings.adapters, folder.and_then(Folder::find_adapters), ADAPTERS_DIR),
-        dialects: layer(&settings.dialects, folder.and_then(Folder::find_dialects), DIALECTS_DIR),
-        recorded: layer(&settings.recorded, folder.and_then(Folder::find_recorded), RECORDED_DIR),
+    Ok(Dirs {
+        // A record is the photograph of one corpus, so a corpus of somebody else's leaves the
+        // carried records out rather than judging against answers to cases nobody loaded.
+        recorded: match corpus.is_some() {
+            true => recorded.into_iter().collect(),
+            false => layer(RECORDED_DIR, recorded),
+        },
+        corpus: corpus.unwrap_or_else(|| shipped.join(CASES_DIR)),
+        adapters: layer(ADAPTERS_DIR, adapters),
+        dialects: layer(DIALECTS_DIR, dialects),
         known_failures: settings
             .known_failures
             .clone()
             .or_else(|| folder.and_then(Folder::find_known_failures)),
-    }
+    })
 }
 
 fn anchor_every_path_of(settings: &mut Settings) {
@@ -510,19 +516,33 @@ mod tests {
 
     #[test]
     fn a_named_corpus_replaces_the_carried_one_and_a_named_directory_layers_over_the_rest() {
+        let root = std::env::temp_dir().join("linejudge-directories_a_test_names");
+        let mine = root.join("mine");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&mine).unwrap();
         let carried = Path::new("what-this-build-carries");
-        let parsed = settings_of(&["check", "--corpus", "elsewhere/cases"]).unwrap();
-        let dirs = resolve_dirs(&parsed, None, carried);
-        assert_eq!(dirs.corpus, PathBuf::from("elsewhere/cases"));
-        assert_eq!(dirs.adapters, [carried.join(ADAPTERS_DIR)]);
-        assert_eq!(dirs.recorded, [carried.join(RECORDED_DIR)]);
-        assert_eq!(dirs.known_failures, None);
+        let of = |args: &[&str]| resolve_dirs(&settings_of(args).unwrap(), None, carried);
 
-        let named = settings_of(&["check", "--adapters", "mine"]).unwrap();
-        let layered = resolve_dirs(&named, None, carried);
+        let named_corpus = of(&["check", "--corpus", &mine.display().to_string()]).unwrap();
+        let layered = of(&["check", "--adapters", &mine.display().to_string()]).unwrap();
+        let missing = of(&["check", "--dialects", &root.join("nope").display().to_string()]);
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(named_corpus.corpus, mine);
+        assert_eq!(named_corpus.adapters, [carried.join(ADAPTERS_DIR)]);
+        assert!(named_corpus.recorded.is_empty(), "{:?}", named_corpus.recorded);
+        assert_eq!(named_corpus.known_failures, None);
+
         assert_eq!(layered.corpus, carried.join(CASES_DIR));
-        assert_eq!(layered.adapters, [carried.join(ADAPTERS_DIR), PathBuf::from("mine")]);
+        assert_eq!(layered.adapters, [carried.join(ADAPTERS_DIR), mine]);
         assert_eq!(layered.dialects, [carried.join(DIALECTS_DIR)]);
+        assert_eq!(layered.recorded, [carried.join(RECORDED_DIR)]);
+
+        let refused = match missing {
+            Ok(_) => panic!("a directory that is not there was taken anyway"),
+            Err(refused) => refused,
+        };
+        assert!(refused.contains("is not a directory"), "{refused}");
     }
 
     #[test]

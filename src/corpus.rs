@@ -192,13 +192,18 @@ fn get_name_of(path: &Path) -> String {
         .unwrap_or_else(|| path.display().to_string())
 }
 
+/// Sorted by the number each name begins with and not by the name, so that a group or a case whose
+/// number is one digit longer than its neighbours still sits where the number says.
 fn find_the_directories_in(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
     let mut found: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.path())
         .filter(|path| path.is_dir())
         .collect();
-    found.sort();
+    found.sort_by_key(|path| {
+        let name = get_name_of(path);
+        (find_the_number_in(&name), name)
+    });
     Ok(found)
 }
 
@@ -217,21 +222,17 @@ fn find_the_first_number_of(group: &str) -> Result<u32, String> {
 /// number.
 fn check_the_number_of(case: &str, first: u32, group: &str) -> Result<(), String> {
     match find_the_number_in(case) {
-        Some(number) if (first..first + GROUP_SIZE).contains(&number) => Ok(()),
+        Some(number) if (first..first.saturating_add(GROUP_SIZE)).contains(&number) => Ok(()),
         Some(_) => Err(format!(
             "it sits in {group}, whose cases are numbered {first} to {}",
-            first + GROUP_SIZE - 1
+            first.saturating_add(GROUP_SIZE - 1)
         )),
         None => Err(format!("{case} has to be named <number>-<words>")),
     }
 }
 
 fn find_the_number_in(name: &str) -> Option<u32> {
-    let digits = name.split('-').next()?;
-    match digits.len() == 4 {
-        true => digits.parse().ok(),
-        false => None,
-    }
+    name.split('-').next()?.parse().ok()
 }
 
 /// A case is one directory holding one `input.<extension>`, and that file is the whole of what a
@@ -371,6 +372,24 @@ mod tests {
         assert_eq!(misfiled[0].case, "1400-a_case_of_another_thousand");
         assert!(misfiled[0].message.contains("numbered 0 to 999"), "{misfiled:?}");
         assert!(ungrouped[0].message.contains("whole thousand"), "{ungrouped:?}");
+    }
+
+    #[test]
+    fn a_number_one_digit_longer_sorts_by_what_it_is_and_not_by_how_it_reads() {
+        let root = env::temp_dir().join("linejudge-a_corpus_of_two_widths");
+        let _ = fs::remove_dir_all(&root);
+        for (group, case) in [("2000-second", "2010-second"), ("10000-tenth", "10010-tenth")] {
+            let dir = root.join(group).join(case);
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
+            fs::write(dir.join(TRUTH_FILE), "/* a block\nCCcccccccc\n*/ int x = 1;\nUU ... . . ..\n")
+                .unwrap();
+            fs::write(dir.join(CASE_FILE), ONE_CASE).unwrap();
+        }
+        let corpus = Corpus::read(&root).unwrap_or_else(|faults| panic!("{faults:?}"));
+        fs::remove_dir_all(&root).unwrap();
+        let named: Vec<&str> = corpus.cases.iter().map(|case| case.name.as_str()).collect();
+        assert_eq!(named, ["2010-second", "10010-tenth"]);
     }
 
     #[test]

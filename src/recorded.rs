@@ -23,11 +23,9 @@ pub struct RecordedAnswers {
 }
 
 impl RecordedAnswers {
-    /// A file that is not there is a counter nobody here has photographed, which is the ordinary
-    /// state of anybody else's counter and not an error.
     /// Layered like the adapters and the dialects: the last directory holding a file for this
     /// counter is the one read, and a counter no directory names has no record, which is the
-    /// ordinary state for anybody's tool but the ones measured here.
+    /// ordinary state of anybody's tool but the ones measured here, and not an error.
     pub fn read(
         dirs: &[PathBuf],
         counter: &str,

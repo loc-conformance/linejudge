@@ -41,6 +41,12 @@ impl Dialects {
             }
         }
         dialects.sort_by(|a, b| (&a.counter, &a.name).cmp(&(&b.counter, &b.name)));
+        // Emptiness belongs to the layered set and not to one layer of it: a directory naming no
+        // counter adds nothing, and the run still has every dialect this build carries.
+        if dialects.is_empty() && faults.is_empty() {
+            let named: Vec<String> = dirs.iter().map(|dir| dir.display().to_string()).collect();
+            faults.push(format!("{} holds no dialect file", named.join(" or ")));
+        }
         if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults) }
     }
 
@@ -88,9 +94,6 @@ impl Dialects {
                     Err(mut found) => faults.append(&mut found),
                 }
             }
-        }
-        if dialects.is_empty() && faults.is_empty() {
-            faults.push(format!("{} holds no dialect file", dir.display()));
         }
         if faults.is_empty() { Ok(dialects) } else { Err(faults) }
     }
@@ -397,6 +400,18 @@ mod tests {
             "counter = \"tokei\"\ndialect = \"default\"\nbuckets = [\"code\"]\nrule = []\n",
         );
         assert!(refused[0].contains("holds no rule"), "{refused:?}");
+    }
+
+    #[test]
+    fn a_layer_that_names_no_counter_leaves_the_ones_under_it_alone() {
+        let empty = env::temp_dir().join("linejudge-a_layer_that_names_nobody");
+        let _ = fs::remove_dir_all(&empty);
+        fs::create_dir_all(&empty).unwrap();
+        let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("dialects");
+        let read = Dialects::read(&[shipped, empty.clone()]);
+        fs::remove_dir_all(&empty).unwrap();
+        let dialects = read.unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
+        assert_eq!(dialects.iter().count(), 4);
     }
 
     #[test]

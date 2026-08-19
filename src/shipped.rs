@@ -8,13 +8,9 @@ const APP_DIR: &str = "linejudge";
 const PARTIAL_SUFFIX: &str = ".partial";
 
 /// The corpus, the adapters, the dialects and the recorded answers this build carries, written out
-/// where the counters can be pointed at them. A counter is a separate program that takes a path, so
-/// a case has to be a real file by the time one runs, and the copy is kept rather than made afresh
-/// so that the command each report prints can still be run afterwards.
-///
-/// The directory is named after a hash of what is written into it, which is what keeps a build
-/// whose corpus changed from reading the copy an older one left behind.
-pub fn find_the_shipped_files() -> Result<PathBuf, String> {
+/// where a counter can be pointed at them. The directory is named after a hash of its contents, so
+/// a build whose corpus changed does not read the copy an older one left behind.
+pub fn create_the_shipped_dir() -> Result<PathBuf, String> {
     let mut refused = Vec::new();
     for root in [find_the_data_dir(), Some(env::temp_dir())].into_iter().flatten() {
         let dir = root.join(APP_DIR).join(HASH);
@@ -29,7 +25,7 @@ pub fn find_the_shipped_files() -> Result<PathBuf, String> {
     Err(format!("what this build carries could not be written out: {}", refused.join("; ")))
 }
 
-pub fn write_the_shipped_files_into(dir: &Path) -> Result<(), String> {
+fn write_the_shipped_files_into(dir: &Path) -> Result<(), String> {
     for (relative, contents) in FILES {
         let path = dir.join(relative);
         if let Some(parent) = path.parent() {
