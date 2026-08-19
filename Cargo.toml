@@ -7,6 +7,21 @@ description = "The test corpus and harness that check line-of-code counters agai
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/loc-conformance/linejudge"
 
+[[bin]]
+name = "linejudge"
+path = "src/bin/linejudge/main.rs"
+
+# Whoever runs a counter against the corpus needs neither of these: one writes the truth of a case
+# somebody is authoring, the other rewrites this suite's own record of a counter. Gated, so that
+# `cargo install` brings the one command a consumer asked for.
+[[bin]]
+name = "propose-markers"
+path = "src/bin/propose-markers/main.rs"
+required-features = ["maintenance"]
+
+[features]
+maintenance = []
+
 [dependencies]
 # Exactly this version: 2.1 onwards throws away a colour given as three numbers unless the
 # environment declares COLORTERM, which Windows terminals do not, and the whole palette falls to

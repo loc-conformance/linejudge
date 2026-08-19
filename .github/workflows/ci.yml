@@ -35,11 +35,15 @@ jobs:
       - name: Build
         run: cargo build --release --verbose
 
+      # --all-features on both, and it is not decoration: a binary behind a feature falls out of
+      # the lint and out of the suite without it, and neither says so. Measured, a deliberate
+      # unused variable inside the gated tool went unreported until --all-features was added, and
+      # its ten tests stop running the same way.
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test --verbose
+        run: cargo test --all-features --verbose
 
       # The corpus is read byte for byte and its answers are compared across machines, so a
       # checkout that rewrote line endings would fail in ways that look like counting bugs.

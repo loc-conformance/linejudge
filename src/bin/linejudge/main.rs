@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
 mod explain;
+#[cfg(feature = "maintenance")]
+mod record;
 mod report;
 mod style;
 
@@ -81,6 +83,21 @@ linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--a
 Both commands print colour when they print to a terminal. NO_COLOR turns it off wherever it is set,
 and CLICOLOR_FORCE keeps it through a pipe.
 ";
+#[cfg(feature = "maintenance")]
+const RECORD_USAGE: &str = "
+linejudge record --counter <name> [--bin <path>] [--corpus <dir>] [--adapters <dir>]
+                [--dialects <dir>] [--recorded <dir>]
+
+    Writes recorded/<name>.toml from scratch: runs that counter over every case, reads the version
+    out of its binary, and records what it answered. It is how this suite keeps its own photographs
+    current and it is not something a consumer of the corpus needs, so it is built only with
+    --features maintenance.
+
+    A note is kept exactly as long as the answer it was written about and dropped the moment that
+    answer moves, and every note dropped is named, since the sentence is owed by a person. An
+    exception is carried over as it stands. A counter that breaks on any case is refused rather
+    than written down with a hole in it.
+";
 
 fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
@@ -100,6 +117,15 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// A command the build does not carry is a command nobody is told about, so the help text of a
+/// plain build names only what a plain build can run.
+fn get_the_usage() -> String {
+    #[cfg(not(feature = "maintenance"))]
+    return USAGE.to_string();
+    #[cfg(feature = "maintenance")]
+    format!("{USAGE}{RECORD_USAGE}")
 }
 
 enum Trouble {
@@ -123,7 +149,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
     let mut settings = Settings::of(args)?;
     let mut out = io::stdout().lock();
     if settings.wants_help {
-        writeln!(out, "{USAGE}")?;
+        writeln!(out, "{}", get_the_usage())?;
         return Ok(false);
     }
     let folder = match env::current_dir() {
@@ -210,6 +236,33 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
                 "{} {what} set aside as disabled and not judged: {}",
                 corpus.disabled.len(), corpus.disabled.join(", "))))?;
     }
+    #[cfg(feature = "maintenance")]
+    if let Command::Record = &settings.command {
+        let name = &adapters[0].name_of_counter;
+        let Some(binary) = find_binary(name) else {
+            return Err(Trouble::Said(format!("{name}: no binary named for it, nothing to record")));
+        };
+        let into = dirs.recorded.last().filter(|dir| !dir.starts_with(&shipped));
+        let Some(into) = into else {
+            return Err(Trouble::Said(
+                "record writes into a recorded directory of your own, and none was named"
+                    .to_string(),
+            ));
+        };
+        let held = RecordedAnswers::read(&dirs.recorded, name, &dialects)
+            .map_err(|faults| faults.join("\n"))?;
+        record::record_one_counter(
+            &mut out,
+            &adapters[0],
+            &binary,
+            &corpus,
+            &dialects,
+            held.as_ref(),
+            into,
+        )?;
+        return Ok(false);
+    }
+
     let mut broken = false;
     let mut ran = 0;
     for adapter in &adapters {
@@ -288,6 +341,8 @@ struct Settings {
 enum Command {
     Check,
     Explain { case: String },
+    #[cfg(feature = "maintenance")]
+    Record,
 }
 
 impl Settings {
@@ -305,7 +360,7 @@ impl Settings {
             wants_help: false,
         };
         let mut args = args.into_iter();
-        let Some(command) = args.next() else { return Err(USAGE.to_string()) };
+        let Some(command) = args.next() else { return Err(get_the_usage()) };
         match command.as_str() {
             "--help" | "-h" => {
                 settings.wants_help = true;
@@ -313,7 +368,12 @@ impl Settings {
             }
             "check" => {}
             "explain" => settings.command = Command::Explain { case: String::new() },
-            _ => return Err(format!("{command} is not a command of this program\n\n{USAGE}")),
+            #[cfg(feature = "maintenance")]
+            "record" => settings.command = Command::Record,
+            _ => {
+                let usage = get_the_usage();
+                return Err(format!("{command} is not a command of this program\n\n{usage}"));
+            }
         }
         // The flag is recognised before its value is taken, so a misspelled last flag is told it is
         // misspelled instead of being told it was given nothing.
@@ -336,7 +396,10 @@ impl Settings {
                     {
                         *case = flag;
                     }
-                    _ => return Err(format!("{flag} is not a flag of this command\n\n{USAGE}")),
+                    _ => {
+                        let usage = get_the_usage();
+                        return Err(format!("{flag} is not a flag of this command\n\n{usage}"));
+                    }
                 },
             }
         }
@@ -355,6 +418,20 @@ impl Settings {
             }
             if settings.recorded.is_some() {
                 return Err("--recorded belongs to check".to_string());
+            }
+        }
+        #[cfg(feature = "maintenance")]
+        if let Command::Record = &settings.command {
+            if settings.name_of_counter.is_none() {
+                return Err("record needs --counter to say whose answers it writes".to_string());
+            }
+            if settings.known_failures.is_some() {
+                return Err("--known-failures belongs to check".to_string());
+            }
+            if !settings.disabled.is_empty() {
+                return Err("--disabled belongs to check, and a record with a case left out of it \
+                            is not a record"
+                    .to_string());
             }
         }
         if settings.binary.is_some() && settings.name_of_counter.is_none() {
@@ -499,7 +576,7 @@ mod tests {
         let parsed = settings_of(&["explain", "0400-a_case", "--counter", "scc"]).unwrap();
         match parsed.command {
             Command::Explain { case } => assert_eq!(case, "0400-a_case"),
-            Command::Check => panic!("explain parsed as check"),
+            _ => panic!("explain parsed as another command"),
         }
         let empty = settings_of(&["explain"]).unwrap_err();
         assert!(empty.contains("needs the name of a case"), "{empty}");
