@@ -138,17 +138,18 @@ mod tests {
     #[test]
     fn a_relative_path_in_the_settings_resolves_against_the_folders_root() {
         let root = env::temp_dir().join("linejudge-a_folder_with_settings");
+        let absolute = env::temp_dir().join("known.txt").display().to_string().replace('\\', "/");
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join(FOLDER_NAME)).unwrap();
         fs::write(
             root.join(FOLDER_NAME).join(SETTINGS_FILE),
-            "corpus = \"cases\"\nknown-failures = \"D:/absolute/known.txt\"\n",
+            format!("corpus = \"cases\"\nknown-failures = \"{absolute}\"\n"),
         )
         .unwrap();
         let folder = Folder::find(&root).unwrap().unwrap_or_else(|| panic!("nothing found"));
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(folder.find_corpus().unwrap(), root.join("cases"));
-        assert_eq!(folder.find_known_failures().unwrap(), PathBuf::from("D:/absolute/known.txt"));
+        assert_eq!(folder.find_known_failures().unwrap(), PathBuf::from(&absolute));
         assert!(folder.find_dialects().is_none());
     }
 

@@ -77,15 +77,17 @@ mod tests {
 
     #[test]
     fn a_relative_binary_resolves_against_the_root_and_an_absolute_one_stays() {
+        let absolute = env::temp_dir().join("tokei.exe");
+        let root = env::temp_dir().join("somewhere");
         let mut counters = Counters::empty();
         counters.name_binary("mezura", PathBuf::from("target/release/mezura.exe"));
-        counters.name_binary("tokei", PathBuf::from("D:/dev/tools/tokei.exe"));
-        counters.resolve_against(Path::new("D:/somewhere"));
+        counters.name_binary("tokei", absolute.clone());
+        counters.resolve_against(&root);
         assert_eq!(
             counters.find_binary("mezura"),
-            Some(Path::new("D:/somewhere/target/release/mezura.exe"))
+            Some(root.join("target/release/mezura.exe").as_path())
         );
-        assert_eq!(counters.find_binary("tokei"), Some(Path::new("D:/dev/tools/tokei.exe")));
+        assert_eq!(counters.find_binary("tokei"), Some(absolute.as_path()));
     }
 
     #[test]
