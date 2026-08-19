@@ -103,9 +103,15 @@ counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.2090-docstring_holding_a_comment_symbol.default]
 counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+note = """
+any triple quoted block that opens a line is read as documentation, so the three lines of this one
+are comments by the definition it declares and not by a mistake"""
 
 [answer.2100-triple_quoted_data_not_documentation.default]
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+the same definition reaches a block that is data the program prints, so three lines of program
+data land in the comment count"""
 
 [answer.2110-here_string_holding_an_apostrophe.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }

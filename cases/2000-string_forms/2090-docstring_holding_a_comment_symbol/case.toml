@@ -1,4 +1,3 @@
 trap = """
-a comment symbol inside a docstring is text, and the docstring itself is a string. A counter that
-reads any triple quoted block opening a line as a comment answers this file differently, which is
-a definition and not a mistake"""
+the # inside the docstring is text and not a comment symbol, and the docstring around it is a
+triple quoted string like any other, opening a line on its own"""
