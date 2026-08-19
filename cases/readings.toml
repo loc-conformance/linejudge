@@ -5,8 +5,8 @@
 
 [rust-doc-comment]
 sentence = "the body of a doc comment, a Rust /// block, which a counter may read as a stretch of Markdown documentation of its own"
-witness = "4900-doc_comment_with_no_text"
+witness = "8040-doc_comment_with_no_text"
 
 [vue-template]
 sentence = "the markup inside a Vue file's <template> block, which a counter may read as a stretch of HTML of its own"
-witness = "5100-vue_blocks_count_as_their_own_languages"
+witness = "6090-vue_blocks_count_as_their_own_languages"

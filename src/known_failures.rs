@@ -55,31 +55,31 @@ mod tests {
 
     const A_LIST: &str = "\
 # the ones we know about
-2400-punctuation_only_line
-region:2300-blank_line_inside_block_comment      # only one of the two models fails this
+8010-punctuation_only_line
+region:8020-blank_line_inside_block_comment      # only one of the two models fails this
 
-4900-doc_comment_with_no_text
+8040-doc_comment_with_no_text
 ";
 
     #[test]
     fn a_case_named_alone_is_named_for_every_dialect() {
         let known = KnownFailures::of(A_LIST).unwrap();
-        assert!(known.names("content", "2400-punctuation_only_line"));
-        assert!(known.names("region", "2400-punctuation_only_line"));
-        assert!(known.names("default", "4900-doc_comment_with_no_text"));
+        assert!(known.names("content", "8010-punctuation_only_line"));
+        assert!(known.names("region", "8010-punctuation_only_line"));
+        assert!(known.names("default", "8040-doc_comment_with_no_text"));
     }
 
     #[test]
     fn a_case_named_with_a_dialect_is_named_for_that_one_only() {
         let known = KnownFailures::of(A_LIST).unwrap();
-        assert!(known.names("region", "2300-blank_line_inside_block_comment"));
-        assert!(!known.names("content", "2300-blank_line_inside_block_comment"));
+        assert!(known.names("region", "8020-blank_line_inside_block_comment"));
+        assert!(!known.names("content", "8020-blank_line_inside_block_comment"));
     }
 
     #[test]
     fn the_number_alone_names_no_case() {
         let known = KnownFailures::of(A_LIST).unwrap();
-        assert!(!known.names("content", "2400"));
+        assert!(!known.names("content", "8010"));
     }
 
     #[test]

@@ -77,7 +77,7 @@ mod tests {
         assert_eq!(named, ["rust-doc-comment", "vue-template"]);
         let doc = readings.find("rust-doc-comment").unwrap();
         assert!(doc.sentence.contains("doc comment"), "{}", doc.sentence);
-        assert_eq!(doc.witness, "4900-doc_comment_with_no_text");
+        assert_eq!(doc.witness, "8040-doc_comment_with_no_text");
         assert!(readings.find("js-jsdoc").is_none());
     }
 

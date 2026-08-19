@@ -315,16 +315,16 @@ mod tests {
     #[test]
     fn a_fragment_naming_one_case_runs_it_and_one_naming_several_lists_them_instead() {
         let (corpus, _, _) = read_everything();
-        assert!(find_case(&corpus, "4900-doc_comment_with_no_text").is_ok());
-        let unique = find_case(&corpus, "2500").unwrap_or_else(|refused| panic!("{refused}"));
-        assert_eq!(unique.name, "2500-docstring_holding_a_comment_symbol");
+        assert!(find_case(&corpus, "8040-doc_comment_with_no_text").is_ok());
+        let unique = find_case(&corpus, "2090").unwrap_or_else(|refused| panic!("{refused}"));
+        assert_eq!(unique.name, "2090-docstring_holding_a_comment_symbol");
         let refuse = |name: &str| {
             find_case(&corpus, name).err().unwrap_or_else(|| panic!("{name} found a case"))
         };
         let several = refuse("doc_comment_with_no_text");
         assert!(several.contains("more than one contains it"), "{several}");
-        assert!(several.contains("4900-doc_comment_with_no_text"), "{several}");
-        assert!(several.contains("5000-doc_comment_with_no_text_ending_a_block"), "{several}");
+        assert!(several.contains("8040-doc_comment_with_no_text"), "{several}");
+        assert!(several.contains("8050-doc_comment_with_no_text_ending_a_block"), "{several}");
         assert_eq!(refuse("a_case_of_no_such_kind"), "no case is named a_case_of_no_such_kind");
     }
 
@@ -332,12 +332,12 @@ mod tests {
     fn every_line_comes_out_with_its_spans_its_rule_and_its_region_and_no_binary_stops_nothing() {
         colored::control::set_override(false);
         let (corpus, dialects, adapters) = read_everything();
-        let case = find_case(&corpus, "4900-doc_comment_with_no_text").unwrap();
+        let case = find_case(&corpus, "8040-doc_comment_with_no_text").unwrap();
         let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
         let mut written = Vec::new();
         explain_one_counter(&mut written, tokei, None, case, &dialects, &corpus.readings).unwrap();
         let text = String::from_utf8(written).unwrap();
-        assert!(text.contains("tokei.default on 4900-doc_comment_with_no_text"), "{text}");
+        assert!(text.contains("tokei.default on 8040-doc_comment_with_no_text"), "{text}");
         assert!(text.contains("by a-comment-alone-is-comments"), "{text}");
         assert!(text.contains("(in-comment, word-in-comment)"), "{text}");
         assert!(text.contains("in Markdown"), "{text}");
@@ -348,7 +348,7 @@ mod tests {
     fn a_counter_with_a_per_line_command_and_no_binary_says_so_instead_of_failing() {
         colored::control::set_override(false);
         let (corpus, dialects, adapters) = read_everything();
-        let case = find_case(&corpus, "4900-doc_comment_with_no_text").unwrap();
+        let case = find_case(&corpus, "8040-doc_comment_with_no_text").unwrap();
         let scc = adapters.iter().find(|a| a.name_of_counter == "scc").unwrap();
         let mut written = Vec::new();
         explain_one_counter(&mut written, scc, None, case, &dialects, &corpus.readings).unwrap();
@@ -360,7 +360,7 @@ mod tests {
     fn a_line_the_counter_reads_differently_is_named_under_that_line_and_counted_at_the_top() {
         colored::control::set_override(false);
         let (corpus, dialects, _) = read_everything();
-        let case = find_case(&corpus, "2270-code_then_a_spliced_line_comment").unwrap();
+        let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
         let dialect = dialects.find("mezura", "content").unwrap();
         let explained = explain_every_line(&case.truth, dialect, &corpus.readings).unwrap();
         let ours = sum(&explained, dialect);
@@ -386,7 +386,7 @@ mod tests {
     fn a_counter_that_prints_a_document_nobody_can_read_says_what_is_wrong_with_it() {
         colored::control::set_override(false);
         let (corpus, dialects, adapters) = read_everything();
-        let case = find_case(&corpus, "2270-code_then_a_spliced_line_comment").unwrap();
+        let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
         let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
         let dialect = dialects.find("mezura", "content").unwrap();
         let explained = explain_every_line(&case.truth, dialect, &corpus.readings).unwrap();

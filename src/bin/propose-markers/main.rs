@@ -22,17 +22,17 @@ const USAGE: &str = r#"propose-markers <spec>
     so read what it wrote before believing it. 'cargo test' then refuses a truth that does not
     match its input.
 
-    Case 0550 is a worked example. Its first line is
+    Case 1070 is a worked example. Its first line is
 
         /* block */ // trailing
 
     which holds two comments, so its spec is
 
-        == 0550
+        == 1070
         1 C /*| block |*/
         1 C //| trailing
 
-    In case 0550, on line 1, there is a comment that the symbol /* opens and the symbol */
+    In case 1070, on line 1, there is a comment that the symbol /* opens and the symbol */
     closes, and another that // opens and nothing closes, so it runs to the end of the line.
     The first bar ends the opening symbol, the second begins the closing one; with no second
     bar the span runs to the end of the line, and a closing bar at the very end, like \|"|,
@@ -413,11 +413,16 @@ fn find_text(
 }
 
 fn find_case(id: &str) -> Result<PathBuf, String> {
-    let entries = fs::read_dir("cases").map_err(|e| format!("cases: {e}"))?;
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with(&format!("{id}-")) {
-            return Ok(entry.path());
+    let groups = fs::read_dir("cases").map_err(|e| format!("cases: {e}"))?;
+    for group in groups.flatten() {
+        let Ok(entries) = fs::read_dir(group.path()) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with(&format!("{id}-")) {
+                return Ok(entry.path());
+            }
         }
     }
     Err(format!("no case starts with {id}-"))

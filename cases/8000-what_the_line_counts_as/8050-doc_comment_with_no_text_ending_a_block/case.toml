@@ -1,4 +1,4 @@
 trap = """
-the same empty doc comment line as case 4900, this time with no further documentation under it.
+the same empty doc comment line as case 8040, this time with no further documentation under it.
 What makes it its own case is that the answer stops being about comments and becomes about
 lines"""

@@ -288,7 +288,7 @@ mod tests {
         dialects: &Dialects,
     ) -> Result<Vec<Judged<'static>>, Vec<String>> {
         let cases = root.join("cases");
-        let dir = cases.join("0400-a_case_built_by_a_test");
+        let dir = cases.join("0000-a_group_built_by_a_test").join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(root);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();

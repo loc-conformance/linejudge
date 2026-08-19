@@ -1,3 +1,0 @@
-trap = """
-the same close and reopen as case 0700 with whitespace between the symbols, which must change
-nothing"""

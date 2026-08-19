@@ -2,4 +2,4 @@ trap = """
 a triple quoted string that is data the program prints, not documentation, with its opening
 symbol at the start of a line. A counter that reads any triple quoted block opening a line as a
 comment puts three lines of program data in its comment count, which is a definition and not a
-mistake, and case 2500 is the same definition where the block really is documentation"""
+mistake, and case 2090 is the same definition where the block really is documentation"""

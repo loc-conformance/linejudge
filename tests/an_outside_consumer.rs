@@ -43,10 +43,10 @@ fn a_consumer_reads_what_was_recorded_about_a_counter_of_the_roster() {
     assert!(!is_same_build(&record.version, "unknown version"));
 
     let entry = record
-        .find("0100-escaped_quote_before_comment", "default")
+        .find("3010-escaped_quote_before_comment", "default")
         .unwrap_or_else(|| panic!("0100 is not recorded"));
     let counted = entry.counted.as_ref().unwrap_or_else(|| panic!("0100 was not claimed"));
     assert!(counted.counts.buckets.contains_key("code"));
     assert!(!entry.is_known_failure);
-    assert!(record.find_exception("0100-escaped_quote_before_comment", "default").is_none());
+    assert!(record.find_exception("3010-escaped_quote_before_comment", "default").is_none());
 }

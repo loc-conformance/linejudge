@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -11,9 +11,12 @@ use crate::truth::Truth;
 pub const DISABLED_PREFIX: &str = "disabled-";
 
 const CASE_FILE: &str = "case.toml";
+const GROUP_SIZE: u32 = 1000;
 const INPUT_STEM: &str = "input.";
 const TRUTH_FILE: &str = "truth.txt";
 
+/// Every case of the corpus, read from a directory holding one directory per group, each named
+/// after a whole thousand, with the cases of that thousand inside it.
 pub struct Corpus {
     pub cases: Vec<Case>,
     /// The cases set aside by the `disabled-` prefix on their directory, named without it. Their
@@ -31,12 +34,8 @@ impl Corpus {
                 return Err(vec![Fault { case: READINGS_FILE.to_string(), message }]);
             }
         };
-        let mut dirs = match fs::read_dir(dir) {
-            Ok(entries) => entries
-                .filter_map(|e| e.ok())
-                .map(|e| e.path())
-                .filter(|p| p.is_dir())
-                .collect::<Vec<_>>(),
+        let groups = match find_the_directories_in(dir) {
+            Ok(groups) => groups,
             Err(error) => {
                 return Err(vec![Fault {
                     case: dir.display().to_string(),
@@ -44,19 +43,42 @@ impl Corpus {
                 }]);
             }
         };
-        dirs.sort();
 
-        let mut cases = Vec::with_capacity(dirs.len());
+        let mut cases = Vec::new();
         let mut disabled = Vec::new();
         let mut faults = Vec::new();
-        for path in dirs {
-            if let Some(name) = find_disabled_name(&path) {
-                disabled.push(name);
-                continue;
-            }
-            match Case::read(&path, &readings) {
-                Ok(case) => cases.push(case),
-                Err(mut found) => faults.append(&mut found),
+        for group in groups {
+            let group_name = get_name_of(&group);
+            let first = match find_the_first_number_of(&group_name) {
+                Ok(first) => first,
+                Err(message) => {
+                    faults.push(Fault { case: group_name, message });
+                    continue;
+                }
+            };
+            let inside = match find_the_directories_in(&group) {
+                Ok(inside) => inside,
+                Err(error) => {
+                    let message = format!("the group directory could not be opened: {error}");
+                    faults.push(Fault { case: group_name, message });
+                    continue;
+                }
+            };
+            for path in inside {
+                let name = get_name_of(&path);
+                let disabled_name = find_disabled_name(&name);
+                let named = disabled_name.clone().unwrap_or(name);
+                if let Err(message) = check_the_number_of(&named, first, &group_name) {
+                    faults.push(Fault { case: named, message });
+                    continue;
+                }
+                match disabled_name {
+                    Some(name) => disabled.push(name),
+                    None => match Case::read(&path, &readings) {
+                        Ok(case) => cases.push(case),
+                        Err(mut found) => faults.append(&mut found),
+                    },
+                }
             }
         }
         disabled.sort();
@@ -73,9 +95,9 @@ impl Corpus {
     }
 }
 
-/// `name` is the whole directory name, number and words together, and it is how a case is named in
-/// the report and in a known-failures file: the number alone stops naming the same case the day the
-/// corpus is renumbered.
+/// `name` is the case's own directory name, number and words together, and it is how a case is
+/// named in the report and in a known-failures file. The group it sits in is no part of it, so
+/// moving a case between groups is a renumbering and nothing else.
 pub struct Case {
     pub name: String,
     pub input_file: PathBuf,
@@ -85,10 +107,7 @@ pub struct Case {
 
 impl Case {
     pub fn read(dir: &Path, readings: &Readings) -> Result<Case, Vec<Fault>> {
-        let name = dir
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| dir.display().to_string());
+        let name = get_name_of(dir);
         let one = |message: String| vec![Fault { case: name.clone(), message }];
 
         let input_file = match find_input_file_in(dir) {
@@ -163,11 +182,56 @@ impl fmt::Display for Fault {
     }
 }
 
-fn find_disabled_name(dir: &Path) -> Option<String> {
-    dir.file_name()
-        .and_then(|name| name.to_str())
-        .and_then(|name| name.strip_prefix(DISABLED_PREFIX))
-        .map(|name| name.to_string())
+fn find_disabled_name(name: &str) -> Option<String> {
+    name.strip_prefix(DISABLED_PREFIX).map(|name| name.to_string())
+}
+
+fn get_name_of(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
+fn find_the_directories_in(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
+    let mut found: Vec<PathBuf> = fs::read_dir(dir)?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
+    found.sort();
+    Ok(found)
+}
+
+fn find_the_first_number_of(group: &str) -> Result<u32, String> {
+    match find_the_number_in(group) {
+        Some(number) if number % GROUP_SIZE == 0 => Ok(number),
+        _ => Err(format!(
+            "a corpus holds groups and a group holds cases, so {group} has to be named after a \
+             whole thousand, as <thousand>-<words>"
+        )),
+    }
+}
+
+/// A case filed under the wrong group would keep working and stop being findable by anybody
+/// reading the corpus by number, so the group a case sits in has to agree with the case's own
+/// number.
+fn check_the_number_of(case: &str, first: u32, group: &str) -> Result<(), String> {
+    match find_the_number_in(case) {
+        Some(number) if (first..first + GROUP_SIZE).contains(&number) => Ok(()),
+        Some(_) => Err(format!(
+            "it sits in {group}, whose cases are numbered {first} to {}",
+            first + GROUP_SIZE - 1
+        )),
+        None => Err(format!("{case} has to be named <number>-<words>")),
+    }
+}
+
+fn find_the_number_in(name: &str) -> Option<u32> {
+    let digits = name.split('-').next()?;
+    match digits.len() == 4 {
+        true => digits.parse().ok(),
+        false => None,
+    }
 }
 
 /// A case is one directory holding one `input.<extension>`, and that file is the whole of what a
@@ -225,6 +289,7 @@ mod tests {
 
     use super::*;
 
+    const A_GROUP: &str = "0000-a_group_built_by_a_test";
     const ONE_CASE: &str = "trap = \"\"\"\n\
                             a line comment inside a block comment is part of the block\"\"\"\n";
 
@@ -243,7 +308,7 @@ mod tests {
     #[test]
     fn a_case_that_carries_no_truth_is_refused() {
         let root = env::temp_dir().join("linejudge-a_case_with_no_truth");
-        let dir = root.join("0400-a_case_built_by_a_test");
+        let dir = root.join(A_GROUP).join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
@@ -267,8 +332,8 @@ mod tests {
     #[test]
     fn a_disabled_case_is_set_aside_by_its_directory_name_and_never_read() {
         let root = env::temp_dir().join("linejudge-a_disabled_case");
-        let kept = root.join("0400-a_case_built_by_a_test");
-        let aside = root.join("disabled-0500-a_case_nobody_trusts");
+        let kept = root.join(A_GROUP).join("0400-a_case_built_by_a_test");
+        let aside = root.join(A_GROUP).join("disabled-0500-a_case_nobody_trusts");
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&kept).unwrap();
         fs::create_dir_all(&aside).unwrap();
@@ -282,6 +347,30 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(corpus.cases.len(), 1);
         assert_eq!(corpus.disabled, ["0500-a_case_nobody_trusts"]);
+    }
+
+    #[test]
+    fn a_case_outside_its_groups_thousand_is_refused_and_so_is_a_group_that_is_not_one() {
+        let root = env::temp_dir().join("linejudge-a_case_in_the_wrong_group");
+        let stray = root.join(A_GROUP).join("1400-a_case_of_another_thousand");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&stray).unwrap();
+        fs::write(stray.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
+        let misfiled = Corpus::read(&root)
+            .err()
+            .unwrap_or_else(|| panic!("it was read anyway"));
+
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("1234-not_a_whole_thousand").join("1240-a_case")).unwrap();
+        let ungrouped = Corpus::read(&root)
+            .err()
+            .unwrap_or_else(|| panic!("it was read anyway"));
+        fs::remove_dir_all(&root).unwrap();
+
+        assert_eq!(misfiled.len(), 1, "{misfiled:?}");
+        assert_eq!(misfiled[0].case, "1400-a_case_of_another_thousand");
+        assert!(misfiled[0].message.contains("numbered 0 to 999"), "{misfiled:?}");
+        assert!(ungrouped[0].message.contains("whole thousand"), "{ungrouped:?}");
     }
 
     #[test]
@@ -302,7 +391,7 @@ mod tests {
     #[test]
     fn the_witness_of_a_reading_has_to_exist_and_to_mark_it() {
         let root = env::temp_dir().join("linejudge-a_witness_that_is_not_there");
-        let dir = root.join("0400-a_case_built_by_a_test");
+        let dir = root.join(A_GROUP).join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
@@ -336,7 +425,7 @@ mod tests {
         marked: &str,
     ) -> Result<Corpus, Vec<Fault>> {
         let root = env::temp_dir().join(format!("linejudge-{name}"));
-        let dir = root.join("0400-a_case_built_by_a_test");
+        let dir = root.join(A_GROUP).join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(input_file), input).unwrap();

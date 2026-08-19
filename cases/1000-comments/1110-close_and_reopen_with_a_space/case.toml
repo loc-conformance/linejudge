@@ -1,0 +1,3 @@
+trap = """
+the same close and reopen as case 1100 with whitespace between the symbols, which must change
+nothing"""

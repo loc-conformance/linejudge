@@ -58,7 +58,7 @@ linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--c
 
     With --known-failures, the run breaks on a failing case the file does not name, and on nothing
     else. One case per line, named the way this report names it, '#' starts a comment, and
-    'region:2400-punctuation_only_line' names one way of counting where naming the case alone
+    'region:8010-punctuation_only_line' names one way of counting where naming the case alone
     names them all. It needs --counter.
 
 linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--adapters <dir>]

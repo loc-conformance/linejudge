@@ -1,5 +1,5 @@
 trap = """
 the '//' opening the line comment is formed on the '/' that closes the block comment, so the two
-share a byte and no search for '//' yields both of the places it appears to be at. Case 0550 is
+share a byte and no search for '//' yields both of the places it appears to be at. Case 1070 is
 the same line with a space between them, and Pascal's '{ block }//trailing' is the same line
 again with a closer that shares no byte with it"""
