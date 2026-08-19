@@ -191,6 +191,12 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
     if !excess.starts_with(' ') {
         return Err(format!("the marker under [{source}] runs past the end of the line"));
     }
+    // Whatever sits past the columns is read as a label, and the one thing that lands there
+    // without anybody writing it is the whitespace an editor leaves behind, which no eye can see
+    // in the file. It gets named for what it is instead of failing as an empty label.
+    if excess.trim().is_empty() {
+        return Err(format!("the marker under [{source}] ends in trailing whitespace"));
+    }
     let opens_a_span = marker.chars().any(|ch| find_marks_of_opener(ch).is_some());
     if !marker.contains(TAG_OPENS) && !opens_a_span {
         return Err(format!("[{}] labels a line that opens no tag and no span", excess.trim()));
@@ -588,6 +594,18 @@ mod tests {
     fn a_label_on_a_line_that_opens_nothing_is_refused() {
         let refused = Truth::read("int x = 1;\n... . . .. CSS\n", "int x = 1;\n").unwrap_err();
         assert!(refused[0].contains("opens no tag and no span"), "{refused:?}");
+    }
+
+    // The one thing that lands past the columns without anybody writing it, and it is invisible in
+    // the file, so the refusal has to name it instead of reporting an empty label.
+    #[test]
+    fn a_marker_row_ending_in_whitespace_is_blamed_on_the_whitespace_and_not_on_a_label() {
+        let refused = Truth::read("int x = 1;\n... . . .. \n", "int x = 1;\n").unwrap_err();
+        assert!(refused[0].contains("ends in trailing whitespace"), "{refused:?}");
+
+        let on_an_opener = Truth::read("// a comment\nCCcccccccccc  \n", "// a comment\n");
+        let refused = on_an_opener.unwrap_err();
+        assert!(refused[0].contains("ends in trailing whitespace"), "{refused:?}");
     }
 
     // The refusal is what a case author meets, and before it existed they met a marker reported as

@@ -194,7 +194,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::adapter::{Acquisition, Reader};
+    use crate::adapter::Reader;
     use crate::answer::Counts;
     use crate::dialects::{Dialects, read_the_shipped_dialects};
     use crate::measurement::OutputFormat;
@@ -330,10 +330,7 @@ mod tests {
             explain_output: None,
             explain_keep_from: None,
             version_flag: None,
-            acquisition: Acquisition {
-                channel: "crates-io".to_string(),
-                name: "tokei".to_string(),
-            },
+            acquisition: None,
             dialects: vec![Dialect {
                 name: "default".to_string(),
                 args: Vec::new(),

@@ -37,7 +37,9 @@ pub struct Adapter {
     /// matches, everything is shown and the report says so.
     pub explain_keep_from: Option<String>,
     pub version_flag: Option<String>,
-    pub acquisition: Acquisition,
+    /// Where the binary is downloaded from. `None` is a counter that cannot be fetched: it is left
+    /// out of any scheduled sweep, loudly, and still runs for anyone holding its binary.
+    pub acquisition: Option<Acquisition>,
     pub dialects: Vec<Dialect>,
 }
 
@@ -312,7 +314,7 @@ struct RawAdapter {
     explain_keep_from: Option<String>,
     #[serde(rename = "version-flag")]
     version_flag: Option<String>,
-    acquisition: Acquisition,
+    acquisition: Option<Acquisition>,
     dialect: std::collections::BTreeMap<String, RawDialect>,
 }
 
@@ -342,11 +344,25 @@ mod tests {
         assert_eq!(dialects, ["content", "region"]);
         assert_eq!(mezura.dialects[0].buckets, ["code", "comments", "extra"]);
         assert_eq!(mezura.dialects[1].buckets, ["code", "comments", "blanks"]);
-        assert_eq!(adapters[2].acquisition.channel, "crates-io");
+        assert_eq!(adapters[2].acquisition.as_ref().map(|a| a.channel.as_str()), Some("crates-io"));
         for dialect in mezura.dialects.iter().chain(&adapters[1].dialects) {
             assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
         }
         assert!(matches!(adapters[2].dialects[0].reader, Reader::Written(OutputFormat::TokeiJson)));
+    }
+
+    // A counter nobody publishes anywhere has no channel to declare, and forcing one would be
+    // asking its adapter to lie. What the absence costs is only that nothing can fetch it.
+    #[test]
+    fn an_adapter_with_no_acquisition_reads_as_a_counter_that_cannot_be_fetched() {
+        let path = write_an_adapter(
+            "an_adapter_that_cannot_be_fetched",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             [dialect.default]\nargs = []\n",
+        );
+        let adapter = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(adapter.acquisition.is_none());
     }
 
     #[test]

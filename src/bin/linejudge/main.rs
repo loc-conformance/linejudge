@@ -6,6 +6,7 @@ mod style;
 
 use std::env;
 use std::io::{self, ErrorKind, Write};
+use std::path;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::vec::IntoIter;
@@ -114,7 +115,7 @@ impl From<io::Error> for Trouble {
 }
 
 fn run(args: Vec<String>) -> Result<bool, Trouble> {
-    let settings = Settings::of(args)?;
+    let mut settings = Settings::of(args)?;
     let mut out = io::stdout().lock();
     if settings.wants_help {
         writeln!(out, "{USAGE}")?;
@@ -124,6 +125,16 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         Ok(here) => Folder::find(&here)?,
         Err(_) => None,
     };
+    // The run moves to the folder's root, so that a relative path inside an adapter's args, a
+    // wrapper script say, resolves against the project wherever the command was typed, by the same
+    // rule the counters file already follows. A path given as a flag means it from where it was
+    // typed, so those are pinned down first.
+    if let Some(folder) = &folder {
+        anchor_every_path_of(&mut settings);
+        env::set_current_dir(folder.get_root()).map_err(|e| {
+            format!("{} could not be moved into: {e}", folder.get_root().display())
+        })?;
+    }
     let dirs = resolve_dirs(&settings, folder.as_ref());
     let dialects = Dialects::read(&dirs.dialects).map_err(|faults| faults.join("\n"))?;
     let mut corpus = read_the_corpus(&dirs.corpus)?;
@@ -373,6 +384,22 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>) -> Dirs {
             .known_failures
             .clone()
             .or_else(|| folder.and_then(Folder::find_known_failures)),
+    }
+}
+
+fn anchor_every_path_of(settings: &mut Settings) {
+    for path in [
+        &mut settings.corpus,
+        &mut settings.adapters,
+        &mut settings.dialects,
+        &mut settings.recorded,
+        &mut settings.binary,
+        &mut settings.known_failures,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        *path = path::absolute(&path).unwrap_or_else(|_| path.clone());
     }
 }
 
