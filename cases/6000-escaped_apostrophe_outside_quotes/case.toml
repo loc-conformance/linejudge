@@ -1,15 +1,3 @@
 trap = """
 a backslash before an apostrophe in unquoted shell text, which is how one writes an apostrophe
 without quoting it. Shell escapes with the backslash outside a string and not inside"""
-
-[answer.mezura.content]
-counted = { lines = 4, code = 2, comments = 2, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 4, code = 2, comments = 2, blanks = 0 }

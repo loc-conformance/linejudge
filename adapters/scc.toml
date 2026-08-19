@@ -1,5 +1,4 @@
 name   = "scc"
-output = "scc-json"
 args   = ["--format", "json", "{file}"]
 explain-args = ["-t", "--no-cocomo", "-f", "csv", "{file}"]
 explain-keep-from = "line "
@@ -10,3 +9,10 @@ name    = "boyter/scc"
 
 [dialect.default]
 args = []
+
+[dialect.default.read]
+each     = "[]"
+lines    = "Lines"
+code     = "Code"
+comments = "Comment"
+blanks   = "Blank"

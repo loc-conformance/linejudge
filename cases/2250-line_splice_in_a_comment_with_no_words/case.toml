@@ -1,19 +1,3 @@
 trap = """
 the splice of case 2200 on a comment line holding no letter or digit at all, which is how a
 decorative rule is written. What a line says has no bearing on whether it continues"""
-
-[answer.mezura.content]
-counted = { lines = 4, code = 2, comments = 1, extra = 1 }
-
-[answer.mezura.region]
-counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
-note    = """
-the comment ends at the newline, so the line joined to it is counted as code"""
-
-[answer.tokei.default]
-counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
-note    = """
-the comment ends at the newline, so the line joined to it is counted as code"""

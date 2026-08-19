@@ -12,29 +12,48 @@ use std::vec::IntoIter;
 
 use linejudge::adapter::Adapter;
 use linejudge::corpus::Corpus;
-use linejudge::counters::COUNTERS_FILE;
 use linejudge::counters::Counters;
 use linejudge::dialects::Dialects;
+use linejudge::linejudge_folder::COUNTERS_FILE;
+use linejudge::linejudge_folder::Folder;
 use linejudge::known_failures::KnownFailures;
+use linejudge::recorded::RECORDED_DIR;
+use linejudge::recorded::{RecordedAnswers, is_same_build};
 use linejudge::verdict::measure_and_judge_every_case;
 
 use crate::explain::{explain_one_counter, find_case};
-use crate::report::{report_entries_that_name_nothing, report_the_verdicts_of_one_dialect};
+use crate::report::OneRun;
+use crate::report::{
+    report_entries_that_name_nothing, report_recorded_answers_that_name_nothing,
+    report_the_verdicts_of_one_dialect,
+};
 
 const ADAPTERS_DIR: &str = "adapters";
 const CASES_DIR: &str = "cases";
 const DIALECTS_DIR: &str = "dialects";
 const USAGE: &str = "\
 linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--corpus <dir>]
-                [--adapters <dir>] [--dialects <dir>]
+                [--adapters <dir>] [--dialects <dir>] [--recorded <dir>] [--disabled <case>]
 
-    Runs every counter it has a binary for over every case, and says for each of them whether it
-    answers what its own rules ask for. Binaries are named in linejudge-counters.toml in the
-    directory it is run from, or with --bin, which needs --counter to say whose binary it is.
+    Runs every counter it has a binary for over every case, and answers two questions apart. The
+    first is conformance: does the counter answer what its own declared rules ask for, judged for
+    any counter at all. The second is drift: does it still answer what it did when its answers
+    were recorded, judged only where recorded/<counter>.toml holds a photograph and the binary is
+    the version written at the top of it; a different build is said once and what changed since
+    is reported, never judged. A case a counter breaks on, by exiting non-zero or printing
+    something unreadable, is an outcome of its own beside the failures, and every other case is
+    measured anyway.
 
-    The cases, the dialects and the adapters are looked for in that same directory, so run it from
-    a checkout of the linejudge repository or point it at one with --corpus, --dialects and
-    --adapters.
+    Binaries are named in .linejudge/counters.toml, or with --bin, which needs --counter to say
+    whose binary it is, and whatever a fetch has put in .linejudge/bin/ is found under the
+    counter's own name. The .linejudge folder is looked for upward from the working directory,
+    the way cargo finds its own, and its settings.toml can name the corpus, adapters, dialects,
+    recorded and known-failures paths. A flag wins over the folder, and the folder wins over the
+    defaults, which are the directories of a linejudge checkout.
+
+    A case whose directory name starts with 'disabled-' is set aside and named, never judged,
+    since the prefix says this suite's own resolution of it is not to be trusted. --disabled sets
+    one more aside for a single run.
 
     With --known-failures, the run breaks on a failing case the file does not name, and on nothing
     else. One case per line, named the way this report names it, '#' starts a comment, and
@@ -101,61 +120,123 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         writeln!(out, "{USAGE}")?;
         return Ok(false);
     }
-    let dialects = Dialects::read(&settings.dialects).map_err(|faults| faults.join("\n"))?;
-    let corpus = read_the_corpus(&settings.corpus, &dialects)?;
-    let adapters = match &settings.name_of_counter {
-        Some(name) => vec![Adapter::read_one(&settings.adapters, name, &dialects)?],
-        None => Adapter::read_all(&settings.adapters, &dialects)?,
+    let folder = match env::current_dir() {
+        Ok(here) => Folder::find(&here)?,
+        Err(_) => None,
     };
-    // With --bin there is no reason to open linejudge-counters.toml, the desired
-    // counter tool has been named
+    let dirs = resolve_dirs(&settings, folder.as_ref());
+    let dialects = Dialects::read(&dirs.dialects).map_err(|faults| faults.join("\n"))?;
+    let mut corpus = read_the_corpus(&dirs.corpus)?;
+    set_aside_what_was_disabled(&mut corpus, &settings.disabled)?;
+    let adapters = match &settings.name_of_counter {
+        Some(name) => vec![Adapter::read_one(&dirs.adapters, name, &dialects)?],
+        None => Adapter::read_all(&dirs.adapters, &dialects)?,
+    };
+    // With --bin there is no reason to open the counters file, the desired counter tool has been
+    // named.
     let counters = match (&settings.name_of_counter, &settings.binary) {
         (Some(counter), Some(binary)) => {
             let mut counters = Counters::empty();
             counters.name_binary(counter, binary.clone());
             counters
         }
-        _ => Counters::read(Path::new(COUNTERS_FILE))?,
+        _ => match &folder {
+            Some(folder) => {
+                let mut counters = Counters::read(&folder.get_counters_file())?;
+                counters.resolve_against(folder.get_root());
+                counters
+            }
+            None => Counters::empty(),
+        },
     };
-    let known_failures = match &settings.known_failures {
-        Some(path) => Some(KnownFailures::read(path)?),
-        None => None,
+    let find_binary = |counter: &str| {
+        counters
+            .find_binary(counter)
+            .map(Path::to_path_buf)
+            .or_else(|| folder.as_ref().and_then(|folder| folder.find_fetched_binary(counter)))
+    };
+    let known_failures = match (&dirs.known_failures, &settings.name_of_counter) {
+        (Some(path), Some(_)) => Some(KnownFailures::read(path)?),
+        (Some(_), None) => {
+            return Err(Trouble::Said(
+                "a known-failures list needs --counter to say whose failures it names".to_string(),
+            ));
+        }
+        (None, _) => None,
     };
 
     if let Command::Explain { case } = &settings.command {
-        let found = find_case(&corpus, case)?;
+        let found = match find_case(&corpus, case) {
+            Ok(found) => found,
+            Err(_) if corpus.disabled.iter().any(|name| name.contains(case.as_str())) => {
+                return Err(Trouble::Said(format!(
+                    "{case} names a disabled case, whose resolution this suite itself does not \
+                     trust, so there is nothing honest to explain"
+                )));
+            }
+            Err(message) => return Err(Trouble::Said(message)),
+        };
         if found.name != *case {
             writeln!(out, "{}", style::DETAIL.paint(&format!(
                     "no case is named {case}, so this is {}", found.name)))?;
         }
         for adapter in &adapters {
-            let binary = counters.find_binary(&adapter.name_of_counter);
-            explain_one_counter(&mut out, adapter, binary, found, &dialects, &corpus.readings)?;
+            let binary = find_binary(&adapter.name_of_counter);
+            explain_one_counter(&mut out, adapter, binary.as_deref(), found, &dialects, &corpus.readings)?;
         }
         return Ok(false);
     }
 
+    if !corpus.disabled.is_empty() {
+        let what = if corpus.disabled.len() == 1 { "case is" } else { "cases are" };
+        writeln!(out, "{}", style::RECORDED.paint(&format!(
+                "{} {what} set aside as disabled and not judged: {}",
+                corpus.disabled.len(), corpus.disabled.join(", "))))?;
+    }
     let mut broken = false;
     let mut ran = 0;
     for adapter in &adapters {
-        let Some(binary) = counters.find_binary(&adapter.name_of_counter) else {
+        let name = &adapter.name_of_counter;
+        let Some(binary) = find_binary(name) else {
             writeln!(out, "{}", style::RECORDED.paint(&format!(
-                    "{}: no binary named for it, nothing run", adapter.name_of_counter)))?;
+                    "{name}: no binary named for it, nothing run")))?;
             continue;
         };
         ran += 1;
-        let version = adapter.read_version_or_unknown(binary);
+        let version = adapter.read_version_or_unknown(&binary);
+        let record = RecordedAnswers::read(&dirs.recorded, name, &dialects)
+            .map_err(|faults| faults.join("\n"))?;
+        let drift_is_judged =
+            record.as_ref().is_some_and(|record| is_same_build(&record.version, &version));
+        if let Some(record) = &record
+            && !drift_is_judged
+        {
+            writeln!(out, "\n{}  {}", style::HEADING.paint(name), style::RECORDED.paint(&format!(
+                    "recorded at [{}] and running [{version}], so what changed since the record \
+                     is not judged", record.version)))?;
+        }
         for dialect in &adapter.dialects {
-            let judged = measure_and_judge_every_case(adapter, dialect, binary, &corpus)?;
-            broken |= report_the_verdicts_of_one_dialect(
-                &mut out,
+            let Some(rules) = dialects.find(name, &dialect.name) else {
+                return Err(Trouble::Said(format!(
+                    "{name}.{} names no dialect file to judge by", dialect.name
+                )));
+            };
+            let judged = measure_and_judge_every_case(
                 adapter,
                 dialect,
-                binary,
+                rules,
+                &binary,
+                &corpus,
+                record.as_ref(),
                 &version,
-                &judged,
-                known_failures.as_ref(),
-            )?;
+            )
+            .map_err(|faults| faults.join("\n"))?;
+            let run = OneRun { adapter, dialect, binary: &binary, version: &version, drift_is_judged };
+            broken |=
+                report_the_verdicts_of_one_dialect(&mut out, &run, &judged, known_failures.as_ref())?;
+        }
+        if let Some(record) = &record {
+            report_recorded_answers_that_name_nothing(&mut out, record, &corpus)?;
         }
         if let Some(known_failures) = &known_failures {
             report_entries_that_name_nothing(&mut out, adapter, &corpus, known_failures)?;
@@ -165,7 +246,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
     // hides, and a name misspelled in the counters file is all it takes.
     if ran == 0 {
         return Err(Trouble::Said(format!(
-            "no counter was run: name a binary with --bin, or in {COUNTERS_FILE} beside the command"
+            "no counter was run: name a binary with --bin, or in .linejudge/{COUNTERS_FILE} beside \
+             the project"
         )));
     }
     Ok(broken)
@@ -174,12 +256,14 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
 #[derive(Debug)]
 struct Settings {
     command: Command,
-    corpus: PathBuf,
-    adapters: PathBuf,
-    dialects: PathBuf,
+    corpus: Option<PathBuf>,
+    adapters: Option<PathBuf>,
+    dialects: Option<PathBuf>,
+    recorded: Option<PathBuf>,
     name_of_counter: Option<String>,
     binary: Option<PathBuf>,
     known_failures: Option<PathBuf>,
+    disabled: Vec<String>,
     wants_help: bool,
 }
 
@@ -193,12 +277,14 @@ impl Settings {
     fn of(args: Vec<String>) -> Result<Settings, String> {
         let mut settings = Settings {
             command: Command::Check,
-            corpus: PathBuf::from(CASES_DIR),
-            adapters: PathBuf::from(ADAPTERS_DIR),
-            dialects: PathBuf::from(DIALECTS_DIR),
+            corpus: None,
+            adapters: None,
+            dialects: None,
+            recorded: None,
             name_of_counter: None,
             binary: None,
             known_failures: None,
+            disabled: Vec::new(),
             wants_help: false,
         };
         let mut args = args.into_iter();
@@ -217,14 +303,16 @@ impl Settings {
         while let Some(flag) = args.next() {
             match flag.as_str() {
                 "--help" | "-h" => settings.wants_help = true,
-                "--corpus" => settings.corpus = PathBuf::from(value_of(&flag, &mut args)?),
-                "--adapters" => settings.adapters = PathBuf::from(value_of(&flag, &mut args)?),
-                "--dialects" => settings.dialects = PathBuf::from(value_of(&flag, &mut args)?),
+                "--corpus" => settings.corpus = Some(PathBuf::from(value_of(&flag, &mut args)?)),
+                "--adapters" => settings.adapters = Some(PathBuf::from(value_of(&flag, &mut args)?)),
+                "--dialects" => settings.dialects = Some(PathBuf::from(value_of(&flag, &mut args)?)),
+                "--recorded" => settings.recorded = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--counter" => settings.name_of_counter = Some(value_of(&flag, &mut args)?),
                 "--bin" => settings.binary = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--known-failures" => {
                     settings.known_failures = Some(PathBuf::from(value_of(&flag, &mut args)?))
                 }
+                "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
                 _ => match &mut settings.command {
                     Command::Explain { case }
                         if case.is_empty() && !flag.starts_with('-') =>
@@ -245,6 +333,12 @@ impl Settings {
             if settings.known_failures.is_some() {
                 return Err("--known-failures belongs to check".to_string());
             }
+            if !settings.disabled.is_empty() {
+                return Err("--disabled belongs to check".to_string());
+            }
+            if settings.recorded.is_some() {
+                return Err("--recorded belongs to check".to_string());
+            }
         }
         if settings.binary.is_some() && settings.name_of_counter.is_none() {
             return Err("--bin needs --counter to say whose binary it is".to_string());
@@ -256,13 +350,40 @@ impl Settings {
     }
 }
 
+/// Where everything is read from: a flag wins over the `.linejudge` folder, and the folder wins
+/// over the defaults, which are the directories of a checkout.
+struct Dirs {
+    corpus: PathBuf,
+    adapters: PathBuf,
+    dialects: PathBuf,
+    recorded: PathBuf,
+    known_failures: Option<PathBuf>,
+}
+
+fn resolve_dirs(settings: &Settings, folder: Option<&Folder>) -> Dirs {
+    let pick = |flag: &Option<PathBuf>, named: Option<PathBuf>, or_else: &str| {
+        flag.clone().or(named).unwrap_or_else(|| PathBuf::from(or_else))
+    };
+    Dirs {
+        corpus: pick(&settings.corpus, folder.and_then(Folder::find_corpus), CASES_DIR),
+        adapters: pick(&settings.adapters, folder.and_then(Folder::find_adapters), ADAPTERS_DIR),
+        dialects: pick(&settings.dialects, folder.and_then(Folder::find_dialects), DIALECTS_DIR),
+        recorded: pick(&settings.recorded, folder.and_then(Folder::find_recorded), RECORDED_DIR),
+        known_failures: settings
+            .known_failures
+            .clone()
+            .or_else(|| folder.and_then(Folder::find_known_failures)),
+    }
+}
+
 fn value_of(flag: &str, args: &mut IntoIter<String>) -> Result<String, String> {
     args.next().ok_or_else(|| format!("{flag} was given nothing"))
 }
 
-fn read_the_corpus(dir: &Path, dialects: &Dialects) -> Result<Corpus, String> {
-    let corpus = Corpus::read(dir, dialects).map_err(|faults| {
-        let mut report = format!("{} cases could not be read:", faults.len());
+fn read_the_corpus(dir: &Path) -> Result<Corpus, String> {
+    let corpus = Corpus::read(dir).map_err(|faults| {
+        let what = if faults.len() == 1 { "fault" } else { "faults" };
+        let mut report = format!("the cases could not be read, {} {what}:", faults.len());
         for fault in &faults {
             report.push_str(&format!("\n  {fault}"));
         }
@@ -272,6 +393,23 @@ fn read_the_corpus(dir: &Path, dialects: &Dialects) -> Result<Corpus, String> {
         return Err(format!("{} holds no case at all", dir.display()));
     }
     Ok(corpus)
+}
+
+fn set_aside_what_was_disabled(corpus: &mut Corpus, named: &[String]) -> Result<(), String> {
+    for name in named {
+        match corpus.cases.iter().position(|case| case.name == *name) {
+            Some(at) => {
+                corpus.cases.remove(at);
+                corpus.disabled.push(name.clone());
+            }
+            None if corpus.disabled.contains(name) => {}
+            None => {
+                return Err(format!("--disabled names {name}, and there is no case of that name"));
+            }
+        }
+    }
+    corpus.disabled.sort();
+    Ok(())
 }
 
 #[cfg(test)]
@@ -308,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn explain_takes_one_case_by_name_and_no_list_of_known_failures() {
+    fn explain_takes_one_case_by_name_and_the_check_only_flags_are_refused_on_it() {
         let parsed = settings_of(&["explain", "0400-a_case", "--counter", "scc"]).unwrap();
         match parsed.command {
             Command::Explain { case } => assert_eq!(case, "0400-a_case"),
@@ -318,8 +456,29 @@ mod tests {
         assert!(empty.contains("needs the name of a case"), "{empty}");
         let second = settings_of(&["explain", "one-case", "another-case"]).unwrap_err();
         assert!(second.contains("not a flag"), "{second}");
-        let with_list = settings_of(&["explain", "one-case", "--known-failures", "known.txt"]);
-        assert!(with_list.unwrap_err().contains("belongs to check"));
+        for check_only in [
+            ["explain", "one-case", "--known-failures", "known.txt"],
+            ["explain", "one-case", "--disabled", "one-case"],
+            ["explain", "one-case", "--recorded", "recorded"],
+        ] {
+            assert!(settings_of(&check_only).unwrap_err().contains("belongs to check"));
+        }
+    }
+
+    #[test]
+    fn a_flag_wins_over_the_folder_and_the_folder_over_the_defaults() {
+        let parsed = settings_of(&["check", "--corpus", "elsewhere/cases"]).unwrap();
+        let dirs = resolve_dirs(&parsed, None);
+        assert_eq!(dirs.corpus, PathBuf::from("elsewhere/cases"));
+        assert_eq!(dirs.adapters, PathBuf::from(ADAPTERS_DIR));
+        assert_eq!(dirs.recorded, PathBuf::from(RECORDED_DIR));
+        assert_eq!(dirs.known_failures, None);
+    }
+
+    #[test]
+    fn a_disabled_flag_names_a_case_or_is_refused() {
+        let parsed = settings_of(&["check", "--disabled", "0400-a", "--disabled", "0500-b"]).unwrap();
+        assert_eq!(parsed.disabled, ["0400-a", "0500-b"]);
     }
 
     fn settings_of(args: &[&str]) -> Result<Settings, String> {

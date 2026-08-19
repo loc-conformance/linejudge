@@ -3,30 +3,3 @@ three languages deep, the everyday shape of a page: the php file holds html betw
 and the html holds a script. Every line belongs to the innermost language, and a tag's own line
 to the language that encloses the tag, so the script tags are html and the html sits between the
 php blocks"""
-
-[answer.mezura.content]
-counted         = { lines = 11, code = 8, comments = 1, extra = 2 }
-counted-regions = []
-note            = """
-the file is read as php from beginning to end, so neither block is found; the totals survive
-because php happens to bucket every line the same way the three languages do"""
-
-[answer.mezura.region]
-counted         = { lines = 11, code = 10, comments = 1, blanks = 0 }
-counted-regions = []
-note            = """
-the file is read as php from beginning to end, so neither block is found"""
-
-[answer.scc.default]
-counted         = { lines = 11, code = 10, comments = 1, blanks = 0 }
-counted-regions = []
-note            = """
-it has no notion of a file holding a second language, and the js comment survives only because
-php spells its line comment the same way"""
-
-[answer.tokei.default]
-counted         = { lines = 11, code = 10, comments = 1, blanks = 0 }
-counted-regions = []
-note            = """
-a php file never yields children, so the page that nests two levels deep in a markdown fence is
-counted flat here, everything php"""

@@ -11,6 +11,10 @@ own `counter` and `dialect` keys must match the folder and the name. The folder 
 tool's maintainer owns, however many dialects it grows. A tool with one way of counting calls it
 `default`; mezura counts two ways and its folder holds two files.
 
+A dialect file carries no case names. It declares how the tool counts, knows nothing about any
+corpus, and stays portable into the tool's own repository; what a tool answers on a particular
+case lives in that counter's file under `recorded/`.
+
 ```toml
 counter = "tokei"
 dialect = "default"

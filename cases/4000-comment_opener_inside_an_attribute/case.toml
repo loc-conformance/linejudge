@@ -1,21 +1,3 @@
 trap = """
 a comment opener written inside a quoted attribute value, where HTML reads it as text. Nothing
 closes it further down, so a counter that opened a comment there never ends one"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 1, comments = 2, extra = 0 }
-note    = """
-HTML declares no string symbols, on purpose, because its quotes hold attributes and its text is
-full of apostrophes. The price is this one: a quoted opener cannot be seen"""
-
-[answer.mezura.region]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-note    = """
-HTML declares no string symbols, on purpose, because its quotes hold attributes and its text is
-full of apostrophes. The price is this one: a quoted opener cannot be seen"""
-
-[answer.scc.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }

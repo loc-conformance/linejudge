@@ -1,5 +1,4 @@
 name   = "mezura"
-output = "mezura-json"
 args   = ["{file}", "--output", "json", "--hide", "timing"]
 explain-args   = ["{file}", "--explain", "--output", "json"]
 explain-output = "linejudge-per-line"
@@ -11,5 +10,35 @@ name    = "mezura"
 [dialect.content]
 args = ["--counting", "content"]
 
+[dialect.content.read]
+claims   = "languages[]"
+lines    = "total.lines"
+code     = "total.code"
+comments = "total.comments"
+extra    = "total.extra"
+
+[dialect.content.read.regions]
+each     = "languages[].nested_languages[]"
+language = "name"
+lines    = "lines"
+code     = "code"
+comments = "comments"
+extra    = "extra"
+
 [dialect.region]
 args = ["--counting", "region"]
+
+[dialect.region.read]
+claims   = "languages[]"
+lines    = "total.lines"
+code     = "total.code"
+comments = "total.comments"
+blanks   = "total.blanks"
+
+[dialect.region.read.regions]
+each     = "languages[].nested_languages[]"
+language = "name"
+lines    = "lines"
+code     = "code"
+comments = "comments"
+blanks   = "blanks"

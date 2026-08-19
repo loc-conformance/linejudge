@@ -300,7 +300,7 @@ mod tests {
     use crate::corpus::Corpus;
     use crate::dialects::Condition::{Fails, Holds};
     use crate::dialects::Predicate::{Blank, HasResidue};
-    use crate::dialects::{Dialects, read_the_shipped_dialects};
+    use crate::dialects::read_the_shipped_dialects;
     use crate::readings::read_the_shipped_readings;
 
     use super::*;
@@ -310,7 +310,7 @@ mod tests {
     fn every_rule_of_every_dialect_decides_a_line_of_the_corpus() {
         let dialects = read_the_shipped_dialects();
         let readings = read_the_shipped_readings();
-        let corpus = read_the_corpus(&dialects);
+        let corpus = read_the_corpus();
         let mut dead = Vec::new();
         for dialect in dialects.iter() {
             let mut ever_fired = vec![false; dialect.rules.len()];
@@ -462,9 +462,9 @@ mod tests {
         assert_eq!(bucket("tokei", "default", "code"), 4);
     }
 
-    fn read_the_corpus(dialects: &Dialects) -> Corpus {
+    fn read_the_corpus() -> Corpus {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
-        Corpus::read(&dir, dialects).unwrap_or_else(|faults| {
+        Corpus::read(&dir).unwrap_or_else(|faults| {
             let report: Vec<String> = faults.iter().map(|fault| fault.to_string()).collect();
             panic!("{}", report.join("\n"))
         })

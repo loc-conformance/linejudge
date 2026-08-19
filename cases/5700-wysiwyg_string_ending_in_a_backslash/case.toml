@@ -1,21 +1,3 @@
 trap = """
 a wysiwyg string whose last byte is a backslash. In D the body of r"..." is literal, so the
 closing quote closes it whatever precedes it, and the line ends where it looks like it ends"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the backslash cancels the closing quote, so the string stays open and the comment under it is
-counted as code"""
-
-[answer.tokei.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the backslash cancels the closing quote, so the string stays open and the comment under it is
-counted as code"""

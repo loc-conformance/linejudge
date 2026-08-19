@@ -1,14 +1,2 @@
 trap = """
 an unmatched quote inside a comment opens nothing"""
-
-[answer.mezura.content]
-counted = { lines = 2, code = 1, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

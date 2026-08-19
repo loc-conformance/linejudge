@@ -2,27 +2,3 @@ trap = """
 a closing tag written with a space before its bracket, which is legal and rare. It is not the
 closer any language file declares, and all four totals are the same whether the block is found or
 not, which is what hides it"""
-
-[answer.mezura.content]
-counted         = { lines = 4, code = 4, comments = 0, extra = 0 }
-counted-regions = []
-note            = """
-the block is not found, so its line is counted as the page and not as JavaScript"""
-
-[answer.mezura.region]
-counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
-counted-regions = []
-note            = """
-the block is not found, so its line is counted as the page and not as JavaScript"""
-
-[answer.scc.default]
-counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
-counted-regions = []
-note            = """
-the block is not found, so its line is counted as the page and not as JavaScript"""
-
-[answer.tokei.default]
-counted         = { lines = 4, code = 4, comments = 0, blanks = 0 }
-counted-regions = []
-note            = """
-the block is not found, so its line is counted as the page and not as JavaScript"""

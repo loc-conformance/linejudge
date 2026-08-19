@@ -1,15 +1,3 @@
 trap = """
 an apostrophe inside a PowerShell here string. The body of a here string is literal and it ends
 only at a closer sitting at the start of a line, so the apostrophe in the word is a byte"""
-
-[answer.mezura.content]
-counted = { lines = 5, code = 4, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }

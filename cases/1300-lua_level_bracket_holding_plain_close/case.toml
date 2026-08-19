@@ -1,16 +1,2 @@
 trap = """
 a counted bracket is closed only by an end carrying the same count"""
-
-[answer.mezura.content]
-counted = { lines = 4, code = 1, comments = 2, extra = 1 }
-
-[answer.mezura.region]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
-note    = """
-the comment is ended at the bare ]], so the text beside it and the real end count as code"""

@@ -2,20 +2,3 @@ trap = """
 the same empty doc comment line as case 4900, this time with no further documentation under it.
 What makes it its own case is that the answer stops being about comments and becomes about
 lines"""
-
-[answer.mezura.content]
-counted         = { lines = 3, code = 1, comments = 1, extra = 1 }
-
-[answer.mezura.region]
-counted         = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.scc.default]
-counted         = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.tokei.default]
-counted         = { lines = 2, code = 1, comments = 1, blanks = 0 }
-counted-regions = [
-    { language = "Markdown", lines = 1, code = 0, comments = 1, blanks = 0 },
-]
-note            = """
-the '///' line is counted as neither comment nor blank, so a file of 3 lines is reported as 2"""

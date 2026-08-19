@@ -1,16 +1,2 @@
 trap = """
 a bare ]] must not hide the ]=] that begins one byte inside it"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 1, comments = 1, extra = 1 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-note    = """
-the bare ]] ends the comment, so the rest of that line counts as code"""

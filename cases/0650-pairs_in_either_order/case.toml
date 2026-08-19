@@ -4,15 +4,3 @@ string and a comment, a brace and a comment, a semicolon and a wordless comment.
 every span the same kind, so within each pair the two lines must classify identically, whatever
 order a counter's own classifier reads them in. The string pair is the witness that words inside
 a comment do not outweigh a string on the same line in either direction"""
-
-[answer.mezura.content]
-counted = { lines = 8, code = 4, comments = 2, extra = 2 }
-
-[answer.mezura.region]
-counted = { lines = 8, code = 8, comments = 0, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 8, code = 8, comments = 0, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 8, code = 8, comments = 0, blanks = 0 }

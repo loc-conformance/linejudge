@@ -1,21 +1,3 @@
 trap = """
 a doc comment that opens on a line which already holds code. The line is code, and the block of
 documentation that begins on it does not begin at its first character"""
-
-[answer.mezura.content]
-counted         = { lines = 3, code = 2, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted         = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted         = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.tokei.default]
-counted         = { lines = 3, code = 1, comments = 2, blanks = 0 }
-counted-regions = [
-    { language = "Markdown", lines = 2, code = 0, comments = 2, blanks = 0 },
-]
-note            = """
-the whole of the first line is given to the documentation, so the code in front of the doc marker
-is counted as a comment and lands in the Markdown block instead of in Rust"""

@@ -1,16 +1,2 @@
 trap = """
 HTML declares no string symbols, so an apostrophe in the text costs nothing"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the apostrophe opens a string, so the comment under it is counted as markup"""

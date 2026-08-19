@@ -1,14 +1,2 @@
 trap = """
 only the symbol that opened a string can close it, so the other kind inside is text"""
-
-[answer.mezura.content]
-counted = { lines = 2, code = 2, comments = 0, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }

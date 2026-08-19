@@ -6,13 +6,15 @@ use serde::Deserialize;
 
 use crate::answer::Answer;
 use crate::dialects::Dialects;
+use crate::locator::{Locator, RawLocator};
 use crate::measurement::{OutputFormat, read_output};
 use crate::per_line::PerLineFormat;
+
+pub const UNKNOWN_VERSION: &str = "unknown version";
 
 const ADAPTER_EXTENSION: &str = "toml";
 const FILE_PLACEHOLDER: &str = "{file}";
 const VERSION_FLAG: &str = "--version";
-const UNKNOWN_VERSION: &str = "unknown version";
 
 // An Adapter symbolizes the bridge between a loc counter tool, and this program.
 // Every field of it is declared in adapters/<name_of_counter>.toml: the shape that tool prints its
@@ -22,7 +24,6 @@ const UNKNOWN_VERSION: &str = "unknown version";
 pub struct Adapter {
     // a 'counter' is a loc counting tool, like mezura or tokei
     pub name_of_counter: String,
-    pub output_format: OutputFormat,
     pub args: Vec<String>,
     /// The command line that asks the counter for its own analysis of a file line by line, in
     /// place of `args`, with the dialect's arguments appended the same way. `None` is a counter
@@ -124,6 +125,7 @@ impl Adapter {
             ));
         }
         let mut ways = Vec::new();
+        let mut output_is_read = false;
         for (name, dialect) in raw.dialect {
             let Some(found) = dialects.find(&raw.name, &name) else {
                 return Err(format!("{}: {} is a dialect this suite has no buckets for", path.display(), name));
@@ -136,15 +138,41 @@ impl Adapter {
                     name
                 ));
             }
-            ways.push(Dialect { name, args: dialect.args, buckets: found.buckets.clone() });
+            let reader = match dialect.read {
+                Some(read) => Reader::Declared(Box::new(
+                    Locator::of(read, &found.buckets).map_err(|e| {
+                        format!("{}: the read block of {name} {e}", path.display())
+                    })?,
+                )),
+                None => match raw.output {
+                    Some(format) => {
+                        output_is_read = true;
+                        Reader::Written(format)
+                    }
+                    None => {
+                        return Err(format!(
+                            "{}: {name} has no read block and the adapter names no output, so \
+                             nothing says how what the counter prints is read",
+                            path.display()
+                        ));
+                    }
+                },
+            };
+            ways.push(Dialect { name, args: dialect.args, buckets: found.buckets.clone(), reader });
         }
         if ways.is_empty() {
             return Err(format!("{} names no way of counting to run", path.display()));
         }
+        if raw.output.is_some() && !output_is_read {
+            return Err(format!(
+                "{} names an output, and every dialect declares its own read block, so leave the \
+                 field out",
+                path.display()
+            ));
+        }
         ways.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(Adapter {
             name_of_counter: raw.name,
-            output_format: raw.output,
             args: raw.args,
             explain_args: raw.explain_args,
             explain_output: raw.explain_output,
@@ -167,8 +195,11 @@ impl Adapter {
     ) -> Result<Option<Answer>, String> {
         let args = self.build_args(dialect, file);
         let printed = run_counter(binary, &args)?;
-        read_output(self.output_format, &dialect.buckets, &printed)
-            .map_err(|e| format!("{} on {}: {e}", self.name_of_counter, file.display()))
+        match &dialect.reader {
+            Reader::Written(format) => read_output(*format, &dialect.buckets, &printed),
+            Reader::Declared(locator) => locator.read(&printed),
+        }
+        .map_err(|e| format!("{} on {}: {e}", self.name_of_counter, file.display()))
     }
 
     /// The version is a label on the report and never a condition of the run, so a binary that
@@ -218,6 +249,15 @@ pub struct Dialect {
     pub name: String,
     pub args: Vec<String>,
     pub buckets: Vec<String>,
+    pub reader: Reader,
+}
+
+/// How what this way of counting prints is turned into an answer: through a reader written in
+/// `measurement`, or through the read block its own adapter declares.
+#[derive(Debug)]
+pub enum Reader {
+    Written(OutputFormat),
+    Declared(Box<Locator>),
 }
 
 #[derive(Debug, Deserialize)]
@@ -262,7 +302,7 @@ fn run_counter(binary: &Path, args: &[String]) -> Result<String, String> {
 #[serde(deny_unknown_fields)]
 struct RawAdapter {
     name: String,
-    output: OutputFormat,
+    output: Option<OutputFormat>,
     args: Vec<String>,
     #[serde(rename = "explain-args")]
     explain_args: Option<Vec<String>>,
@@ -280,6 +320,7 @@ struct RawAdapter {
 #[serde(deny_unknown_fields)]
 struct RawDialect {
     args: Vec<String>,
+    read: Option<RawLocator>,
 }
 
 #[cfg(test)]
@@ -302,6 +343,48 @@ mod tests {
         assert_eq!(mezura.dialects[0].buckets, ["code", "comments", "extra"]);
         assert_eq!(mezura.dialects[1].buckets, ["code", "comments", "blanks"]);
         assert_eq!(adapters[2].acquisition.channel, "crates-io");
+        for dialect in mezura.dialects.iter().chain(&adapters[1].dialects) {
+            assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
+        }
+        assert!(matches!(adapters[2].dialects[0].reader, Reader::Written(OutputFormat::TokeiJson)));
+    }
+
+    #[test]
+    fn a_dialect_nothing_says_how_to_read_is_refused_and_so_is_an_output_nobody_reads() {
+        let unread = write_an_adapter(
+            "an_adapter_saying_nothing_about_reading",
+            "name = \"tokei\"\nargs = [\"{file}\"]\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+        );
+        let refused = Adapter::read(&unread, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(unread.parent().unwrap()).unwrap();
+        assert!(refused.contains("nothing says how"), "{refused}");
+
+        let unused = write_an_adapter(
+            "an_adapter_whose_output_nobody_reads",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n\
+             [dialect.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
+             comments = \"Comment\"\nblanks = \"Blank\"\n",
+        );
+        let refused = Adapter::read(&unused, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(unused.parent().unwrap()).unwrap();
+        assert!(refused.contains("leave the field out"), "{refused}");
+    }
+
+    #[test]
+    fn a_broken_read_block_is_refused_with_the_file_and_the_dialect_named() {
+        let path = write_an_adapter(
+            "an_adapter_with_a_broken_read_block",
+            "name = \"tokei\"\nargs = [\"{file}\"]\n\
+             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n\
+             [dialect.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
+             comments = \"Comment\"\n",
+        );
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(refused.contains("the read block of default"), "{refused}");
+        assert!(refused.contains("no path for blanks"), "{refused}");
     }
 
     #[test]
@@ -317,7 +400,7 @@ mod tests {
     fn an_adapter_under_a_name_that_is_not_its_own_is_refused() {
         let path = write_an_adapter(
             "an_adapter_under_the_wrong_name",
-            "name = \"scc\"\noutput = \"scc-json\"\nargs = [\"{file}\"]\n\
+            "name = \"scc\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              [acquisition]\nchannel = \"crates-io\"\nname = \"scc\"\n[dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();

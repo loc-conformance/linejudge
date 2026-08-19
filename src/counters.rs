@@ -3,8 +3,6 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-pub const COUNTERS_FILE: &str = "linejudge-counters.toml";
-
 const BOM: &str = "\u{feff}";
 
 /// Where each counter's binary sits, named once so that neither a person nor a workflow has to
@@ -41,6 +39,16 @@ impl Counters {
     pub fn name_binary(&mut self, counter: &str, binary: PathBuf) {
         self.binaries.insert(counter.to_string(), binary);
     }
+
+    /// A relative path in a committed counters file, `target/release/...` say, means it from the
+    /// file's own project however deep the working directory sits.
+    pub fn resolve_against(&mut self, root: &Path) {
+        for binary in self.binaries.values_mut() {
+            if binary.is_relative() {
+                *binary = root.join(&binary);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -65,6 +73,19 @@ mod tests {
         counters.name_binary("tokei", PathBuf::from("elsewhere/tokei.exe"));
         assert_eq!(counters.find_binary("tokei"), Some(Path::new("elsewhere/tokei.exe")));
         fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    fn a_relative_binary_resolves_against_the_root_and_an_absolute_one_stays() {
+        let mut counters = Counters::empty();
+        counters.name_binary("mezura", PathBuf::from("target/release/mezura.exe"));
+        counters.name_binary("tokei", PathBuf::from("D:/dev/tools/tokei.exe"));
+        counters.resolve_against(Path::new("D:/somewhere"));
+        assert_eq!(
+            counters.find_binary("mezura"),
+            Some(Path::new("D:/somewhere/target/release/mezura.exe"))
+        );
+        assert_eq!(counters.find_binary("tokei"), Some(Path::new("D:/dev/tools/tokei.exe")));
     }
 
     #[test]

@@ -1,14 +1,2 @@
 trap = """
 the same close and reopen with a pair that nests, where the reopener must not be counted twice"""
-
-[answer.mezura.content]
-counted = { lines = 4, code = 1, comments = 2, extra = 1 }
-
-[answer.mezura.region]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }

@@ -1,14 +1,2 @@
 trap = """
 a primed name beside an apostrophe inside a string, where neither tick may pair"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }

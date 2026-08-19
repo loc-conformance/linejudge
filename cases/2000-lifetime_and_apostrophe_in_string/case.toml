@@ -1,14 +1,2 @@
 trap = """
 two lone ticks on one line, a lifetime and the apostrophe of a word inside a string"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 1, comments = 2, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }

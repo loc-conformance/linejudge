@@ -1,17 +1,3 @@
 trap = """
 the splice carries a string only off a line ending in a backslash, and the blank line does not,
 so the string is over before the comment line"""
-
-[answer.mezura.content]
-counted = { lines = 4, code = 2, comments = 1, extra = 1 }
-
-[answer.mezura.region]
-counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
-note    = """
-the string is carried past the blank line, so the comment line is counted as code"""
-
-[answer.tokei.default]
-counted = { lines = 4, code = 3, comments = 1, blanks = 0 }

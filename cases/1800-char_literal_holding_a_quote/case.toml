@@ -1,18 +1,2 @@
 trap = """
 the quote inside a character literal opens no string"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 1, comments = 2, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the quote opens a string, so both comments under it are counted as code"""
-
-[answer.tokei.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the quote opens a string, so both comments under it are counted as code"""

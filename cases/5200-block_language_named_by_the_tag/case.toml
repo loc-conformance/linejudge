@@ -2,36 +2,3 @@ trap = """
 the opener names the block's language, so this file is Vue, TypeScript and SCSS and not Vue,
 JavaScript and CSS. The three totals are the same either way, which is why a case about labelling
 has to declare its regions and not only its counts"""
-
-[answer.mezura.content]
-counted         = { lines = 11, code = 9, comments = 2, extra = 0 }
-counted-regions = [
-    { language = "SCSS", lines = 2, code = 1, comments = 1, extra = 0 },
-    { language = "TypeScript", lines = 2, code = 1, comments = 1, extra = 0 },
-]
-
-[answer.mezura.region]
-counted         = { lines = 11, code = 9, comments = 2, blanks = 0 }
-counted-regions = [
-    { language = "SCSS", lines = 2, code = 1, comments = 1, blanks = 0 },
-    { language = "TypeScript", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
-
-[answer.scc.default]
-counted         = { lines = 11, code = 9, comments = 2, blanks = 0 }
-counted-regions = []
-note            = """
-the file is counted as one language from beginning to end. The totals come out right because
-both block comment symbols happen to be the ones Vue's own markup already declares, and neither
-block is found"""
-
-[answer.tokei.default]
-counted         = { lines = 11, code = 9, comments = 2, blanks = 0 }
-counted-regions = [
-    { language = "CSS", lines = 2, code = 1, comments = 1, blanks = 0 },
-    { language = "HTML", lines = 1, code = 1, comments = 0, blanks = 0 },
-    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
-]
-note            = """
-counts the same lines and calls the two blocks JavaScript and CSS, although each tag names its
-own language"""

@@ -447,7 +447,7 @@ mod tests {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let dialects = Dialects::read(&root.join("dialects"))
             .unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
-        let corpus = Corpus::read(&root.join("cases"), &dialects)
+        let corpus = Corpus::read(&root.join("cases"))
             .unwrap_or_else(|faults| panic!("{faults:?}"));
         let adapters = Adapter::read_all(&root.join("adapters"), &dialects).unwrap();
         (corpus, dialects, adapters)

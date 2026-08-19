@@ -1,18 +1,2 @@
 trap = """
 a line holding real code ends in a spliced line comment, so the next line belongs to that comment in C"""
-
-[answer.mezura.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the comment ends at the newline, so the line joined to it is counted as code"""
-
-[answer.tokei.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note    = """
-the comment ends at the newline, so the line joined to it is counted as code"""

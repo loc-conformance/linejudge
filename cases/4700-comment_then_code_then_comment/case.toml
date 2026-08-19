@@ -1,17 +1,3 @@
 trap = """
 a line that opens with a block comment, holds code, and closes with another. The shape of every
 generated table: '/* 00 */ 0x8d022e27, /* cps = 10.02 */'"""
-
-[answer.mezura.content]
-counted = { lines = 2, code = 2, comments = 0, extra = 0 }
-
-[answer.mezura.region]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
-note    = """
-the line counts as a comment although there is code on it"""

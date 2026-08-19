@@ -2,21 +2,3 @@ trap = """
 a doc comment line holding nothing but its marker, which is how a blank line is put between two
 paragraphs of documentation. A bare marker says nothing, so it is extra to a counter that asks
 what a line says"""
-
-[answer.mezura.content]
-counted         = { lines = 4, code = 1, comments = 2, extra = 1 }
-
-[answer.mezura.region]
-counted         = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.scc.default]
-counted         = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.tokei.default]
-counted         = { lines = 4, code = 1, comments = 2, blanks = 1 }
-counted-regions = [
-    { language = "Markdown", lines = 3, code = 0, comments = 2, blanks = 1 },
-]
-note            = """
-the bare marker is counted blank, although a blank line inside a '/** */' doc comment of the same
-language counts as comment, so the answer turns on which of the two doc syntaxes was used"""

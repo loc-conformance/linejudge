@@ -1,15 +1,3 @@
 trap = """
 a raw string whose last byte is a backslash, written with the same symbol at both ends. A
 backtick string in Odin escapes nothing, so the second backtick closes it whatever precedes it"""
-
-[answer.mezura.content]
-counted = { lines = 6, code = 2, comments = 2, extra = 2 }
-
-[answer.mezura.region]
-counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
-
-[answer.scc.default]
-counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
-
-[answer.tokei.default]
-counted = { lines = 6, code = 2, comments = 4, blanks = 0 }

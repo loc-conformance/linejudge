@@ -2,113 +2,329 @@ use std::path::Path;
 
 use crate::adapter::{Adapter, Dialect};
 use crate::answer::Answer;
-use crate::corpus::{AnswerBlock, Case, Corpus};
+use crate::corpus::{Case, Corpus};
+use crate::deriver::derive_answer;
+use crate::dialects;
+use crate::recorded::{Exception, RecordedAnswer, RecordedAnswers, is_same_build};
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Verdict {
-    /// Answers what its own definitions ask for, and the case file says the same.
+/// Whether a counter does what its own rules say. This is the whole of what can be asked of a
+/// counter nobody here has photographed, and it never needs a recorded answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Conformance {
     Agrees,
-    /// Answers what its own definitions ask for, and the case file records a failure: it was fixed.
-    Fixed,
-    /// Answers something else, and the case file already carries that answer and a note.
-    KnownFailure,
-    /// Answers something else, and something other than what the case file recorded.
-    NewFailure,
-    /// Does not claim the file, and the case file says it does not.
+    Fails,
+    /// The counter says there is no such file, which is an answer of its own and not a failure.
     Unclaimed,
-    /// Does not claim the file any more.
+}
+
+/// Whether a counter still does what it did when it was photographed. Only asked where a recorded
+/// answer exists and the running build is the recorded one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Drift {
+    Same,
+    Changed,
     NoLongerClaimed,
-    /// Claims a file the case file says it does not.
     NowClaimed,
 }
 
-impl Verdict {
-    /// A counter that stops claiming files, or starts claiming files a case says it does not, has
-    /// changed what it counts, which is the one thing a suite of this kind exists to catch.
+/// One counter's answer to one case. A counter that breaks on a case has answered it: the trouble
+/// is this case's outcome, carrying the message, and every other case is measured anyway.
+pub struct Judged<'a> {
+    pub case: &'a Case,
+    pub outcome: Outcome<'a>,
+}
+
+impl Judged<'_> {
+    pub fn breaks_the_run(&self) -> bool {
+        match &self.outcome {
+            Outcome::Broke(_) => true,
+            Outcome::Measured(measured) => measured.breaks_the_run(),
+        }
+    }
+}
+
+pub enum Outcome<'a> {
+    /// A non-zero exit, a panic, or output that could not be read, with what is known about why.
+    Broke(String),
+    Measured(Measured<'a>),
+}
+
+pub struct Measured<'a> {
+    /// What the counter ought to answer by its own rules, or by its exception where one is
+    /// declared.
+    pub real: Answer,
+    /// What it answered now. `None` is a counter that claims no such file.
+    pub live: Option<Answer>,
+    pub record: Option<&'a RecordedAnswer>,
+    pub exception: Option<&'a Exception>,
+    pub conformance: Conformance,
+    /// `None` where there is no photograph to hold the run against, or the build differs from the
+    /// recorded one.
+    pub drift: Option<Drift>,
+}
+
+impl Measured<'_> {
+    /// A failure that fails exactly as the photograph says is known, and known is the one failure
+    /// that does not break the run.
+    pub fn is_a_known_failure(&self) -> bool {
+        self.conformance == Conformance::Fails && self.drift == Some(Drift::Same)
+    }
+
+    /// What a known-failures list is asked to name: a wrong answer, or a change in what the
+    /// counter claims at all.
     pub fn is_a_failure(&self) -> bool {
-        matches!(
-            self,
-            Verdict::NewFailure
-                | Verdict::KnownFailure
-                | Verdict::NoLongerClaimed
-                | Verdict::NowClaimed
-        )
+        self.conformance == Conformance::Fails
+            || matches!(self.drift, Some(Drift::NoLongerClaimed | Drift::NowClaimed))
     }
 
     pub fn breaks_the_run(&self) -> bool {
-        self.is_a_failure() && *self != Verdict::KnownFailure
+        self.is_a_failure() && !self.is_a_known_failure()
+    }
+
+    pub fn agrees_through_its_exception(&self) -> bool {
+        self.exception.is_some() && self.conformance == Conformance::Agrees
     }
 }
 
-/// One counter's answer to one case, beside what the case records and what the verdict was.
-pub struct Judged<'a> {
-    pub verdict: Verdict,
-    pub case: &'a Case,
-    pub answer: &'a AnswerBlock,
-    pub live: Option<Answer>,
-}
-
-/// Runs the counter once per case, so this is as slow as the counter is, times the corpus. A case
-/// that records no answer for this way of counting is passed over; a corpus where no case records
-/// one is refused, since a counter nobody has written an answer for would otherwise be measured
-/// against nothing and reported as agreeing on everything.
+/// Runs the counter once per case, so this is as slow as the counter is, times the corpus.
+/// `Err` is never the counter's doing: it is this suite's own data refusing to judge, a case no
+/// rule can place or a recorded flag its own numbers contradict.
 pub fn measure_and_judge_every_case<'a>(
     adapter: &Adapter,
     dialect: &Dialect,
+    rules: &dialects::Dialect,
     binary: &Path,
     corpus: &'a Corpus,
-) -> Result<Vec<Judged<'a>>, String> {
-    let mut judged = Vec::new();
+    record: Option<&'a RecordedAnswers>,
+    version_of_this_run: &str,
+) -> Result<Vec<Judged<'a>>, Vec<String>> {
+    let drift_is_judged =
+        record.is_some_and(|record| is_same_build(&record.version, version_of_this_run));
+    let key = format!("{}.{}", adapter.name_of_counter, dialect.name);
+
+    let mut prepared = Vec::with_capacity(corpus.cases.len());
+    let mut faults = Vec::new();
     for case in &corpus.cases {
-        let Some(answer) = case.find_answer_block(&adapter.name_of_counter, &dialect.name) else {
-            continue;
+        let exception = record.and_then(|r| r.find_exception(&case.name, &dialect.name));
+        let real = match exception {
+            Some(exception) => exception.expected.clone(),
+            None => match derive_answer(&case.truth, rules, &corpus.readings) {
+                Ok(derivation) => derivation.real,
+                Err(messages) => {
+                    faults.extend(messages.into_iter().map(|m| format!("{}: {m}", case.name)));
+                    continue;
+                }
+            },
         };
-        let live = adapter.measure(dialect, binary, &case.input_file)?;
-        judged.push(Judged { verdict: judge(answer, live.as_ref()), case, answer, live });
+        let entry = record.and_then(|r| r.find(&case.name, &dialect.name));
+        if let Some(entry) = entry
+            && let Some(counted) = &entry.counted
+            && entry.is_known_failure == (*counted == real)
+        {
+            faults.push(match entry.is_known_failure {
+                true => format!(
+                    "{}: the record calls {key} a known failure, and its numbers agree with the \
+                     rules, so the flag is stale",
+                    case.name
+                ),
+                false => format!(
+                    "{}: the record's numbers for {key} differ from what the rules ask, and the \
+                     block does not say is-known-failure",
+                    case.name
+                ),
+            });
+        }
+        prepared.push((case, real, entry, exception));
     }
-    if judged.is_empty() {
-        return Err(format!(
-            "no case writes down an answer for {}.{}, so there was nothing to measure it against",
-            adapter.name_of_counter, dialect.name
-        ));
+    if !faults.is_empty() {
+        return Err(faults);
+    }
+
+    let mut judged = Vec::with_capacity(prepared.len());
+    for (case, real, entry, exception) in prepared {
+        let live = match adapter.measure(dialect, binary, &case.input_file) {
+            Ok(live) => live,
+            Err(message) => {
+                judged.push(Judged { case, outcome: Outcome::Broke(message) });
+                continue;
+            }
+        };
+        let conformance = judge_conformance(&real, live.as_ref());
+        let drift = match (drift_is_judged, entry) {
+            (true, Some(entry)) => Some(judge_drift(entry, live.as_ref())),
+            _ => None,
+        };
+        judged.push(Judged {
+            case,
+            outcome: Outcome::Measured(Measured {
+                real,
+                live,
+                record: entry,
+                exception,
+                conformance,
+                drift,
+            }),
+        });
     }
     Ok(judged)
 }
 
-pub fn judge(answer: &AnswerBlock, live: Option<&Answer>) -> Verdict {
-    match (&answer.counted, live) {
-        (None, None) => Verdict::Unclaimed,
-        (None, Some(_)) => Verdict::NowClaimed,
-        (Some(_), None) => Verdict::NoLongerClaimed,
-        (Some(counted), Some(live)) => match (answer.real == *live, counted == live) {
-            (true, true) => Verdict::Agrees,
-            (true, false) => Verdict::Fixed,
-            (false, true) => Verdict::KnownFailure,
-            (false, false) => Verdict::NewFailure,
-        },
+pub fn judge_conformance(real: &Answer, live: Option<&Answer>) -> Conformance {
+    match live {
+        None => Conformance::Unclaimed,
+        Some(live) if live == real => Conformance::Agrees,
+        Some(_) => Conformance::Fails,
+    }
+}
+
+pub fn judge_drift(record: &RecordedAnswer, live: Option<&Answer>) -> Drift {
+    match (&record.counted, live) {
+        (None, None) => Drift::Same,
+        (None, Some(_)) => Drift::NowClaimed,
+        (Some(_), None) => Drift::NoLongerClaimed,
+        (Some(counted), Some(live)) if counted == live => Drift::Same,
+        _ => Drift::Changed,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::env;
+    use std::fs;
 
     use super::*;
-    use crate::adapter::Acquisition;
+    use crate::adapter::{Acquisition, Reader};
     use crate::answer::Counts;
-    use crate::dialects::read_the_shipped_dialects;
+    use crate::dialects::{Dialects, read_the_shipped_dialects};
     use crate::measurement::OutputFormat;
+    use crate::recorded::RecordedAnswers;
 
-    // Every case answers all four ways of counting this suite knows, so the counter nobody has
-    // answered is invented here, and nothing runs its binary because there is no case to run it on.
     #[test]
-    fn a_way_of_counting_no_case_answers_is_refused_instead_of_agreeing_on_nothing() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
-        let corpus =
-            Corpus::read(&dir, &read_the_shipped_dialects()).unwrap_or_else(|faults| panic!("{faults:?}"));
-        let unrecorded = Adapter {
-            name_of_counter: "cloc".to_string(),
-            output_format: OutputFormat::LinejudgeJson,
+    fn a_counter_that_answers_what_its_rules_ask_agrees_and_one_that_does_not_fails() {
+        assert_eq!(judge_conformance(&a_measurement(2), Some(&a_measurement(2))), Conformance::Agrees);
+        assert_eq!(judge_conformance(&a_measurement(2), Some(&a_measurement(3))), Conformance::Fails);
+        assert_eq!(judge_conformance(&a_measurement(2), None), Conformance::Unclaimed);
+    }
+
+    #[test]
+    fn drift_holds_the_run_against_the_photograph_and_claims_are_answers_too() {
+        let failure = a_record(Some(3), true);
+        assert_eq!(judge_drift(&failure, Some(&a_measurement(3))), Drift::Same);
+        assert_eq!(judge_drift(&failure, Some(&a_measurement(2))), Drift::Changed);
+        assert_eq!(judge_drift(&failure, None), Drift::NoLongerClaimed);
+        let unclaimed = a_record(None, false);
+        assert_eq!(judge_drift(&unclaimed, None), Drift::Same);
+        assert_eq!(judge_drift(&unclaimed, Some(&a_measurement(2))), Drift::NowClaimed);
+    }
+
+    #[test]
+    fn the_known_failure_is_the_one_failure_that_breaks_nothing() {
+        let known = measured(Conformance::Fails, Some(Drift::Same));
+        assert!(known.is_a_known_failure());
+        assert!(known.is_a_failure());
+        assert!(!known.breaks_the_run());
+
+        let new = measured(Conformance::Fails, Some(Drift::Changed));
+        assert!(!new.is_a_known_failure());
+        assert!(new.breaks_the_run());
+
+        let unrecorded = measured(Conformance::Fails, None);
+        assert!(unrecorded.breaks_the_run());
+
+        let fixed = measured(Conformance::Agrees, Some(Drift::Changed));
+        assert!(!fixed.is_a_failure());
+        assert!(!fixed.breaks_the_run());
+    }
+
+    #[test]
+    fn a_change_in_what_the_counter_claims_breaks_the_run() {
+        let gone = measured(Conformance::Unclaimed, Some(Drift::NoLongerClaimed));
+        assert!(gone.is_a_failure());
+        assert!(gone.breaks_the_run());
+
+        let appeared = measured(Conformance::Agrees, Some(Drift::NowClaimed));
+        assert!(appeared.is_a_failure());
+        assert!(appeared.breaks_the_run());
+
+        let quiet = measured(Conformance::Unclaimed, None);
+        assert!(!quiet.is_a_failure());
+    }
+
+    // The contradiction is found while the answers are prepared, before any binary runs, which is
+    // why a binary that does not exist can stand in for the counter here.
+    #[test]
+    fn a_stale_failure_flag_is_refused_before_anything_is_run() {
+        let dialects = read_the_shipped_dialects();
+        let root = env::temp_dir().join("linejudge-a_stale_flag");
+        let record_text = "counter = \"tokei\"\nversion = \"tokei 14.0.0\"\n\n\
+                           [answer.0400-a_case_built_by_a_test.default]\n\
+                           is-known-failure = true\n\
+                           counted = { lines = 2, code = 1, comments = 1, blanks = 0 }\n";
+        let faults = judge_a_built_corpus(&root, record_text, &dialects)
+            .err()
+            .unwrap_or_else(|| panic!("the stale flag was read anyway"));
+        assert!(faults[0].contains("the flag is stale"), "{faults:?}");
+    }
+
+    #[test]
+    fn a_recorded_failure_that_does_not_say_so_is_refused() {
+        let dialects = read_the_shipped_dialects();
+        let root = env::temp_dir().join("linejudge-an_unflagged_failure");
+        let record_text = "counter = \"tokei\"\nversion = \"tokei 14.0.0\"\n\n\
+                           [answer.0400-a_case_built_by_a_test.default]\n\
+                           counted = { lines = 2, code = 2, comments = 0, blanks = 0 }\n";
+        let faults = judge_a_built_corpus(&root, record_text, &dialects)
+            .err()
+            .unwrap_or_else(|| panic!("the unflagged failure was read anyway"));
+        assert!(faults[0].contains("does not say is-known-failure"), "{faults:?}");
+    }
+
+    // The two lines derive as one comment and one code line, so a record saying the same numbers
+    // with no flag is consistent, and nothing here needs the counter to exist until it is run.
+    fn judge_a_built_corpus(
+        root: &std::path::Path,
+        record_text: &str,
+        dialects: &Dialects,
+    ) -> Result<Vec<Judged<'static>>, Vec<String>> {
+        let cases = root.join("cases");
+        let dir = cases.join("0400-a_case_built_by_a_test");
+        let _ = fs::remove_dir_all(root);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("input.c"), "/* a block\n*/ int x = 1;\n").unwrap();
+        fs::write(dir.join("truth.txt"), "/* a block\nCCcccccccc\n*/ int x = 1;\nUU ... . . ..\n")
+            .unwrap();
+        fs::write(dir.join("case.toml"), "trap = \"\"\"\na block\"\"\"\n").unwrap();
+        let recorded_dir = root.join("recorded");
+        fs::create_dir_all(&recorded_dir).unwrap();
+        fs::write(recorded_dir.join("tokei.toml"), record_text).unwrap();
+
+        let corpus = Box::leak(Box::new(
+            Corpus::read(&cases).unwrap_or_else(|faults| panic!("{faults:?}")),
+        ));
+        let record = Box::leak(Box::new(
+            RecordedAnswers::read(&recorded_dir, "tokei", dialects)
+                .unwrap_or_else(|faults| panic!("{faults:?}"))
+                .unwrap_or_else(|| panic!("no record was read")),
+        ));
+        let adapter = a_tokei_adapter();
+        let rules = dialects.find("tokei", "default").unwrap_or_else(|| panic!("no tokei rules"));
+        let judged = measure_and_judge_every_case(
+            &adapter,
+            &adapter.dialects[0],
+            rules,
+            Path::new("a-binary-that-is-never-run"),
+            corpus,
+            Some(record),
+            "tokei 14.0.0",
+        );
+        let _ = fs::remove_dir_all(root);
+        judged
+    }
+
+    fn a_tokei_adapter() -> Adapter {
+        Adapter {
+            name_of_counter: "tokei".to_string(),
             args: vec!["{file}".to_string()],
             explain_args: None,
             explain_output: None,
@@ -116,101 +332,47 @@ mod tests {
             version_flag: None,
             acquisition: Acquisition {
                 channel: "crates-io".to_string(),
-                name: "cloc".to_string(),
+                name: "tokei".to_string(),
             },
             dialects: vec![Dialect {
                 name: "default".to_string(),
                 args: Vec::new(),
                 buckets: vec!["code".to_string(), "comments".to_string(), "blanks".to_string()],
+                reader: Reader::Written(OutputFormat::TokeiJson),
             }],
-        };
-        let refused = measure_and_judge_every_case(
-            &unrecorded,
-            &unrecorded.dialects[0],
-            Path::new("a-binary-that-is-never-run"),
-            &corpus,
-        )
-        .err()
-        .unwrap_or_else(|| panic!("a counter no case answers was reported on all the same"));
-        assert!(refused.contains("cloc.default"), "{refused}");
+        }
     }
 
-    #[test]
-    fn a_counter_that_answers_what_the_case_expects_of_it_agrees() {
-        let answer = an_answer(2, 2);
-        assert_eq!(judge(&answer, Some(&a_measurement(2))), Verdict::Agrees);
-    }
-
-    #[test]
-    fn a_recorded_failure_that_still_fails_the_same_way_is_known() {
-        let answer = an_answer(2, 3);
-        assert_eq!(judge(&answer, Some(&a_measurement(3))), Verdict::KnownFailure);
-    }
-
-    #[test]
-    fn a_recorded_failure_that_has_stopped_failing_breaks_nothing() {
-        let answer = an_answer(2, 3);
-        let verdict = judge(&answer, Some(&a_measurement(2)));
-        assert_eq!(verdict, Verdict::Fixed);
-        assert!(!verdict.is_a_failure());
-        assert!(!verdict.breaks_the_run());
-    }
-
-    #[test]
-    fn a_counter_that_has_changed_what_it_claims_breaks_the_run_and_a_known_failure_does_not() {
-        assert!(Verdict::NoLongerClaimed.breaks_the_run());
-        assert!(Verdict::NowClaimed.breaks_the_run());
-        assert!(Verdict::KnownFailure.is_a_failure());
-        assert!(!Verdict::KnownFailure.breaks_the_run());
-        assert!(!Verdict::Unclaimed.is_a_failure());
-        assert!(!Verdict::Agrees.is_a_failure());
-    }
-
-    #[test]
-    fn an_answer_nobody_wrote_down_is_the_one_that_breaks_the_run() {
-        let answer = an_answer(2, 3);
-        let verdict = judge(&answer, Some(&a_measurement(4)));
-        assert_eq!(verdict, Verdict::NewFailure);
-        assert!(verdict.breaks_the_run());
-    }
-
-    #[test]
-    fn claiming_and_not_claiming_are_answers_of_their_own() {
-        let claimed = an_answer(2, 2);
-        let unclaimed = AnswerBlock {
-            name_of_counter: "tokei".to_string(),
-            dialect: "default".to_string(),
+    fn measured(conformance: Conformance, drift: Option<Drift>) -> Measured<'static> {
+        Measured {
             real: a_measurement(2),
-            counted: None,
-            note: None,
-        };
-        assert_eq!(judge(&unclaimed, None), Verdict::Unclaimed);
-        assert_eq!(judge(&claimed, None), Verdict::NoLongerClaimed);
-        assert_eq!(judge(&unclaimed, Some(&a_measurement(2))), Verdict::NowClaimed);
+            live: None,
+            record: None,
+            exception: None,
+            conformance,
+            drift,
+        }
     }
 
-    fn an_answer(real_code: u32, counted_code: u32) -> AnswerBlock {
-        AnswerBlock {
-            name_of_counter: "tokei".to_string(),
-            dialect: "default".to_string(),
-            real: a_measurement(real_code),
-            counted: Some(a_measurement(counted_code)),
+    fn a_record(counted_code: Option<u32>, is_known_failure: bool) -> RecordedAnswer {
+        RecordedAnswer {
+            counted: counted_code.map(a_measurement),
+            is_known_failure,
             note: None,
         }
     }
 
     fn a_measurement(code: u32) -> Answer {
-        Answer { counts: counts(code), regions: Vec::new() }
-    }
-
-    fn counts(code: u32) -> Counts {
-        Counts {
-            lines: 4,
-            buckets: BTreeMap::from([
-                ("code".to_string(), code),
-                ("comments".to_string(), 4 - code),
-                ("blanks".to_string(), 0),
-            ]),
+        Answer {
+            counts: Counts {
+                lines: 4,
+                buckets: BTreeMap::from([
+                    ("code".to_string(), code),
+                    ("comments".to_string(), 4 - code),
+                    ("blanks".to_string(), 0),
+                ]),
+            },
+            regions: Vec::new(),
         }
     }
 }
