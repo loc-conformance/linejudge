@@ -3,10 +3,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use linejudge::adapter::{Adapter, Dialect};
 use linejudge::corpus::{Case, Corpus};
+use linejudge::deriver::explain_every_line;
 use linejudge::dialects::Dialects;
 use linejudge::recorded::RecordedAnswers;
 use linejudge::verdict::{Conformance, Judged, Outcome, measure_and_judge_every_case};
 
+use crate::marks::cut_into_stretches;
 use crate::render::data::{self, Verdict};
 use crate::style;
 
@@ -69,6 +71,68 @@ pub fn measure_every_counter(
         groups: collect_the_groups_of(corpus),
         counters,
     })
+}
+
+/// Reads every case the way the pages under the scoreboard show it, which needs no binary: the
+/// file, its marked spans, and each way of counting's own reading of every line. The ways are the
+/// ones the sweep measured, so a counter left out for want of a binary is left out here too.
+pub fn read_every_case(
+    sweep: &data::Sweep,
+    corpus: &Corpus,
+    dialects: &Dialects,
+) -> Result<Vec<data::CaseDetail>, String> {
+    let mut ways = Vec::new();
+    for counter in &sweep.counters {
+        for dialect in &counter.dialects {
+            let Some(rules) = dialects.find(&counter.name, &dialect.name) else {
+                return Err(format!("{}.{} names no dialect file", counter.name, dialect.name));
+            };
+            ways.push((format!("{}.{}", counter.name, dialect.name), rules));
+        }
+    }
+
+    let mut detailed = Vec::with_capacity(corpus.cases.len());
+    for case in &corpus.cases {
+        let mut read_by_way = Vec::with_capacity(ways.len());
+        for (way, rules) in &ways {
+            let explained = explain_every_line(&case.truth, rules, &corpus.readings)
+                .map_err(|faults| format!("{}, {way}: {}", case.name, faults.join("; ")))?;
+            read_by_way.push(explained);
+        }
+        let lines = case
+            .truth
+            .lines
+            .iter()
+            .enumerate()
+            .map(|(at, line)| data::Line {
+                pieces: cut_into_stretches(&line.source, &line.marker)
+                    .into_iter()
+                    .map(|(ink, text)| data::Piece { ink, text })
+                    .collect(),
+                counted: read_by_way
+                    .iter()
+                    .map(|explained| data::Counted {
+                        bucket: explained[at].bucket.clone(),
+                        rules: explained[at].rules.clone(),
+                        region: explained[at].region.clone(),
+                    })
+                    .collect(),
+            })
+            .collect();
+        detailed.push(data::CaseDetail {
+            name: case.name.clone(),
+            group: find_the_group_of(&case.name, &corpus.groups).unwrap_or_default().to_string(),
+            trap: case.trap.clone(),
+            file: case
+                .input_file
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+            ways: ways.iter().map(|(way, _)| way.clone()).collect(),
+            lines,
+        });
+    }
+    Ok(detailed)
 }
 
 fn build_one_answer(judged: &Judged, command: String) -> data::Answer {

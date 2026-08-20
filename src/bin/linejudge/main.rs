@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod explain;
+mod marks;
 #[cfg(feature = "maintenance")]
 mod record;
 mod render;
@@ -8,9 +9,9 @@ mod report;
 mod style;
 
 use std::env;
-use std::io::{self, ErrorKind, Write};
+use std::io::{self, ErrorKind, IsTerminal, Write};
 use std::path::{self, Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{self, ExitCode};
 use std::vec::IntoIter;
 
 use linejudge::adapter::Adapter;
@@ -92,9 +93,13 @@ linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <
 
     Measures every counter it has a binary for over every case, the way check does, and writes the
     published pages instead of a report: index.html, the scoreboard of every counter over every
-    case with the failures explained on hover, and data.json, the whole measurement as one record,
-    for anybody building their own view of the same numbers. Both land in --out, or in ./site. A
-    counter with no binary is named on stderr and left out rather than failing the run.
+    case with the failures explained on hover, a page under cases/ for each of them holding the
+    file with its marked spans and every answer to it, and data.json, the whole measurement as one
+    record for anybody building their own view of the same numbers. They land in --out, or in
+    ./site. A counter with no binary is named on stderr and left out rather than failing the run.
+
+    The scoreboard is opened afterwards with whatever this machine opens an HTML file with, unless
+    the output is not a terminal, so a run on a build machine writes the pages and opens nothing.
 
 The commands print colour when they print to a terminal. NO_COLOR turns it off wherever it is set,
 and CLICOLOR_FORCE keeps it through a pipe.
@@ -246,7 +251,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
 
     if let Command::Render = &settings.command {
         let site = settings.out.clone().unwrap_or_else(|| PathBuf::from(SITE_DIR));
-        render::write_the_site(
+        let cases = render::write_the_site(
             &adapters,
             &corpus,
             &dialects,
@@ -254,12 +259,16 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             &find_binary,
             &site,
         )?;
+        let index = site.join(render::INDEX_FILE);
         writeln!(
             out,
-            "wrote {} and {}",
-            site.join(render::INDEX_FILE).display(),
+            "wrote {}, {} and a page for each of {cases} cases",
+            index.display(),
             site.join(render::DATA_FILE).display()
         )?;
+        if io::stdout().is_terminal() {
+            open_the_page(&index);
+        }
         return Ok(false);
     }
 
@@ -553,6 +562,23 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
             .clone()
             .or_else(|| folder.and_then(Folder::find_known_failures)),
     })
+}
+
+/// Hands the page to whatever the machine opens an HTML file with. Nothing is checked and nothing
+/// is waited for: the pages are written either way, and a machine with no browser at all is not a
+/// run that failed.
+fn open_the_page(page: &Path) {
+    let mut opener = if cfg!(target_os = "windows") {
+        // The empty argument is the window title, which start takes from the first quoted one.
+        let mut shell = process::Command::new("cmd");
+        shell.args(["/C", "start", ""]);
+        shell
+    } else if cfg!(target_os = "macos") {
+        process::Command::new("open")
+    } else {
+        process::Command::new("xdg-open")
+    };
+    let _ = opener.arg(page).spawn();
 }
 
 /// `check` and `explain` name a case the same way, so they refuse an unknown one the same way and

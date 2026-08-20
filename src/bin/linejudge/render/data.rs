@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use linejudge::answer;
 use serde::{Deserialize, Serialize};
 
+use crate::marks::Ink;
+
 /// What one measurement of the whole roster holds, in the shape it is published: the pages are
 /// rendered from this and `data.json` is this, so a field here is a promise to whoever reads it
 /// and not an implementation detail. Nothing of the library reaches the page except through here.
@@ -79,6 +81,43 @@ pub enum Verdict {
     Fails,
     Unclaimed,
     Broke,
+}
+
+/// One case as its own page shows it, which is everything the measurement does not carry: the file
+/// itself, the spans marked in it, and how each way of counting reads every line. It is not part of
+/// the published JSON, since that document is what the tools answered and not a copy of the corpus.
+#[derive(Debug, PartialEq)]
+pub struct CaseDetail {
+    pub name: String,
+    pub group: String,
+    pub trap: String,
+    pub file: String,
+    /// Every way of counting the page speaks about, as `counter.dialect`, in the order the
+    /// scoreboard shows them, and the order every line's readings are in.
+    pub ways: Vec<String>,
+    pub lines: Vec<Line>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Line {
+    pub pieces: Vec<Piece>,
+    pub counted: Vec<Counted>,
+}
+
+/// A stretch of one line and what covers it, so the page can paint the file without knowing what
+/// a marker looks like.
+#[derive(Debug, PartialEq)]
+pub struct Piece {
+    pub ink: Ink,
+    pub text: String,
+}
+
+/// Where one way of counting puts one line, and which of its rules put it there.
+#[derive(Debug, PartialEq)]
+pub struct Counted {
+    pub bucket: String,
+    pub rules: Vec<String>,
+    pub region: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

@@ -8,8 +8,8 @@ use linejudge::deriver::{ExplainedLine, derive_answer, explain_every_line};
 use linejudge::dialects::Dialects;
 use linejudge::per_line::{PerLineAnswer, PerLineFormat, read_per_line};
 use linejudge::readings::Readings;
-use linejudge::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
 
+use crate::marks::{Ink, cut_into_stretches};
 use crate::report::paint_counts;
 use crate::style;
 
@@ -363,54 +363,16 @@ fn write_what_it_printed(
     Ok(())
 }
 
-/// The source line painted by what every column of it is marked as. It is walked by character
-/// rather than by byte, which it may be because a case input is ASCII.
 fn paint_by_marks(text: &str, marker: &str) -> String {
-    let marks: Vec<char> = marker.chars().collect();
-    let mut painted = String::with_capacity(text.len() + 32);
-    let mut stretch = String::new();
-    let mut ink = Ink::Unmarked;
-    for (at, ch) in text.chars().enumerate() {
-        let here = Ink::of(marks.get(at).copied().unwrap_or(RESIDUE));
-        if here != ink && !stretch.is_empty() {
-            painted.push_str(&ink.paint(&stretch));
-            stretch.clear();
-        }
-        ink = here;
-        stretch.push(ch);
-    }
-    if !stretch.is_empty() {
-        painted.push_str(&ink.paint(&stretch));
-    }
-    painted
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum Ink {
-    Comment,
-    String,
-    Tag,
-    Unmarked,
-}
-
-impl Ink {
-    fn of(mark: char) -> Ink {
-        match mark {
-            _ if STRING_MARKS.owns(mark) => Ink::String,
-            _ if COMMENT_MARKS.owns(mark) => Ink::Comment,
-            TAG_OPENS | TAG_CLOSES => Ink::Tag,
-            _ => Ink::Unmarked,
-        }
-    }
-
-    fn paint(self, text: &str) -> String {
-        match self {
-            Ink::Comment => style::COMMENT.paint(text).to_string(),
-            Ink::String => style::STRING.paint(text).to_string(),
-            Ink::Tag => style::REGION.paint(text).to_string(),
-            Ink::Unmarked => text.to_string(),
-        }
-    }
+    cut_into_stretches(text, marker)
+        .iter()
+        .map(|(ink, stretch)| match ink {
+            Ink::Comment => style::COMMENT.paint(stretch).to_string(),
+            Ink::String => style::STRING.paint(stretch).to_string(),
+            Ink::Tag => style::REGION.paint(stretch).to_string(),
+            Ink::Plain => stretch.clone(),
+        })
+        .collect()
 }
 
 #[cfg(test)]

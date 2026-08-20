@@ -221,6 +221,17 @@ td.case {
   font-weight: 500;
 }
 
+td.case a {
+  color: #0969da;
+  cursor: pointer;
+  font-size: 1.05em;
+  text-decoration: none;
+}
+
+td.case a:hover {
+  text-decoration: underline;
+}
+
 tr.disabled td {
   background: #fafbfc;
   color: #8c959f;
@@ -281,8 +292,8 @@ tr.disabled td {
   margin-top: .3rem;
   color: #57606a;
   font-family: ui-monospace, Consolas, monospace;
-  font-size: .8rem;
-  line-height: 1.6;
+  font-size: .85rem;
+  line-height: 1.4;
 }
 
 .nums .lbl {
@@ -333,4 +344,149 @@ footer {
   margin-top: 1.25rem;
   color: #8c959f;
   font-size: .8rem;
+}
+
+.crumb {
+  margin: 0 0 .5rem;
+  color: #6e7781;
+  font-size: .85rem;
+}
+
+.crumb a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.trap {
+  max-width: 54rem;
+  margin: 0 0 1.5rem;
+  color: #57606a;
+  font-size: .9375rem;
+}
+
+.chips.ways {
+  margin-bottom: .6rem;
+}
+
+.picked {
+  color: #8c959f;
+  font-size: .8rem;
+}
+
+table.file {
+  width: auto;
+  min-width: 0;
+  margin-bottom: .6rem;
+}
+
+table.file td {
+  border: none;
+  border-bottom: 0.0625rem solid #eaeef2;
+  padding: .15rem .75rem;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  white-space: pre;
+}
+
+table.file tr:last-child td {
+  border-bottom: none;
+}
+
+/* The two columns in front of the file are one band, so the source stands on its own. */
+td.ln,
+td.gut {
+  background: #f6f8fa;
+}
+
+td.ln {
+  position: static;
+  color: #b1b8c0;
+  text-align: right;
+  user-select: none;
+}
+
+td.gut {
+  color: #6e7781;
+  font-size: .78rem;
+  border-right: 0.0625rem solid #d0d7de;
+}
+
+
+td.gut .bucket {
+  cursor: help;
+}
+
+td.src {
+  width: 100%;
+  padding-left: 1rem;
+}
+
+.ink-string {
+  color: #0a7b53;
+}
+
+.ink-comment {
+  color: #8c959f;
+  font-style: italic;
+}
+
+.ink-tag {
+  color: #0550ae;
+}
+
+.rgn {
+  color: #0550ae;
+}
+
+.file-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  margin: 0 0 2rem;
+  color: #8c959f;
+  font-size: .8rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 .75rem;
+}
+
+.answer {
+  padding: .7rem .9rem;
+  margin-bottom: .6rem;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .5rem;
+}
+
+.answer .who {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+
+.answer .way {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.answer .note {
+  max-width: 60rem;
+  margin: .4rem 0 0;
+  color: #57606a;
+  font-size: .85rem;
+}
+
+.answer .cmd {
+  margin: .5rem 0 0;
+  overflow-x: auto;
+}
+
+.answer .cmd code {
+  color: #6e7781;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .78rem;
+  white-space: pre;
 }

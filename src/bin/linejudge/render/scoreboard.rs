@@ -1,7 +1,9 @@
-use maud::{DOCTYPE, Markup, PreEscaped, html};
+use maud::{Markup, html};
 
-use crate::render::DATA_FILE;
 use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Verdict};
+use crate::render::{
+    CASES_DIR, DATA_FILE, format_as_one_line, format_the_group_title, wrap_the_page,
+};
 
 const OPEN_TIP: &str = "the tool disagrees with its own rules here, and nobody has reviewed the \
                         disagreement yet to say why";
@@ -9,10 +11,6 @@ const UNCLAIMED_TIP: &str = "the tool does not support this file's language, so 
                              neither for nor against it";
 const CASES_COLUMN_REM: usize = 25;
 const TOOL_COLUMN_REM: usize = 16;
-/// The width of the cases column is written in both `page.css` and `CASES_COLUMN_REM`: the first
-/// sizes the column and the second is what the table is told it needs at its narrowest.
-const STYLE: &str = include_str!("page.css");
-const SCRIPT: &str = include_str!("page.js");
 
 pub fn render_the_scoreboard(sweep: &Sweep) -> String {
     let counted: usize = sweep
@@ -20,58 +18,51 @@ pub fn render_the_scoreboard(sweep: &Sweep) -> String {
         .iter()
         .map(|group| group.cases.iter().filter(|case| !case.disabled).count())
         .sum();
+    // The width of the cases column is written here and in `page.css`: the stylesheet sizes the
+    // column and this is what the table is told it needs at its narrowest.
     let width = CASES_COLUMN_REM + TOOL_COLUMN_REM * sweep.counters.len();
-    let page = html! {
-        (DOCTYPE)
-        html lang="en" {
-            head {
-                meta charset="utf-8";
-                meta name="viewport" content="width=device-width, initial-scale=1";
-                title { "line counting conformance" }
-                style { (PreEscaped(STYLE)) }
+    let body = html! {
+        (render_the_header(sweep, counted))
+        table style=(format!("min-width: {width}rem")) {
+            colgroup {
+                col .cases;
+                @for _ in &sweep.counters { col; }
             }
-            body {
-                div .wrap {
-                    (render_the_header(sweep, counted))
-                    table style=(format!("min-width: {width}rem")) {
-                        colgroup {
-                            col .cases;
-                            @for _ in &sweep.counters { col; }
-                        }
-                        thead { tr {
-                            th {}
-                            @for counter in &sweep.counters { (render_one_column_head(counter)) }
-                        } }
-                        tbody {
-                            @for group in &sweep.groups {
-                                tr .group { td colspan=(sweep.counters.len() + 1) {
-                                    span { (format_the_group_title(&group.name)) }
-                                } }
-                                @for case in &group.cases {
-                                    @if case.disabled {
-                                        tr .disabled {
-                                            td .case { span .tag { "disabled" } (case.name) }
-                                            @for _ in &sweep.counters { td {} }
-                                        }
-                                    } @else {
-                                        tr {
-                                            td .case { span .tip data-tip=(format_as_one_line(&case.trap)) { (case.name) } }
-                                            @for counter in &sweep.counters {
-                                                (render_one_cell(counter, &case.name))
-                                            }
-                                        }
+            thead { tr {
+                th {}
+                @for counter in &sweep.counters { (render_one_column_head(counter)) }
+            } }
+            tbody {
+                @for group in &sweep.groups {
+                    tr .group { td colspan=(sweep.counters.len() + 1) {
+                        span { (format_the_group_title(&group.name)) }
+                    } }
+                    @for case in &group.cases {
+                        @if case.disabled {
+                            tr .disabled {
+                                td .case { span .tag { "disabled" } (case.name) }
+                                @for _ in &sweep.counters { td {} }
+                            }
+                        } @else {
+                            tr {
+                                td .case {
+                                    a .tip href=(format!("{CASES_DIR}/{}.html", case.name))
+                                            data-tip=(format_as_one_line(&case.trap)) {
+                                        (case.name)
                                     }
+                                }
+                                @for counter in &sweep.counters {
+                                    (render_one_cell(counter, &case.name))
                                 }
                             }
                         }
                     }
-                    footer { "measured on " (sweep.measured_on) " · generated by linejudge" }
                 }
-                script { (PreEscaped(SCRIPT)) }
             }
         }
+        footer { "measured on " (sweep.measured_on) " · generated by linejudge" }
     };
-    page.into_string()
+    wrap_the_page("line counting conformance", body, "")
 }
 
 fn render_the_header(sweep: &Sweep, counted: usize) -> Markup {
@@ -110,8 +101,8 @@ fn render_one_column_head(counter: &Counter) -> Markup {
             div .chips {
                 @for (at, dialect) in counter.dialects.iter().enumerate() {
                     span .chip .pick[multi] .active[multi && at == 0]
-                            data-tool=[multi.then_some(&counter.name)]
-                            data-d=[multi.then_some(&dialect.name)] {
+                            data-group=[multi.then_some(&counter.name)]
+                            data-value=[multi.then_some(&dialect.name)] {
                         (dialect.name) " · " (render_one_tally(&dialect.answers))
                     }
                 }
@@ -143,7 +134,7 @@ fn render_one_cell(counter: &Counter, case: &str) -> Markup {
             @for (at, dialect) in counter.dialects.iter().enumerate() {
                 @let answer = dialect.answers.iter().find(|answer| answer.case == case);
                 @if multi {
-                    div .dv data-tool=(counter.name) data-d=(dialect.name) hidden[at > 0] {
+                    div .dv data-group=(counter.name) data-value=(dialect.name) hidden[at > 0] {
                         @if let Some(answer) = answer { (render_one_answer(answer)) }
                     }
                 } @else {
@@ -313,17 +304,6 @@ fn format_the_version_of(counter: &Counter) -> &str {
         .map(str::trim_start)
         .filter(|rest| !rest.is_empty())
         .unwrap_or(&counter.version)
-}
-
-fn format_as_one_line(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn format_the_group_title(name: &str) -> String {
-    match name.split_once('-') {
-        Some((number, words)) => format!("{number} · {}", words.replace('_', " ")),
-        None => name.to_string(),
-    }
 }
 
 #[cfg(test)]
