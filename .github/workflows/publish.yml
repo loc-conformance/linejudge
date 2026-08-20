@@ -1,0 +1,70 @@
+name: Publish
+
+# By hand and by nothing else. A push to main can land in the middle of a piece of work, a case
+# added whose answers have not been recorded yet, and a page published from that state says
+# something untrue with nobody having asked for it.
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+# Two runs would race over the same branch and the second would force push over the first, so the
+# later one waits instead of being thrown away: it is the one somebody asked for most recently.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache the cargo registry and the build dir
+        uses: Swatinem/rust-cache@v2
+
+      # tokei is published as source and nowhere as a built program, so downloading it is a compile
+      # of several minutes. The key is the adapters, because that is where the wanted versions are
+      # written: raising one is exactly the change that has to fetch again.
+      - name: Cache the counters that were downloaded
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/linejudge/bin
+          key: counters-${{ hashFiles('adapters/**') }}
+
+      - name: Build
+        run: cargo build --release
+
+      # The run stops here if any counter of the roster could not be delivered, and nothing is
+      # published. The pages that are live then stay exactly as they were, which is one whole
+      # measurement with its own date on it, rather than one column from today beside one from a
+      # week ago and holes where the cases added since would be.
+      - name: Download the counters
+        run: ./target/release/linejudge fetch
+
+      - name: Measure the roster and write the pages
+        run: ./target/release/linejudge render
+
+      # A fresh repository inside the folder, one commit, forced over whatever was there before.
+      # The branch therefore holds the pages and nothing else, never the source, and it stays at a
+      # single commit however often this runs, so cloning the repository does not grow with it.
+      # .nojekyll turns off the site generator github would otherwise run over the folder.
+      - name: Publish the pages
+        working-directory: site
+        run: |
+          touch .nojekyll
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "the pages, measured $(date -u +%F)"
+          git push -qf \
+            "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" \
+            HEAD:gh-pages
