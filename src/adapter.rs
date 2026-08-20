@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -235,8 +236,11 @@ impl Adapter {
         Some(run_counter(binary, &build_command_args(base, dialect, file)))
     }
 
+    /// The command as a person would retype it, so paths under the directory the run works from
+    /// are written relative to it and the rest are left whole. It is meant to be pasted into a
+    /// shell, which is why the case is not cut down to its file name.
     pub fn format_command(&self, dialect: &Dialect, binary: &Path, file: &Path) -> String {
-        format!("{} {}", binary.display(), self.build_args(dialect, file).join(" "))
+        format!("{} {}", shorten(binary), self.build_args(dialect, &shorten_the_path(file)).join(" "))
     }
 
     pub fn format_explain_command(
@@ -246,7 +250,8 @@ impl Adapter {
         file: &Path,
     ) -> Option<String> {
         let base = self.explain_args.as_ref()?;
-        Some(format!("{} {}", binary.display(), build_command_args(base, dialect, file).join(" ")))
+        let args = build_command_args(base, dialect, &shorten_the_path(file));
+        Some(format!("{} {}", shorten(binary), args.join(" ")))
     }
 
     fn build_args(&self, dialect: &Dialect, file: &Path) -> Vec<String> {
@@ -275,6 +280,15 @@ pub enum Reader {
 pub struct Acquisition {
     pub channel: String,
     pub name: String,
+}
+
+fn shorten(path: &Path) -> String {
+    shorten_the_path(path).display().to_string()
+}
+
+fn shorten_the_path(path: &Path) -> PathBuf {
+    let Ok(here) = env::current_dir() else { return path.to_path_buf() };
+    path.strip_prefix(&here).unwrap_or(path).to_path_buf()
 }
 
 fn name_every_one_of(dirs: &[PathBuf]) -> String {
@@ -361,6 +375,24 @@ mod tests {
             assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
         }
         assert!(matches!(adapters[2].dialects[0].reader, Reader::Written(OutputFormat::TokeiJson)));
+    }
+
+    #[test]
+    fn the_command_a_report_prints_is_written_from_where_the_run_works() {
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
+        let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
+        let here = env::current_dir().unwrap();
+
+        let under = here.join("cases").join("0400-a_case").join("input.c");
+        let printed = tokei.format_command(&tokei.dialects[0], Path::new("tokei"), &under);
+        assert!(printed.contains(&format!("cases{}0400-a_case", std::path::MAIN_SEPARATOR)),
+                "{printed}");
+        assert!(!printed.contains(&here.display().to_string()), "{printed}");
+
+        let elsewhere = Path::new("/somewhere/of/its/own/input.c");
+        let whole = tokei.format_command(&tokei.dialects[0], Path::new("tokei"), elsewhere);
+        assert!(whole.contains("somewhere"), "{whole}");
     }
 
     // A counter nobody publishes anywhere has no channel to declare, and forcing one would be

@@ -5,9 +5,9 @@ use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Verdict};
 
 const OPEN_TIP: &str = "the tool disagrees with its own rules here, and nobody has reviewed the \
                         disagreement yet to say why";
-const UNCLAIMED_TIP: &str = "the tool answers that there is no such file. Which files it claims \
-                             is its own decision, so this is not a failure, and the case leaves \
-                             its denominator";
+const UNCLAIMED_TIP: &str = "the tool answers that it does not count this file. Which files a \
+                             tool takes on is its own decision, so this is not a failure: the \
+                             case is left out of its score rather than held against it";
 const CASES_COLUMN_REM: usize = 25;
 const TOOL_COLUMN_REM: usize = 16;
 /// The width of the cases column is written in both `page.css` and `CASES_COLUMN_REM`: the first
@@ -81,9 +81,10 @@ fn render_the_header(sweep: &Sweep, counted: usize) -> Markup {
             h1 { "Line counting conformance" }
             p .intro {
                 "Every tool below is judged against its own declared rules, so a failure means \
-                 the tool disagrees with itself, never with us. A tool that does not claim a \
-                 file is not failing: unclaimed cases leave its denominator. Hover a case for \
-                 its trap, hover a verdict for the reason."
+                 the tool disagrees with itself. A tool that does not count a file at all is not \
+                 failing it: those cases are left out of its score rather than held against it. \
+                 Hover elements like the test name or the status result for more information or \
+                 the reasons."
             }
             p .meta {
                 "measured " (sweep.measured_on)
@@ -96,7 +97,7 @@ fn render_the_header(sweep: &Sweep, counted: usize) -> Markup {
                 span { span .s.s-exc { "◆" } " agrees through a declared exception" }
                 span { span .s.s-fail { "✗" } " fails, reviewed" }
                 span { span .s.s-open { "✗" } " fails, not yet reviewed" }
-                span { span .s.s-na { "⊘" } " does not claim the file" }
+                span { span .s.s-na { "⊘" } " does not count this file" }
                 span { span .s.s-broke { "broke" } }
             }
         }

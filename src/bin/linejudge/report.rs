@@ -10,6 +10,7 @@ use linejudge::verdict::{Conformance, Drift, Judged, Measured, Outcome};
 
 use crate::style;
 
+const FILE_PLACEHOLDER: &str = "{file}";
 const ROW_WIDTH: usize = "recorded note".len() + 1;
 const REGION_ROW_WIDTH: usize = "recorded regions".len() + 1;
 
@@ -39,13 +40,17 @@ pub fn report_the_verdicts_of_one_dialect(
             style::HEADING.paint(&format!("{}.{}", adapter.name_of_counter, dialect.name)),
             style::DETAIL.paint(&format!("[{}]", run.version)))?;
     writeln!(out, "  {}", format_summary(judged, drift_is_judged))?;
+    // Once, and never per finding: the command is the same for every case but the file, and the
+    // case is the one thing already named above every set of rows.
+    writeln!(out, "  {} {}", style::LABEL.paint("run"), style::DETAIL.paint(
+            &adapter.format_command(dialect, run.binary, Path::new(FILE_PLACEHOLDER))))?;
 
     let Some(known_failures) = known_failures else {
         for one in judged {
             let measured = match &one.outcome {
                 Outcome::Broke(message) => {
-                    write_the_name_of(out, &style::DIFFERS, "broke", &one.case.name)?;
-                    write_what_broke(out, run, one.case, message)?;
+                    write_the_name_above_the_rows(out, &style::DIFFERS, "broke", &one.case.name)?;
+                    write_what_broke(out, message)?;
                     continue;
                 }
                 Outcome::Measured(measured) => measured,
@@ -61,22 +66,23 @@ pub fn report_the_verdicts_of_one_dialect(
                         true => "known, and it now fails in a new way",
                         false => "new failure",
                     };
-                    write_the_name_of(out, &style::DIFFERS, what, &one.case.name)?;
-                    describe(out, run, one.case, measured)?;
+                    write_the_name_above_the_rows(out, &style::DIFFERS, what, &one.case.name)?;
+                    describe(out, one.case, measured)?;
                 }
                 (Conformance::Fails, _) => {
                     let what = if drift_is_judged { "new failure" } else { "fails" };
-                    write_the_name_of(out, &style::DIFFERS, what, &one.case.name)?;
-                    describe(out, run, one.case, measured)?;
+                    write_the_name_above_the_rows(out, &style::DIFFERS, what, &one.case.name)?;
+                    describe(out, one.case, measured)?;
                 }
                 (_, Some(Drift::NoLongerClaimed)) => {
-                    write_the_name_of(out, &style::RECORDED, "claims the file no longer", &one.case.name)?;
-                    describe(out, run, one.case, measured)?;
+                    write_the_name_above_the_rows(out, &style::RECORDED,
+                            "claims the file no longer", &one.case.name)?;
+                    describe(out, one.case, measured)?;
                 }
                 (_, Some(Drift::NowClaimed)) => {
-                    write_the_name_of(out, &style::RECORDED,
+                    write_the_name_above_the_rows(out, &style::RECORDED,
                             "claims a file the record says it does not", &one.case.name)?;
-                    describe(out, run, one.case, measured)?;
+                    describe(out, one.case, measured)?;
                 }
                 (Conformance::Agrees, Some(Drift::Changed)) => write_the_name_of(out, &style::AGREES,
                         "now agrees, the record still holds a failure", &one.case.name)?,
@@ -93,9 +99,9 @@ pub fn report_the_verdicts_of_one_dialect(
             Outcome::Broke(message) => {
                 if !named {
                     unnamed += 1;
-                    write_the_name_of(out, &style::DIFFERS,
+                    write_the_name_above_the_rows(out, &style::DIFFERS,
                             "broke, and is not a known failure", &one.case.name)?;
-                    write_what_broke(out, run, one.case, message)?;
+                    write_what_broke(out, message)?;
                 }
                 continue;
             }
@@ -104,14 +110,14 @@ pub fn report_the_verdicts_of_one_dialect(
         match (measured.is_a_failure(), named) {
             (true, false) => {
                 unnamed += 1;
-                write_the_name_of(out, &style::DIFFERS,
+                write_the_name_above_the_rows(out, &style::DIFFERS,
                         "fails and is not a known failure", &one.case.name)?;
-                describe(out, run, one.case, measured)?;
+                describe(out, one.case, measured)?;
             }
             (true, true) if measured.drift == Some(Drift::Changed) => {
-                write_the_name_of(out, &style::DIFFERS,
+                write_the_name_above_the_rows(out, &style::DIFFERS,
                         "known, and it now fails in a new way", &one.case.name)?;
-                describe(out, run, one.case, measured)?;
+                describe(out, one.case, measured)?;
             }
             (false, true) => write_the_name_of(out, &style::AGREES,
                     "passes, take it off the list", &one.case.name)?,
@@ -183,12 +189,25 @@ fn write_the_name_of(
     writeln!(out, "  {}   {name}", ink.paint(what))
 }
 
+/// A finding with rows under it opens with a blank line, so that it does not run into the one
+/// before it. A finding that is no more than its name does not, so that a run of them reads as
+/// the list it is.
+fn write_the_name_above_the_rows(
+    out: &mut dyn Write,
+    ink: &style::Style,
+    what: &str,
+    name: &str,
+) -> io::Result<()> {
+    writeln!(out)?;
+    write_the_name_of(out, ink, what, name)
+}
+
 fn write_row(out: &mut dyn Write, width: usize, name: &str, text: &str) -> io::Result<()> {
     let padding = " ".repeat(width.saturating_sub(name.chars().count()));
     writeln!(out, "      {}{padding}{text}", style::LABEL.paint(name))
 }
 
-fn describe(out: &mut dyn Write, run: &OneRun, case: &Case, measured: &Measured) -> io::Result<()> {
+fn describe(out: &mut dyn Write, case: &Case, measured: &Measured) -> io::Result<()> {
     let real = &measured.real;
     let recorded = measured.record.and_then(|record| record.counted.as_ref());
     match measured.record.and_then(|record| record.note.as_ref()) {
@@ -233,14 +252,11 @@ fn describe(out: &mut dyn Write, run: &OneRun, case: &Case, measured: &Measured)
             writeln!(out, "      {}", style::DIFFERS.paint("answers nothing, it claims no such file"))?;
         }
     }
-    write_row(out, ROW_WIDTH, "run", &style::DETAIL.paint(
-            &run.adapter.format_command(run.dialect, run.binary, &case.input_file)).to_string())
+    Ok(())
 }
 
-fn write_what_broke(out: &mut dyn Write, run: &OneRun, case: &Case, message: &str) -> io::Result<()> {
-    writeln!(out, "      {}", format_as_one_line(message))?;
-    write_row(out, ROW_WIDTH, "run", &style::DETAIL.paint(
-            &run.adapter.format_command(run.dialect, run.binary, &case.input_file)).to_string())
+fn write_what_broke(out: &mut dyn Write, message: &str) -> io::Result<()> {
+    writeln!(out, "      {}", format_as_one_line(message))
 }
 
 fn format_summary(judged: &[Judged], drift_is_judged: bool) -> String {

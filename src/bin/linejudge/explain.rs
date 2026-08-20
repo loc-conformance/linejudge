@@ -2,10 +2,10 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use linejudge::adapter::{Adapter, Dialect as Way};
-use linejudge::answer::Counts;
+use linejudge::answer::{Answer, Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
-use linejudge::deriver::{ExplainedLine, explain_every_line};
-use linejudge::dialects::{Dialect, Dialects};
+use linejudge::deriver::{ExplainedLine, derive_answer, explain_every_line};
+use linejudge::dialects::Dialects;
 use linejudge::per_line::{PerLineAnswer, PerLineFormat, read_per_line};
 use linejudge::readings::Readings;
 use linejudge::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
@@ -14,6 +14,7 @@ use crate::report::paint_counts;
 use crate::style;
 
 const BY_ITS_RULES: &str = "by its rules";
+const IN_ITS_REGIONS: &str = "in its regions";
 
 /// A whole name wins outright, and a fragment is enough where it names exactly one case; what a
 /// fragment matching several gets is their list, never a guess among them.
@@ -48,15 +49,18 @@ pub fn explain_one_counter(
     readings: &Readings,
 ) -> io::Result<()> {
     for way in &adapter.dialects {
-        let key = format!("{}.{}", adapter.name_of_counter, way.name);
+        let block = OneWay { counter: &adapter.name_of_counter, way: &way.name, case };
         let Some(dialect) = dialects.find(&adapter.name_of_counter, &way.name) else {
-            writeln!(out, "\n{key} on {}: no dialect file, nothing to derive with", case.name)?;
+            writeln!(out, "\n{} on {}: no dialect file, nothing to derive with",
+                    block.key(), case.name)?;
             continue;
         };
-        let explained = match explain_every_line(&case.truth, dialect, readings) {
-            Ok(explained) => explained,
+        let derived = derive_answer(&case.truth, dialect, readings)
+            .and_then(|derivation| Ok((derivation.real, explain_every_line(&case.truth, dialect, readings)?)));
+        let (real, explained) = match derived {
+            Ok(both) => both,
             Err(faults) => {
-                writeln!(out, "\n{key} on {}:", case.name)?;
+                writeln!(out, "\n{} on {}:", block.key(), case.name)?;
                 for fault in faults {
                     writeln!(out, "  {}", style::DIFFERS.paint(&fault))?;
                 }
@@ -64,9 +68,9 @@ pub fn explain_one_counter(
             }
         };
         let theirs = read_what_the_counter_says(adapter, way, binary, case);
-        let ours = sum(&explained, dialect);
-        write_the_header(out, &key, case, &adapter.name_of_counter, &ours, &theirs, &explained)?;
-        write_every_line(out, case, &adapter.name_of_counter, &explained, &theirs)?;
+        let its = run_the_counter(adapter, way, binary, case);
+        write_the_header(out, &block, &real, &its, &theirs, &explained)?;
+        write_every_line(out, &block, &explained, &theirs)?;
         if let (TheirAnswer::Text(printed), Some(binary)) = (&theirs, binary) {
             if let Some(command) = adapter.format_explain_command(way, binary, &case.input_file) {
                 writeln!(out, "\n  {} {}",
@@ -77,6 +81,29 @@ pub fn explain_one_counter(
         }
     }
     Ok(())
+}
+
+/// One counter's one way of counting, over one case, as the block being written speaks about it.
+struct OneWay<'a> {
+    counter: &'a str,
+    way: &'a str,
+    case: &'a Case,
+}
+
+impl OneWay<'_> {
+    fn key(&self) -> String {
+        format!("{}.{}", self.counter, self.way)
+    }
+}
+
+/// What the counter answers when it is simply run, which is the answer `check` judges. Kept apart
+/// from its line by line analysis, since a counter that has none still answers.
+enum ItsAnswer {
+    NotMeasured,
+    Broke(String),
+    /// It says there is no such file, which is an answer of its own and never a failure.
+    Unclaimed,
+    Counted(Answer),
 }
 
 /// What the counter itself had to say about the file, which is nothing at all for one that
@@ -108,6 +135,15 @@ impl TheirAnswer {
     }
 }
 
+fn run_the_counter(adapter: &Adapter, way: &Way, binary: Option<&Path>, case: &Case) -> ItsAnswer {
+    let Some(binary) = binary else { return ItsAnswer::NotMeasured };
+    match adapter.measure(way, binary, &case.input_file) {
+        Ok(Some(answer)) => ItsAnswer::Counted(answer),
+        Ok(None) => ItsAnswer::Unclaimed,
+        Err(message) => ItsAnswer::Broke(message),
+    }
+}
+
 fn read_what_the_counter_says(
     adapter: &Adapter,
     way: &Way,
@@ -134,45 +170,127 @@ fn read_what_the_counter_says(
     }
 }
 
+/// What the rules ask, what the counter answered, and whether those two agree. The answer is the
+/// plain run, the one `check` judges, so a counter with nothing to say line by line is still held
+/// to its own rules here instead of showing a derivation and no verdict.
 fn write_the_header(
     out: &mut dyn Write,
-    key: &str,
-    case: &Case,
-    counter: &str,
-    ours: &Counts,
+    block: &OneWay,
+    real: &Answer,
+    its: &ItsAnswer,
     theirs: &TheirAnswer,
     explained: &[ExplainedLine],
 ) -> io::Result<()> {
+    let counter = block.counter;
     let answers = format!("{counter} answers");
-    let width = answers.chars().count().max(BY_ITS_RULES.chars().count());
-    writeln!(out, "\n{} {} {}", style::HEADING.paint(key), style::DETAIL.paint("on"),
-            style::HEADING.paint(&case.name))?;
-    writeln!(out, "  {}  {}", style::LABEL.paint(&format!("{BY_ITS_RULES:<width$}")),
-            paint_counts(ours, None))?;
+    let width = answers
+        .chars()
+        .count()
+        .max(BY_ITS_RULES.chars().count())
+        .max(IN_ITS_REGIONS.chars().count());
+    writeln!(out, "\n{} {} {}", style::HEADING.paint(&block.key()), style::DETAIL.paint("on"),
+            style::HEADING.paint(&block.case.name))?;
+    write_a_row(out, width, BY_ITS_RULES, &paint_counts(&real.counts, None))?;
+
+    match its {
+        ItsAnswer::NotMeasured => {
+            let said = match theirs {
+                TheirAnswer::NoBinary => format!(
+                    "no binary named for {counter}, so neither what it answers nor how it reads \
+                     the lines was measured"),
+                _ => format!("no binary named for {counter}, so what it answers was not measured"),
+            };
+            writeln!(out, "  {}", style::DETAIL.paint(&said))?;
+        }
+        ItsAnswer::Broke(message) => writeln!(out, "  {} {}",
+                style::DIFFERS.paint(&format!("{counter} could not be run:")),
+                style::DETAIL.paint(message))?,
+        ItsAnswer::Unclaimed => write_a_row(out, width, &answers,
+                &style::RECORDED.paint("nothing, it claims no such file").to_string())?,
+        ItsAnswer::Counted(answer) => {
+            let mark = match answer == real {
+                true => style::AGREES.paint("✓ agrees"),
+                false => style::DIFFERS.paint("✗ differs"),
+            };
+            write_a_row(out, width, &answers,
+                    &format!("{}   {mark}", paint_counts(&answer.counts, Some(&real.counts))))?;
+            if answer.regions != real.regions {
+                write_the_regions_that_differ(out, width, &real.regions, &answer.regions)?;
+            }
+        }
+    }
 
     match theirs {
         TheirAnswer::NoCommand => writeln!(out, "  {}", style::DETAIL.paint(
-                &format!("{counter} declares no per-line command of its own"))),
-        TheirAnswer::NoBinary => writeln!(out, "  {}", style::DETAIL.paint(&format!(
-                "{counter} has a per-line command and no binary named to run it"))),
+                &format!("{counter} declares no per-line command of its own")),),
+        // The line above has already said that nothing of this counter was measured.
+        TheirAnswer::NoBinary => Ok(()),
         TheirAnswer::Broken(message) => writeln!(out, "  {} {}",
-                style::DIFFERS.paint(&format!("{counter} could not be run:")),
+                style::DIFFERS.paint(&format!("the per-line command of {counter} could not be run:")),
                 style::DETAIL.paint(message)),
         TheirAnswer::Unreadable(message) => writeln!(out, "  {} {}",
                 style::DIFFERS.paint(&format!("what {counter} printed could not be read:")),
                 style::DETAIL.paint(message)),
         TheirAnswer::Text(_) => Ok(()),
-        TheirAnswer::PerLine(answer) => {
-            let differing = theirs.count_lines_read_differently(explained);
-            let how = match differing {
-                0 => "and reads every line the same way".to_string(),
-                1 => style::DIFFERS.paint("and reads 1 line differently").to_string(),
-                many => style::DIFFERS.paint(&format!("and reads {many} lines differently")).to_string(),
+        TheirAnswer::PerLine(_) => {
+            let how = match theirs.count_lines_read_differently(explained) {
+                0 => style::DETAIL.paint(&format!("{counter} reads every line the same way")),
+                1 => style::DIFFERS.paint(&format!("{counter} reads 1 line differently")),
+                many => style::DIFFERS.paint(&format!("{counter} reads {many} lines differently")),
             };
-            writeln!(out, "  {}  {}, {how}", style::LABEL.paint(&format!("{answers:<width$}")),
-                    paint_counts(&answer.counts, Some(ours)))
+            writeln!(out, "  {how}")
         }
     }
+}
+
+fn write_a_row(out: &mut dyn Write, width: usize, label: &str, text: &str) -> io::Result<()> {
+    writeln!(out, "  {}  {text}", style::LABEL.paint(&format!("{label:<width$}")))
+}
+
+/// One line per stretch of another language the two sides disagree about, and none for the ones
+/// they agree on. Two answers can name the same languages over the same lines and still differ,
+/// by putting those lines in different buckets, so the counts are what is shown and not the names.
+fn write_the_regions_that_differ(
+    out: &mut dyn Write,
+    width: usize,
+    real: &[RegionCounts],
+    its: &[RegionCounts],
+) -> io::Result<()> {
+    let mut languages: Vec<&str> =
+        real.iter().chain(its).map(|region| region.language.as_str()).collect();
+    languages.sort_unstable();
+    languages.dedup();
+    let mut label = IN_ITS_REGIONS;
+    for language in languages {
+        let wanted = find_the_region_of(real, language);
+        let found = find_the_region_of(its, language);
+        if wanted == found {
+            continue;
+        }
+        let against = match (wanted, found) {
+            (Some(wanted), Some(found)) => format!("{} {} {}",
+                    paint_counts(&count_the_lines_of(wanted), None), style::DETAIL.paint("against"),
+                    paint_counts(&count_the_lines_of(found), Some(&count_the_lines_of(wanted)))),
+            (Some(wanted), None) => format!("{} {} {}",
+                    paint_counts(&count_the_lines_of(wanted), None), style::DETAIL.paint("against"),
+                    style::DIFFERS.paint("none")),
+            (None, Some(found)) => format!("{} {} {}", style::DETAIL.paint("none"),
+                    style::DETAIL.paint("against"),
+                    paint_counts(&count_the_lines_of(found), None)),
+            (None, None) => continue,
+        };
+        write_a_row(out, width, label, &format!("{}  {against}", style::REGION.paint(language)))?;
+        label = "";
+    }
+    Ok(())
+}
+
+fn find_the_region_of<'a>(regions: &'a [RegionCounts], language: &str) -> Option<&'a RegionCounts> {
+    regions.iter().find(|region| region.language == language)
+}
+
+fn count_the_lines_of(region: &RegionCounts) -> Counts {
+    Counts { lines: region.lines, buckets: region.buckets.clone() }
 }
 
 /// Every line of the case: the source painted by the spans marked under it, those markers, the
@@ -180,11 +298,12 @@ fn write_the_header(
 /// says instead.
 fn write_every_line(
     out: &mut dyn Write,
-    case: &Case,
-    counter: &str,
+    block: &OneWay,
     explained: &[ExplainedLine],
     theirs: &TheirAnswer,
 ) -> io::Result<()> {
+    let case = block.case;
+    let counter = block.counter;
     let width = case.truth.lines.len().to_string().len();
     for (at, (line, truth_line)) in explained.iter().zip(&case.truth.lines).enumerate() {
         writeln!(out)?;
@@ -294,18 +413,6 @@ impl Ink {
     }
 }
 
-fn sum(explained: &[ExplainedLine], dialect: &Dialect) -> Counts {
-    let mut counts = Counts {
-        lines: 0,
-        buckets: dialect.buckets.iter().map(|bucket| (bucket.clone(), 0)).collect(),
-    };
-    for line in explained {
-        counts.lines += 1;
-        *counts.buckets.entry(line.bucket.clone()).or_default() += 1;
-    }
-    counts
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -353,7 +460,52 @@ mod tests {
         let mut written = Vec::new();
         explain_one_counter(&mut written, scc, None, case, &dialects, &corpus.readings).unwrap();
         let text = String::from_utf8(written).unwrap();
-        assert!(text.contains("scc has a per-line command and no binary named"), "{text}");
+        assert!(text.contains("no binary named for scc, so neither what it answers nor how it \
+                               reads the lines was measured"), "{text}");
+    }
+
+    #[test]
+    fn what_the_counter_answers_is_held_against_its_rules_and_marked() {
+        colored::control::set_override(false);
+        let (corpus, dialects, _) = read_everything();
+        let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
+        let real = a_derivation(&corpus, &dialects, case);
+
+        let agrees = ItsAnswer::Counted(real.clone());
+        let text = a_header(case, &real, &agrees, &TheirAnswer::NoCommand, &[]);
+        assert!(text.contains("mezura answers"), "{text}");
+        assert!(text.contains("✓ agrees"), "{text}");
+
+        let mut moved = real.clone();
+        moved.counts.lines += 1;
+        let text = a_header(case, &real, &ItsAnswer::Counted(moved), &TheirAnswer::NoCommand, &[]);
+        assert!(text.contains("✗ differs"), "{text}");
+
+        let text = a_header(case, &real, &ItsAnswer::Unclaimed, &TheirAnswer::NoCommand, &[]);
+        assert!(text.contains("nothing, it claims no such file"), "{text}");
+        assert!(!text.contains("✗"), "not claiming a file is not a failure\n{text}");
+
+        let broke = ItsAnswer::Broke("exit status 101".to_string());
+        let text = a_header(case, &real, &broke, &TheirAnswer::NoCommand, &[]);
+        assert!(text.contains("mezura could not be run: exit status 101"), "{text}");
+    }
+
+    // The counts can agree while the split into embedded languages does not, and a mark with no
+    // reason under it is what that would otherwise look like.
+    #[test]
+    fn an_answer_whose_regions_alone_differ_is_marked_and_says_which_ones() {
+        colored::control::set_override(false);
+        let (corpus, dialects, _) = read_everything();
+        let case = find_case(&corpus, "6090-vue_blocks_count_as_their_own_languages").unwrap();
+        let real = a_derivation(&corpus, &dialects, case);
+        assert!(!real.regions.is_empty(), "the case is the one with regions in it");
+
+        let mut lost = real.clone();
+        lost.regions.remove(0);
+        let text = a_header(case, &real, &ItsAnswer::Counted(lost), &TheirAnswer::NoCommand, &[]);
+        assert!(text.contains("✗ differs"), "{text}");
+        assert!(text.contains("in its regions"), "{text}");
+        assert!(text.contains("against"), "{text}");
     }
 
     #[test]
@@ -363,22 +515,25 @@ mod tests {
         let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
         let dialect = dialects.find("mezura", "content").unwrap();
         let explained = explain_every_line(&case.truth, dialect, &corpus.readings).unwrap();
-        let ours = sum(&explained, dialect);
+        let real = a_derivation(&corpus, &dialects, case);
 
-        let agreeing = TheirAnswer::PerLine(a_counter_saying(&["code", "comments", "code"], &ours));
+        let block = a_block(case);
+        let agreeing = TheirAnswer::PerLine(a_counter_saying(&["code", "comments", "code"], &real));
         let mut written = Vec::new();
-        write_the_header(&mut written, "mezura.content", case, "mezura", &ours, &agreeing, &explained).unwrap();
-        write_every_line(&mut written, case, "mezura", &explained, &agreeing).unwrap();
+        write_the_header(&mut written, &block, &real, &ItsAnswer::NotMeasured, &agreeing, &explained)
+            .unwrap();
+        write_every_line(&mut written, &block, &explained, &agreeing).unwrap();
         let text = String::from_utf8(written).unwrap();
-        assert!(text.contains("reads every line the same way"), "{text}");
+        assert!(text.contains("mezura reads every line the same way"), "{text}");
         assert!(!text.contains("mezura says"), "{text}");
 
-        let differing = TheirAnswer::PerLine(a_counter_saying(&["code", "code", "code"], &ours));
+        let differing = TheirAnswer::PerLine(a_counter_saying(&["code", "code", "code"], &real));
         let mut written = Vec::new();
-        write_the_header(&mut written, "mezura.content", case, "mezura", &ours, &differing, &explained).unwrap();
-        write_every_line(&mut written, case, "mezura", &explained, &differing).unwrap();
+        write_the_header(&mut written, &block, &real, &ItsAnswer::NotMeasured, &differing, &explained)
+            .unwrap();
+        write_every_line(&mut written, &block, &explained, &differing).unwrap();
         let text = String::from_utf8(written).unwrap();
-        assert!(text.contains("reads 1 line differently"), "{text}");
+        assert!(text.contains("mezura reads 1 line differently"), "{text}");
         assert!(text.contains("mezura says code"), "{text}");
     }
 
@@ -388,13 +543,9 @@ mod tests {
         let (corpus, dialects, adapters) = read_everything();
         let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
         let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
-        let dialect = dialects.find("mezura", "content").unwrap();
-        let explained = explain_every_line(&case.truth, dialect, &corpus.readings).unwrap();
-        let ours = sum(&explained, dialect);
+        let real = a_derivation(&corpus, &dialects, case);
         let unreadable = TheirAnswer::Unreadable("it answers 4 lines, and the file has 3".to_string());
-        let mut written = Vec::new();
-        write_the_header(&mut written, "mezura.content", case, "mezura", &ours, &unreadable, &explained).unwrap();
-        let text = String::from_utf8(written).unwrap();
+        let text = a_header(case, &real, &ItsAnswer::NotMeasured, &unreadable, &[]);
         assert!(text.contains("what mezura printed could not be read: it answers 4 lines"), "{text}");
         assert!(mezura.explain_args.is_some());
     }
@@ -428,8 +579,29 @@ mod tests {
         assert!(String::from_utf8(verbatim).unwrap().starts_with("    TRACE 12:00: a/b.py"));
     }
 
-    fn a_counter_saying(buckets_of_lines: &[&str], ours: &Counts) -> PerLineAnswer {
-        let mut counts = Counts { lines: 0, buckets: ours.buckets.clone() };
+    fn a_header(
+        case: &Case,
+        real: &Answer,
+        its: &ItsAnswer,
+        theirs: &TheirAnswer,
+        explained: &[ExplainedLine],
+    ) -> String {
+        let mut written = Vec::new();
+        write_the_header(&mut written, &a_block(case), real, its, theirs, explained).unwrap();
+        String::from_utf8(written).unwrap()
+    }
+
+    fn a_block(case: &Case) -> OneWay<'_> {
+        OneWay { counter: "mezura", way: "content", case }
+    }
+
+    fn a_derivation(corpus: &Corpus, dialects: &Dialects, case: &Case) -> Answer {
+        let dialect = dialects.find("mezura", "content").unwrap();
+        derive_answer(&case.truth, dialect, &corpus.readings).unwrap().real
+    }
+
+    fn a_counter_saying(buckets_of_lines: &[&str], real: &Answer) -> PerLineAnswer {
+        let mut counts = Counts { lines: 0, buckets: real.counts.buckets.clone() };
         for value in counts.buckets.values_mut() {
             *value = 0;
         }

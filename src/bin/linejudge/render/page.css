@@ -139,23 +139,33 @@ thead th:last-child {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: .3rem;
+  gap: .5rem;
   margin-top: .4rem;
 }
 
 .chip {
+  display: flex;
+  align-items: center;
+  gap: .4em;
   padding: .05rem .6rem;
   background: #f6f8fa;
   border: 0.0625rem solid #d0d7de;
   border-radius: 1rem;
   color: #57606a;
-  font-size: .75rem;
+  font-size: .8rem;
   font-weight: 400;
   white-space: nowrap;
 }
 
 .chip b {
   font-weight: 700;
+}
+
+.chip b.ok,
+.chip b.bad,
+.chip b.open,
+.chip b.na {
+  font-size: 1.1em;
 }
 
 .chip.pick {
@@ -181,7 +191,7 @@ thead th:last-child {
 }
 
 .open {
-  color: #9a6700;
+  color: #c99a06;
 }
 
 .na {
@@ -242,7 +252,7 @@ tr.disabled td {
 }
 
 .s-open {
-  color: #9a6700;
+  color: #c99a06;
 }
 
 .s-exc {
