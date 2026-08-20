@@ -10,10 +10,12 @@ mod case;
 mod data;
 mod measure;
 mod scoreboard;
+mod tool;
 
 pub const DATA_FILE: &str = "data.json";
 pub const INDEX_FILE: &str = "index.html";
 pub const CASES_DIR: &str = "cases";
+pub const TOOLS_DIR: &str = "tools";
 const SCRIPT_FILE: &str = "page.js";
 const STYLE_FILE: &str = "page.css";
 const STYLE: &str = include_str!("page.css");
@@ -40,18 +42,34 @@ pub fn write_the_site(
     write(STYLE_FILE, STYLE.to_string())?;
     write(SCRIPT_FILE, SCRIPT.to_string())?;
     write(INDEX_FILE, scoreboard::render_the_scoreboard(&sweep))?;
-    let cases = out.join(CASES_DIR);
-    fs::create_dir_all(&cases)
-        .map_err(|error| format!("{} could not be created: {error}", cases.display()))?;
-    for detail in &detailed {
-        let page = cases.join(format!("{}.html", detail.name));
-        fs::write(&page, case::render_one_case(detail, &sweep))
-            .map_err(|error| format!("{} could not be written: {error}", page.display()))?;
-    }
+    write_a_page_each(&out.join(CASES_DIR), &detailed, |detail| {
+        (detail.name.clone(), case::render_one_case(detail, &sweep))
+    })?;
+    let tools = measure::read_every_tool(&sweep, adapters, dialects)?;
+    write_a_page_each(&out.join(TOOLS_DIR), &tools, |detail| {
+        (detail.name.clone(), tool::render_one_tool(detail, &sweep))
+    })?;
     let json = serde_json::to_string_pretty(&sweep)
         .map_err(|error| format!("the measurement could not be written as JSON: {error}"))?;
     write(DATA_FILE, json + "\n")?;
     Ok(detailed.len())
+}
+
+/// One directory of pages, named by whatever the caller says each of them is called.
+fn write_a_page_each<T>(
+    dir: &Path,
+    each: &[T],
+    render: impl Fn(&T) -> (String, String),
+) -> Result<(), String> {
+    fs::create_dir_all(dir)
+        .map_err(|error| format!("{} could not be created: {error}", dir.display()))?;
+    for one in each {
+        let (name, text) = render(one);
+        let page = dir.join(format!("{name}.html"));
+        fs::write(&page, text)
+            .map_err(|error| format!("{} could not be written: {error}", page.display()))?;
+    }
+    Ok(())
 }
 
 /// Every page of the site is this, so the stylesheet and the script are written once and named by

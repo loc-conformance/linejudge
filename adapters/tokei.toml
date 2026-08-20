@@ -1,6 +1,7 @@
-name   = "tokei"
-output = "tokei-json"
-args   = ["--output", "json", "{file}"]
+name       = "tokei"
+repository = "https://github.com/XAMPPRocky/tokei"
+output     = "tokei-json"
+args       = ["--output", "json", "{file}"]
 
 [acquisition]
 channel = "crates-io"

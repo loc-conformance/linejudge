@@ -1,6 +1,7 @@
-name   = "scc"
-args   = ["--format", "json", "{file}"]
-explain-args = ["-t", "--no-cocomo", "-f", "csv", "{file}"]
+name       = "scc"
+repository = "https://github.com/boyter/scc"
+args       = ["--format", "json", "{file}"]
+explain-args      = ["-t", "--no-cocomo", "-f", "csv", "{file}"]
 explain-keep-from = "line "
 
 [acquisition]

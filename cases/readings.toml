@@ -4,9 +4,9 @@
 # [counts-as-its-own-language] section of its own file.
 
 [rust-doc-comment]
-sentence = "the body of a doc comment, a Rust /// block, which a counter may read as a stretch of Markdown documentation of its own"
+sentence = "the text inside a Rust doc comment, the /// block written above an item"
 witness = "8040-doc_comment_with_no_text"
 
 [vue-template]
-sentence = "the markup inside a Vue file's <template> block, which a counter may read as a stretch of HTML of its own"
+sentence = "the markup inside the <template> block of a Vue file"
 witness = "6090-vue_blocks_count_as_their_own_languages"

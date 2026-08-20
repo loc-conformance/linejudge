@@ -120,6 +120,38 @@ pub struct Counted {
     pub region: Option<String>,
 }
 
+/// One counter as its own page shows it: where it comes from and what its own rules say, which is
+/// the half of the measurement that has nothing to do with any case.
+#[derive(Debug, PartialEq)]
+pub struct ToolDetail {
+    pub name: String,
+    pub version: String,
+    /// Where the counter itself lives, as its adapter declares it, and `None` where it does not.
+    pub repository: Option<String>,
+    /// Where a build of it is downloaded from, and `None` for a counter that cannot be fetched.
+    pub channel: Option<String>,
+    pub dialects: Vec<DialectDetail>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DialectDetail {
+    pub name: String,
+    /// What is put on the counter's command line to ask for this way of counting, which is the
+    /// only thing that says what its name means. Empty for a counter that has just the one.
+    pub flags: Vec<String>,
+    pub rules: Vec<RuleDetail>,
+}
+
+/// One rule of a dialect, with its conditions already written out in words, since the page is read
+/// by somebody who will never open the file they are parsed from.
+#[derive(Debug, PartialEq)]
+pub struct RuleDetail {
+    pub name: String,
+    pub bucket: String,
+    pub when: Vec<String>,
+}
+
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Counts {
     pub lines: u32,

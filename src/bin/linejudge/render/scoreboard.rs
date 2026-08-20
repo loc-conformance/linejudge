@@ -2,7 +2,7 @@ use maud::{Markup, html};
 
 use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Verdict};
 use crate::render::{
-    CASES_DIR, DATA_FILE, format_as_one_line, format_the_group_title, wrap_the_page,
+    CASES_DIR, DATA_FILE, TOOLS_DIR, format_as_one_line, format_the_group_title, wrap_the_page,
 };
 
 const OPEN_TIP: &str = "the tool disagrees with its own rules here, and nobody has reviewed the \
@@ -96,7 +96,9 @@ fn render_one_column_head(counter: &Counter) -> Markup {
     let multi = counter.dialects.len() > 1;
     html! {
         th {
-            div .tname { (counter.name) }
+            div .tname {
+                a href=(format!("{TOOLS_DIR}/{}.html", counter.name)) { (counter.name) }
+            }
             div .tver title=(counter.version) { (format_the_version_of(counter)) }
             div .chips {
                 @for (at, dialect) in counter.dialects.iter().enumerate() {

@@ -362,6 +362,7 @@ mod tests {
     fn a_tokei_adapter() -> Adapter {
         Adapter {
             name_of_counter: "tokei".to_string(),
+            repository: None,
             args: vec!["{file}".to_string()],
             explain_args: None,
             explain_output: None,

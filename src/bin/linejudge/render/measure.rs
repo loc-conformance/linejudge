@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use linejudge::adapter::{Adapter, Dialect};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::deriver::explain_every_line;
-use linejudge::dialects::Dialects;
+use linejudge::dialects::{Condition, Dialects, Predicate};
 use linejudge::recorded::RecordedAnswers;
 use linejudge::verdict::{Conformance, Judged, Outcome, measure_and_judge_every_case};
 
@@ -133,6 +133,97 @@ pub fn read_every_case(
         });
     }
     Ok(detailed)
+}
+
+/// Reads what every counter's own page shows: where it comes from, and for each of its ways of
+/// counting the rules it is judged by, written out in words.
+pub fn read_every_tool(
+    sweep: &data::Sweep,
+    adapters: &[Adapter],
+    dialects: &Dialects,
+) -> Result<Vec<data::ToolDetail>, String> {
+    let mut detailed = Vec::with_capacity(sweep.counters.len());
+    for counter in &sweep.counters {
+        let adapter = adapters.iter().find(|one| one.name_of_counter == counter.name);
+        let mut ways = Vec::with_capacity(counter.dialects.len());
+        for dialect in &counter.dialects {
+            let Some(rules) = dialects.find(&counter.name, &dialect.name) else {
+                return Err(format!("{}.{} names no dialect file", counter.name, dialect.name));
+            };
+            ways.push(data::DialectDetail {
+                name: dialect.name.clone(),
+                flags: adapter
+                    .and_then(|one| one.dialects.iter().find(|way| way.name == dialect.name))
+                    .map(|way| way.args.clone())
+                    .unwrap_or_default(),
+                rules: rules
+                    .rules
+                    .iter()
+                    .map(|rule| data::RuleDetail {
+                        name: rule.name.clone(),
+                        bucket: rule.bucket.clone(),
+                        when: rule.when.iter().map(say_what_a_condition_asks).collect(),
+                    })
+                    .collect(),
+            });
+        }
+        detailed.push(data::ToolDetail {
+            name: counter.name.clone(),
+            version: counter.version.clone(),
+            repository: adapter.and_then(|one| one.repository.clone()),
+            channel: adapter
+                .and_then(|one| one.acquisition.as_ref())
+                .map(|how| format!("{} as {}", how.channel, how.name)),
+            dialects: ways,
+        });
+    }
+    Ok(detailed)
+}
+
+/// What one condition of a rule asks, in words. The dialect files write these as `in-comment` and
+/// `!in-string`, which say enough to whoever writes one and nothing to whoever opens the page.
+fn say_what_a_condition_asks(condition: &Condition) -> String {
+    let (predicate, holds) = match condition {
+        Condition::Holds(predicate) => (predicate, true),
+        Condition::Fails(predicate) => (predicate, false),
+    };
+    // These ask about the line as a whole and are answered by any one character of it, so a line
+    // can be inside a comment and inside a string at once. Whitespace outside a string or a
+    // comment is not residue, and a word is one letter or one digit.
+    let (yes, no) = match predicate {
+        Predicate::Blank => (
+            "the line is nothing but spaces and tabs",
+            "the line has more on it than spaces and tabs",
+        ),
+        Predicate::HasResidue => (
+            "take the strings and the comments away and something is still there",
+            "take the strings and the comments away and nothing is left but spaces",
+        ),
+        Predicate::InComment => (
+            "part of the line is inside a comment",
+            "no part of the line is inside a comment",
+        ),
+        Predicate::InDocString => (
+            "the line is inside a block that opened with three quotes at the start of a line",
+            "the line is not inside a block that opened with three quotes at the start of a line",
+        ),
+        Predicate::InString => (
+            "part of the line is inside a string",
+            "no part of the line is inside a string",
+        ),
+        Predicate::WordInComment => (
+            "a letter or a digit sits inside one of its comments",
+            "no letter or digit sits inside its comments",
+        ),
+        Predicate::WordInResidue => (
+            "take the strings and the comments away and a letter or a digit is still there",
+            "take the strings and the comments away and no letter or digit is left",
+        ),
+    };
+    match holds {
+        true => yes.to_string(),
+        false => no.to_string(),
+    }
 }
 
 fn build_one_answer(judged: &Judged, command: String) -> data::Answer {

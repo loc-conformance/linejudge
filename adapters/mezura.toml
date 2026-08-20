@@ -1,7 +1,9 @@
-name   = "mezura"
-args   = ["{file}", "--output", "json", "--hide", "timing"]
+name       = "mezura"
+repository = "https://github.com/subamanis/mezura"
+args       = ["{file}", "--output", "json", "--hide", "timing"]
 explain-args   = ["{file}", "--explain", "--output", "json"]
 explain-output = "linejudge-per-line"
+
 
 [acquisition]
 channel = "crates-io"

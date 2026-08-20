@@ -26,6 +26,9 @@ const VERSION_FLAG: &str = "--version";
 pub struct Adapter {
     // a 'counter' is a loc counting tool, like mezura or tokei
     pub name_of_counter: String,
+    /// Where the counter itself lives, for a report that wants to send somebody to it. `None`
+    /// asks nothing of anybody: an adapter that does not say is simply not linked.
+    pub repository: Option<String>,
     pub args: Vec<String>,
     /// The command line that asks the counter for its own analysis of a file line by line, in
     /// place of `args`, with the dialect's arguments appended the same way. `None` is a counter
@@ -184,6 +187,7 @@ impl Adapter {
         ways.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(Adapter {
             name_of_counter: raw.name,
+            repository: raw.repository,
             args: raw.args,
             explain_args: raw.explain_args,
             explain_output: raw.explain_output,
@@ -330,6 +334,7 @@ fn run_counter(binary: &Path, args: &[String]) -> Result<String, String> {
 #[serde(deny_unknown_fields)]
 struct RawAdapter {
     name: String,
+    repository: Option<String>,
     output: Option<OutputFormat>,
     args: Vec<String>,
     #[serde(rename = "explain-args")]
@@ -371,6 +376,10 @@ mod tests {
         assert_eq!(mezura.dialects[0].buckets, ["code", "comments", "extra"]);
         assert_eq!(mezura.dialects[1].buckets, ["code", "comments", "blanks"]);
         assert_eq!(adapters[2].acquisition.as_ref().map(|a| a.channel.as_str()), Some("crates-io"));
+        for adapter in &adapters {
+            let home = adapter.repository.as_deref().unwrap_or_default();
+            assert!(home.starts_with("https://"), "{}: {home}", adapter.name_of_counter);
+        }
         for dialect in mezura.dialects.iter().chain(&adapters[1].dialects) {
             assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
         }
