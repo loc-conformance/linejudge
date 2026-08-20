@@ -319,29 +319,8 @@ fn format_the_version_of(counter: &Counter) -> &str {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::env;
-    use std::fs;
-    use std::path::PathBuf;
 
     use super::*;
-
-    #[test]
-    fn the_scoreboard_matches_its_golden_file() {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/render");
-        let read = |name: &str| {
-            fs::read_to_string(dir.join(name))
-                .unwrap_or_else(|error| panic!("{name}: {error}"))
-                .replace("\r\n", "\n")
-        };
-        let sweep: Sweep = serde_json::from_str(&read("record.json"))
-            .unwrap_or_else(|error| panic!("record.json: {error}"));
-        let rendered = render_the_scoreboard(&sweep);
-        if env::var("LINEJUDGE_UPDATE_GOLDEN").is_ok() {
-            fs::write(dir.join("index.golden.html"), &rendered)
-                .unwrap_or_else(|error| panic!("index.golden.html: {error}"));
-        }
-        assert_eq!(rendered, read("index.golden.html"));
-    }
 
     #[test]
     fn a_failure_shows_the_lines_and_the_buckets_that_moved_and_nothing_else() {

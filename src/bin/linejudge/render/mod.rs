@@ -6,6 +6,8 @@ use linejudge::corpus::Corpus;
 use linejudge::dialects::Dialects;
 use maud::{DOCTYPE, Markup, html};
 
+use crate::render::data::{CaseDetail, Sweep, ToolDetail};
+
 mod badge;
 mod case;
 mod data;
@@ -34,7 +36,19 @@ pub fn write_the_site(
     out: &Path,
 ) -> Result<usize, String> {
     let sweep = measure::measure_every_counter(adapters, corpus, dialects, recorded, find_binary)?;
-    let detailed = measure::read_every_case(&sweep, corpus, dialects)?;
+    let cases = measure::read_every_case(&sweep, corpus, dialects)?;
+    let tools = measure::read_every_tool(&sweep, adapters, dialects)?;
+    write_every_file(&sweep, &cases, &tools, out)
+}
+
+/// Everything the site is, written out of what was already measured. Apart from the measuring, so
+/// that what the pages point at can be checked without a counter on the machine.
+fn write_every_file(
+    sweep: &Sweep,
+    cases: &[CaseDetail],
+    tools: &[ToolDetail],
+    out: &Path,
+) -> Result<usize, String> {
     fs::create_dir_all(out)
         .map_err(|error| format!("{} could not be created: {error}", out.display()))?;
     let write = |name: &str, text: String| {
@@ -43,13 +57,12 @@ pub fn write_the_site(
     };
     write(STYLE_FILE, STYLE.to_string())?;
     write(SCRIPT_FILE, SCRIPT.to_string())?;
-    write(INDEX_FILE, scoreboard::render_the_scoreboard(&sweep))?;
-    write_a_page_each(&out.join(CASES_DIR), &detailed, |detail| {
-        (format!("{}.html", detail.name), case::render_one_case(detail, &sweep))
+    write(INDEX_FILE, scoreboard::render_the_scoreboard(sweep))?;
+    write_a_page_each(&out.join(CASES_DIR), cases, |detail| {
+        (format!("{}.html", detail.name), case::render_one_case(detail, sweep))
     })?;
-    let tools = measure::read_every_tool(&sweep, adapters, dialects)?;
-    write_a_page_each(&out.join(TOOLS_DIR), &tools, |detail| {
-        (format!("{}.html", detail.name), tool::render_one_tool(detail, &sweep))
+    write_a_page_each(&out.join(TOOLS_DIR), tools, |detail| {
+        (format!("{}.html", detail.name), tool::render_one_tool(detail, sweep))
     })?;
     let badges: Vec<(String, String)> = sweep
         .counters
@@ -64,10 +77,10 @@ pub fn write_the_site(
     write_a_page_each(&out.join(BADGES_DIR), &badges, |(name, svg)| {
         (format!("{name}.svg"), svg.clone())
     })?;
-    let json = serde_json::to_string_pretty(&sweep)
+    let json = serde_json::to_string_pretty(sweep)
         .map_err(|error| format!("the measurement could not be written as JSON: {error}"))?;
     write(DATA_FILE, json + "\n")?;
-    Ok(detailed.len())
+    Ok(cases.len())
 }
 
 /// One directory of files, named by whatever the caller says each of them is called. Names carry
@@ -143,5 +156,200 @@ fn format_the_group_title(name: &str) -> String {
     match name.split_once('-') {
         Some((number, words)) => format!("{number} · {}", words.replace('_', " ")),
         None => name.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::env;
+
+    use crate::marks::Ink;
+    use crate::render::data::{
+        Answer, Case, Counted, Counter, Counts, Dialect, DialectDetail, Group, Line, Piece,
+        RuleDetail, Verdict,
+    };
+
+    use super::*;
+
+    // Each page is rendered by a function that knows nothing of where the others were written, so
+    // a name built in one place and a directory made in another are only ever held together by
+    // this. It has already been wrong once: a tool's page linked its failures as `cases/<name>`
+    // when the page sits one directory down and needed `../cases/<name>`.
+    #[test]
+    fn every_page_points_only_at_files_the_site_actually_holds() {
+        let out = env::temp_dir().join("linejudge-every_page_points_at_what_is_there");
+        let _ = fs::remove_dir_all(&out);
+        let sweep = a_sweep();
+        let cases = [a_case("1010-a_case", "1000-comments"), a_case("2010-another_case", "2000-strings")];
+        let tools = [a_tool("mezura", &["content", "region"]), a_tool("tokei", &["default"])];
+
+        let written = write_every_file(&sweep, &cases, &tools, &out).unwrap();
+
+        let mut missing = Vec::new();
+        for page in find_every_page_under(&out) {
+            let here = page.parent().unwrap_or(&out).to_path_buf();
+            let text = fs::read_to_string(&page).unwrap();
+            for link in find_every_link_in(&text) {
+                if link.starts_with("http") || link.starts_with('#') {
+                    continue;
+                }
+                if !here.join(&link).exists() {
+                    missing.push(format!("{} points at {link}", page.display()));
+                }
+            }
+        }
+        let read_back: Sweep = serde_json::from_str(
+            &fs::read_to_string(out.join(DATA_FILE)).unwrap()).unwrap();
+        let badge = out.join(BADGES_DIR).join("mezura.region.svg").is_file();
+        fs::remove_dir_all(&out).unwrap();
+
+        assert!(missing.is_empty(), "{}", missing.join("\n"));
+        assert_eq!(written, 2);
+        assert_eq!(read_back, sweep, "what data.json holds is the measurement itself");
+        assert!(badge, "one badge per counter and way of counting");
+    }
+
+    fn find_every_page_under(dir: &Path) -> Vec<PathBuf> {
+        let mut found = Vec::new();
+        for entry in fs::read_dir(dir).into_iter().flatten().filter_map(|entry| entry.ok()) {
+            let path = entry.path();
+            match path.is_dir() {
+                true => found.extend(find_every_page_under(&path)),
+                false if path.extension().is_some_and(|end| end == "html") => found.push(path),
+                false => {}
+            }
+        }
+        found
+    }
+
+    fn find_every_link_in(page: &str) -> Vec<String> {
+        let mut found = Vec::new();
+        for opener in ["href=\"", "src=\""] {
+            let mut rest = page;
+            while let Some(at) = rest.find(opener) {
+                rest = &rest[at + opener.len()..];
+                let Some(end) = rest.find('"') else { break };
+                found.push(rest[..end].to_string());
+                rest = &rest[end..];
+            }
+        }
+        found
+    }
+
+    fn a_sweep() -> Sweep {
+        let answer = |case: &str, verdict: Verdict| {
+            let counts = |code: u32| Counts {
+                lines: 3,
+                buckets: BTreeMap::from([("code".to_string(), code)]),
+            };
+            Answer {
+                case: case.to_string(),
+                verdict,
+                wants: (verdict != Verdict::Broke).then(|| counts(3)),
+                answered: matches!(verdict, Verdict::Agrees | Verdict::Fails).then(|| counts(2)),
+                wants_regions: Vec::new(),
+                answered_regions: Vec::new(),
+                note: (verdict == Verdict::Fails).then(|| "the /* opens a comment".to_string()),
+                exception: None,
+                broke: (verdict == Verdict::Broke).then(|| "it exited 2".to_string()),
+                command: format!("tokei cases/{case}/input.c"),
+            }
+        };
+        let way = |name: &str, first: Verdict, second: Verdict| Dialect {
+            name: name.to_string(),
+            answers: vec![answer("1010-a_case", first), answer("2010-another_case", second)],
+        };
+        Sweep {
+            measured_on: "2026-08-20".to_string(),
+            groups: vec![
+                Group {
+                    name: "1000-comments".to_string(),
+                    cases: vec![
+                        Case {
+                            name: "1010-a_case".to_string(),
+                            trap: "a trap".to_string(),
+                            disabled: false,
+                        },
+                        // Set aside, so the scoreboard names it and links it nowhere.
+                        Case {
+                            name: "disabled-1020-set_aside".to_string(),
+                            trap: String::new(),
+                            disabled: true,
+                        },
+                    ],
+                },
+                Group {
+                    name: "2000-strings".to_string(),
+                    cases: vec![Case {
+                        name: "2010-another_case".to_string(),
+                        trap: "another trap".to_string(),
+                        disabled: false,
+                    }],
+                },
+            ],
+            counters: vec![
+                Counter {
+                    name: "mezura".to_string(),
+                    version: "v3.0.0".to_string(),
+                    dialects: vec![
+                        way("content", Verdict::Agrees, Verdict::Fails),
+                        way("region", Verdict::Broke, Verdict::Agrees),
+                    ],
+                },
+                Counter {
+                    name: "tokei".to_string(),
+                    version: "tokei 14.0.0".to_string(),
+                    dialects: vec![way("default", Verdict::Unclaimed, Verdict::Fails)],
+                },
+            ],
+        }
+    }
+
+    fn a_case(name: &str, group: &str) -> CaseDetail {
+        CaseDetail {
+            name: name.to_string(),
+            group: group.to_string(),
+            trap: "a trap".to_string(),
+            file: "input.c".to_string(),
+            ways: ["mezura.content", "mezura.region", "tokei.default"]
+                .map(str::to_string)
+                .to_vec(),
+            lines: vec![Line {
+                pieces: vec![
+                    Piece { ink: Ink::Plain, text: "a = 1; ".to_string() },
+                    Piece { ink: Ink::Comment, text: "// two".to_string() },
+                ],
+                counted: ["code", "comments", "code"]
+                    .iter()
+                    .map(|bucket| Counted {
+                        bucket: bucket.to_string(),
+                        rules: vec!["a-rule".to_string()],
+                        region: None,
+                    })
+                    .collect(),
+            }],
+        }
+    }
+
+    fn a_tool(name: &str, ways: &[&str]) -> ToolDetail {
+        ToolDetail {
+            name: name.to_string(),
+            version: format!("{name} 1.0.0"),
+            repository: Some(format!("https://github.com/nobody/{name}")),
+            channel: Some("crates-io".to_string()),
+            dialects: ways
+                .iter()
+                .map(|way| DialectDetail {
+                    name: way.to_string(),
+                    flags: vec!["--mode".to_string(), way.to_string()],
+                    rules: vec![RuleDetail {
+                        name: "a-comment-alone-is-comments".to_string(),
+                        bucket: "comments".to_string(),
+                        when: vec!["part of the line is inside a comment".to_string()],
+                    }],
+                })
+                .collect(),
+        }
     }
 }
