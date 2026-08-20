@@ -3,6 +3,7 @@
 mod explain;
 #[cfg(feature = "maintenance")]
 mod record;
+mod render;
 mod report;
 mod style;
 
@@ -34,6 +35,7 @@ use crate::report::{
 const ADAPTERS_DIR: &str = "adapters";
 const CASES_DIR: &str = "cases";
 const DIALECTS_DIR: &str = "dialects";
+const SITE_DIR: &str = "site";
 const USAGE: &str = "\
 linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--corpus <dir>]
                 [--adapters <dir>] [--dialects <dir>] [--recorded <dir>] [--disabled <case>]
@@ -80,7 +82,16 @@ linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--a
     A counter whose analysis is the linejudge-per-line format is read rather than shown, and every
     line it reads differently from these rules is named where that line is.
 
-Both commands print colour when they print to a terminal. NO_COLOR turns it off wherever it is set,
+linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <dir>]
+                [--recorded <dir>]
+
+    Measures every counter it has a binary for over every case, the way check does, and writes the
+    published pages instead of a report: index.html, the scoreboard of every counter over every
+    case with the failures explained on hover, and data.json, the whole measurement as one record,
+    for anybody building their own view of the same numbers. Both land in --out, or in ./site. A
+    counter with no binary is named on stderr and left out rather than failing the run.
+
+The commands print colour when they print to a terminal. NO_COLOR turns it off wherever it is set,
 and CLICOLOR_FORCE keeps it through a pipe.
 ";
 #[cfg(feature = "maintenance")]
@@ -230,6 +241,25 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         return Ok(false);
     }
 
+    if let Command::Render = &settings.command {
+        let site = settings.out.clone().unwrap_or_else(|| PathBuf::from(SITE_DIR));
+        render::write_the_site(
+            &adapters,
+            &corpus,
+            &dialects,
+            &dirs.recorded,
+            &find_binary,
+            &site,
+        )?;
+        writeln!(
+            out,
+            "wrote {} and {}",
+            site.join(render::INDEX_FILE).display(),
+            site.join(render::DATA_FILE).display()
+        )?;
+        return Ok(false);
+    }
+
     if !corpus.disabled.is_empty() {
         let what = if corpus.disabled.len() == 1 { "case is" } else { "cases are" };
         writeln!(out, "{}", style::RECORDED.paint(&format!(
@@ -334,6 +364,7 @@ struct Settings {
     binary: Option<PathBuf>,
     known_failures: Option<PathBuf>,
     disabled: Vec<String>,
+    out: Option<PathBuf>,
     wants_help: bool,
 }
 
@@ -341,6 +372,7 @@ struct Settings {
 enum Command {
     Check,
     Explain { case: String },
+    Render,
     #[cfg(feature = "maintenance")]
     Record,
 }
@@ -357,6 +389,7 @@ impl Settings {
             binary: None,
             known_failures: None,
             disabled: Vec::new(),
+            out: None,
             wants_help: false,
         };
         let mut args = args.into_iter();
@@ -368,6 +401,7 @@ impl Settings {
             }
             "check" => {}
             "explain" => settings.command = Command::Explain { case: String::new() },
+            "render" => settings.command = Command::Render,
             #[cfg(feature = "maintenance")]
             "record" => settings.command = Command::Record,
             _ => {
@@ -390,6 +424,7 @@ impl Settings {
                     settings.known_failures = Some(PathBuf::from(value_of(&flag, &mut args)?))
                 }
                 "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
+                "--out" => settings.out = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 _ => match &mut settings.command {
                     Command::Explain { case }
                         if case.is_empty() && !flag.starts_with('-') =>
@@ -419,6 +454,28 @@ impl Settings {
             if settings.recorded.is_some() {
                 return Err("--recorded belongs to check".to_string());
             }
+            if settings.out.is_some() {
+                return Err("--out belongs to render".to_string());
+            }
+        }
+        if matches!(settings.command, Command::Check) && settings.out.is_some() {
+            return Err("--out belongs to render".to_string());
+        }
+        if let Command::Render = &settings.command {
+            if settings.name_of_counter.is_some() || settings.binary.is_some() {
+                return Err(
+                    "render measures the whole roster, so --counter and --bin do not belong to it"
+                        .to_string(),
+                );
+            }
+            if settings.known_failures.is_some() {
+                return Err("--known-failures belongs to check".to_string());
+            }
+            if !settings.disabled.is_empty() {
+                return Err("--disabled belongs to check, and a page with a case left out of it \
+                            is not the page"
+                    .to_string());
+            }
         }
         #[cfg(feature = "maintenance")]
         if let Command::Record = &settings.command {
@@ -432,6 +489,9 @@ impl Settings {
                 return Err("--disabled belongs to check, and a record with a case left out of it \
                             is not a record"
                     .to_string());
+            }
+            if settings.out.is_some() {
+                return Err("--out belongs to render".to_string());
             }
         }
         if settings.binary.is_some() && settings.name_of_counter.is_none() {
@@ -494,6 +554,7 @@ fn anchor_every_path_of(settings: &mut Settings) {
         &mut settings.recorded,
         &mut settings.binary,
         &mut settings.known_failures,
+        &mut settings.out,
     ]
     .into_iter()
     .flatten()
@@ -620,6 +681,25 @@ mod tests {
             Err(refused) => refused,
         };
         assert!(refused.contains("is not a directory"), "{refused}");
+    }
+
+    #[test]
+    fn render_measures_the_whole_roster_and_the_narrowing_flags_are_refused_on_it() {
+        assert!(settings_of(&["render"]).is_ok());
+        assert!(settings_of(&["render", "--out", "pages"]).unwrap().out.is_some());
+        assert!(settings_of(&["render", "--corpus", "cases"]).is_ok());
+        for narrowed in [
+            vec!["render", "--counter", "scc"],
+            vec!["render", "--counter", "scc", "--bin", "scc.exe"],
+        ] {
+            assert!(settings_of(&narrowed).unwrap_err().contains("whole roster"));
+        }
+        let with_list = settings_of(&["render", "--known-failures", "known.txt"]);
+        assert!(with_list.unwrap_err().contains("belongs to check"));
+        let one_out = settings_of(&["render", "--disabled", "0400-a_case"]);
+        assert!(one_out.unwrap_err().contains("is not the page"));
+        let on_check = settings_of(&["check", "--out", "pages"]);
+        assert!(on_check.unwrap_err().contains("belongs to render"));
     }
 
     #[test]

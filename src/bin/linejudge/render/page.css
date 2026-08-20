@@ -1,0 +1,326 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #eef6ff;
+  color: #1f2328;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 100rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+header h1 {
+  font-size: 1.6rem;
+  margin: 0 0 .25rem;
+}
+
+.intro {
+  max-width: 54rem;
+  margin: 0 0 .35rem;
+  color: #57606a;
+  font-size: .9375rem;
+}
+
+.meta {
+  margin: 0 0 1rem;
+  color: #6e7781;
+  font-size: .85rem;
+}
+
+.meta a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  margin: 0 0 1.25rem;
+  color: #57606a;
+  font-size: .85rem;
+}
+
+.legend .s {
+  font-weight: 700;
+}
+
+table {
+  width: 100%;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .5rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+col.cases {
+  width: 25rem;
+}
+
+th,
+td {
+  padding: .55rem .75rem;
+  text-align: left;
+  border-bottom: 0.0625rem solid #d8dee4;
+  overflow-wrap: break-word;
+}
+
+th + th,
+td + td {
+  border-left: 0.0625rem solid #d8dee4;
+}
+
+td {
+  vertical-align: middle;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #ffffff;
+  border-bottom: 0.125rem solid #d0d7de;
+  vertical-align: top;
+}
+
+th:first-child,
+td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #ffffff;
+}
+
+/* The row below would otherwise paint over a tooltip hanging out of this cell. */
+td:first-child:hover {
+  z-index: 5;
+}
+
+thead th:first-child {
+  z-index: 4;
+  border-top-left-radius: .5rem;
+}
+
+thead th:last-child {
+  border-top-right-radius: .5rem;
+}
+
+.tname {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.tver {
+  overflow: hidden;
+  color: #6e7781;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .78rem;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem;
+  margin-top: .4rem;
+}
+
+.chip {
+  padding: .05rem .6rem;
+  background: #f6f8fa;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: 1rem;
+  color: #57606a;
+  font-size: .75rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.chip b {
+  font-weight: 700;
+}
+
+.chip.pick {
+  cursor: pointer;
+}
+
+.chip.pick:hover {
+  border-color: #0969da;
+}
+
+.chip.active {
+  background: #ddf4ff;
+  border-color: #0969da;
+  color: #0a3069;
+}
+
+.ok {
+  color: #1a7f37;
+}
+
+.bad {
+  color: #cf222e;
+}
+
+.open {
+  color: #9a6700;
+}
+
+.na {
+  color: #6e7781;
+}
+
+tr.group td {
+  padding: .4rem .8rem;
+  background: #dde4ec;
+  border-bottom: 0.0625rem solid #c4cdd8;
+  color: #2c3a4a;
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+/* The group's own title stays put while the table scrolls sideways under it. */
+tr.group td span {
+  position: sticky;
+  left: .8rem;
+  display: inline-block;
+}
+
+td.case {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  font-weight: 500;
+}
+
+tr.disabled td {
+  background: #fafbfc;
+  color: #8c959f;
+}
+
+.tag {
+  padding: .1rem .4rem;
+  margin-right: .45rem;
+  background: #eaeef2;
+  border-radius: .25rem;
+  color: #57606a;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: .7rem;
+  font-weight: 400;
+}
+
+.status {
+  font-size: .875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.s-pass {
+  color: #1a7f37;
+}
+
+.s-fail {
+  color: #cf222e;
+}
+
+.s-open {
+  color: #9a6700;
+}
+
+.s-exc {
+  color: #8250df;
+}
+
+.s-na {
+  color: #6e7781;
+  font-weight: 400;
+}
+
+.s-broke {
+  padding: .1rem .45rem;
+  background: #cf222e;
+  border-radius: .25rem;
+  color: #ffffff;
+}
+
+.idot {
+  color: #a1a1a1;
+  font-weight: 600;
+  font-size: .8rem;
+}
+
+.nums {
+  margin-top: .3rem;
+  color: #57606a;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .8rem;
+  line-height: 1.6;
+}
+
+.nums .lbl {
+  display: inline-block;
+  min-width: 4.4rem;
+  color: #8c959f;
+}
+
+.nums .off {
+  color: #cf222e;
+  font-weight: 700;
+}
+
+.tip {
+  position: relative;
+  cursor: help;
+}
+
+.tip:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 6;
+  width: 22rem;
+  max-width: 60vw;
+  margin-top: .45rem;
+  padding: .55rem .7rem;
+  background: #24292f;
+  border-radius: .4rem;
+  box-shadow: 0 .5rem 1rem rgba(31, 35, 40, .25);
+  color: #f6f8fa;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: .8rem;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+/* The last column's tooltip would otherwise hang past the right edge of the page. */
+td:last-child .tip:hover::after,
+th:last-child .tip:hover::after {
+  left: auto;
+  right: 0;
+}
+
+footer {
+  margin-top: 1.25rem;
+  color: #8c959f;
+  font-size: .8rem;
+}

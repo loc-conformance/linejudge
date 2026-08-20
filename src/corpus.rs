@@ -19,6 +19,9 @@ const TRUTH_FILE: &str = "truth.txt";
 /// after a whole thousand, with the cases of that thousand inside it.
 pub struct Corpus {
     pub cases: Vec<Case>,
+    /// The group directory names in numeric order, for anything that presents the corpus in its
+    /// own sections. Which group a case belongs to is the thousand its number falls in.
+    pub groups: Vec<String>,
     /// The cases set aside by the `disabled-` prefix on their directory, named without it. Their
     /// files are not read at all, since a case is usually disabled because something in it is
     /// broken, and a broken truth would otherwise fail the whole corpus.
@@ -45,6 +48,7 @@ impl Corpus {
         };
 
         let mut cases = Vec::new();
+        let mut named_groups = Vec::new();
         let mut disabled = Vec::new();
         let mut faults = Vec::new();
         for group in groups {
@@ -56,6 +60,7 @@ impl Corpus {
                     continue;
                 }
             };
+            named_groups.push(group_name.clone());
             let inside = match find_the_directories_in(&group) {
                 Ok(inside) => inside,
                 Err(error) => {
@@ -88,7 +93,7 @@ impl Corpus {
             check_witnesses(&readings, &cases, &mut faults);
         }
         if faults.is_empty() {
-            Ok(Corpus { cases, disabled, readings })
+            Ok(Corpus { cases, groups: named_groups, disabled, readings })
         } else {
             Err(faults)
         }
@@ -298,7 +303,12 @@ mod tests {
     fn every_case_of_the_corpus_is_read_without_a_fault() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
         match Corpus::read(&dir) {
-            Ok(corpus) => assert!(!corpus.cases.is_empty(), "{} holds no case", dir.display()),
+            Ok(corpus) => {
+                assert!(!corpus.cases.is_empty(), "{} holds no case", dir.display());
+                assert_eq!(corpus.groups.len(), 8, "{:?}", corpus.groups);
+                assert_eq!(corpus.groups[0], "1000-comments");
+                assert_eq!(corpus.groups[7], "8000-what_the_line_counts_as");
+            }
             Err(faults) => {
                 let report: Vec<String> = faults.iter().map(|f| f.to_string()).collect();
                 panic!("{}", report.join("\n"));

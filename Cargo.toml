@@ -27,6 +27,7 @@ maintenance = []
 # environment declares COLORTERM, which Windows terminals do not, and the whole palette falls to
 # the nearest of sixteen. Raising it means writing the escape codes here instead.
 colored = "=2.0.0"
+maud = "0.27.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", default-features = false, features = ["std"] }
 toml = { version = "1.1.4", default-features = false, features = ["parse", "serde", "std"] }

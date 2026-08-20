@@ -1,0 +1,190 @@
+{
+  "measured-on": "2026-08-20",
+  "groups": [
+    {
+      "name": "1000-comments",
+      "cases": [
+        {
+          "name": "1010-a_passing_case",
+          "trap": "a line holding both code and a comment is code",
+          "disabled": false
+        },
+        {
+          "name": "1020-a_reviewed_failure",
+          "trap": "a line that opens with a block comment, holds code, and closes with another",
+          "disabled": false
+        },
+        {
+          "name": "1030-a_case_set_aside",
+          "trap": "",
+          "disabled": true
+        }
+      ]
+    },
+    {
+      "name": "2000-string_forms",
+      "cases": [
+        {
+          "name": "2010-an_open_failure",
+          "trap": "a comment symbol inside a string is text",
+          "disabled": false
+        },
+        {
+          "name": "2020-a_broken_case",
+          "trap": "an apostrophe inside a heredoc body",
+          "disabled": false
+        },
+        {
+          "name": "2030-regions_that_differ",
+          "trap": "one file, two languages",
+          "disabled": false
+        }
+      ]
+    }
+  ],
+  "counters": [
+    {
+      "name": "alphacount",
+      "version": "alphacount 1.2.0",
+      "dialects": [
+        {
+          "name": "default",
+          "answers": [
+            {
+              "case": "1010-a_passing_case",
+              "verdict": "agrees",
+              "wants": { "lines": 1, "code": 1, "comments": 0, "blanks": 0 },
+              "answered": { "lines": 1, "code": 1, "comments": 0, "blanks": 0 },
+              "command": "alphacount cases/1000-comments/1010-a_passing_case/input.c"
+            },
+            {
+              "case": "1020-a_reviewed_failure",
+              "verdict": "fails",
+              "wants": { "lines": 2, "code": 2, "comments": 0, "blanks": 0 },
+              "answered": { "lines": 2, "code": 1, "comments": 1, "blanks": 0 },
+              "note": "the line counts as a comment although there is code on it",
+              "command": "alphacount cases/1000-comments/1020-a_reviewed_failure/input.c"
+            },
+            {
+              "case": "2010-an_open_failure",
+              "verdict": "fails",
+              "wants": { "lines": 3, "code": 3, "comments": 0, "blanks": 0 },
+              "answered": { "lines": 3, "code": 2, "comments": 1, "blanks": 0 },
+              "command": "alphacount cases/2000-string_forms/2010-an_open_failure/input.py"
+            },
+            {
+              "case": "2020-a_broken_case",
+              "verdict": "broke",
+              "broke": "exit status 101: thread 'main' panicked at reader.rs:214",
+              "command": "alphacount cases/2000-string_forms/2020-a_broken_case/input.sh"
+            },
+            {
+              "case": "2030-regions_that_differ",
+              "verdict": "agrees",
+              "wants": { "lines": 6, "code": 4, "comments": 2, "blanks": 0 },
+              "answered": { "lines": 6, "code": 4, "comments": 2, "blanks": 0 },
+              "command": "alphacount cases/2000-string_forms/2030-regions_that_differ/input.vue"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "betacount",
+      "version": "betacount 0.3.1",
+      "dialects": [
+        {
+          "name": "content",
+          "answers": [
+            {
+              "case": "1010-a_passing_case",
+              "verdict": "agrees",
+              "wants": { "lines": 1, "code": 1, "comments": 0, "extra": 0 },
+              "answered": { "lines": 1, "code": 1, "comments": 0, "extra": 0 },
+              "command": "betacount --mode content cases/1000-comments/1010-a_passing_case/input.c"
+            },
+            {
+              "case": "1020-a_reviewed_failure",
+              "verdict": "agrees",
+              "wants": { "lines": 2, "code": 1, "comments": 1, "extra": 0 },
+              "answered": { "lines": 2, "code": 1, "comments": 1, "extra": 0 },
+              "exception": "its manual reads a line whose first symbol opens a comment as a comment to its end, whatever follows",
+              "command": "betacount --mode content cases/1000-comments/1020-a_reviewed_failure/input.c"
+            },
+            {
+              "case": "2010-an_open_failure",
+              "verdict": "unclaimed",
+              "wants": { "lines": 3, "code": 3, "comments": 0, "extra": 0 },
+              "command": "betacount --mode content cases/2000-string_forms/2010-an_open_failure/input.py"
+            },
+            {
+              "case": "2020-a_broken_case",
+              "verdict": "agrees",
+              "wants": { "lines": 5, "code": 3, "comments": 2, "extra": 0 },
+              "answered": { "lines": 5, "code": 3, "comments": 2, "extra": 0 },
+              "command": "betacount --mode content cases/2000-string_forms/2020-a_broken_case/input.sh"
+            },
+            {
+              "case": "2030-regions_that_differ",
+              "verdict": "fails",
+              "wants": { "lines": 6, "code": 4, "comments": 2, "extra": 0 },
+              "answered": { "lines": 6, "code": 4, "comments": 2, "extra": 0 },
+              "wants-regions": [
+                { "language": "CSS", "lines": 2, "code": 1, "comments": 1, "extra": 0 }
+              ],
+              "note": "the style block is read but never counted apart",
+              "command": "betacount --mode content cases/2000-string_forms/2030-regions_that_differ/input.vue"
+            }
+          ]
+        },
+        {
+          "name": "region",
+          "answers": [
+            {
+              "case": "1010-a_passing_case",
+              "verdict": "agrees",
+              "wants": { "lines": 1, "code": 1, "comments": 0, "blanks": 0 },
+              "answered": { "lines": 1, "code": 1, "comments": 0, "blanks": 0 },
+              "note": "a line holding both is code by the definition it declares",
+              "command": "betacount --mode region cases/1000-comments/1010-a_passing_case/input.c"
+            },
+            {
+              "case": "1020-a_reviewed_failure",
+              "verdict": "agrees",
+              "wants": { "lines": 2, "code": 1, "comments": 1, "blanks": 0 },
+              "answered": { "lines": 2, "code": 1, "comments": 1, "blanks": 0 },
+              "command": "betacount --mode region cases/1000-comments/1020-a_reviewed_failure/input.c"
+            },
+            {
+              "case": "2010-an_open_failure",
+              "verdict": "unclaimed",
+              "wants": { "lines": 3, "code": 3, "comments": 0, "blanks": 0 },
+              "command": "betacount --mode region cases/2000-string_forms/2010-an_open_failure/input.py"
+            },
+            {
+              "case": "2020-a_broken_case",
+              "verdict": "agrees",
+              "wants": { "lines": 5, "code": 3, "comments": 2, "blanks": 0 },
+              "answered": { "lines": 5, "code": 3, "comments": 2, "blanks": 0 },
+              "command": "betacount --mode region cases/2000-string_forms/2020-a_broken_case/input.sh"
+            },
+            {
+              "case": "2030-regions_that_differ",
+              "verdict": "fails",
+              "wants": { "lines": 6, "code": 4, "comments": 2, "blanks": 0 },
+              "answered": { "lines": 6, "code": 5, "comments": 1, "blanks": 0 },
+              "wants-regions": [
+                { "language": "CSS", "lines": 2, "code": 1, "comments": 1, "blanks": 0 },
+                { "language": "HTML", "lines": 2, "code": 2, "comments": 0, "blanks": 0 }
+              ],
+              "answered-regions": [
+                { "language": "CSS", "lines": 2, "code": 2, "comments": 0, "blanks": 0 }
+              ],
+              "command": "betacount --mode region cases/2000-string_forms/2030-regions_that_differ/input.vue"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
