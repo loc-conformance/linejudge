@@ -302,7 +302,7 @@ mod tests {
     use std::path::Path;
     use std::slice;
 
-    use crate::adapter::Adapter;
+    use crate::adapter::{Adapter, is_the_declared_version};
     use crate::corpus::Corpus;
     use crate::deriver::derive_answer;
     use crate::dialects::read_the_shipped_dialects;
@@ -388,7 +388,7 @@ the line comment is swallowed by the block above it"""
             let record = RecordedAnswers::read(&[root.join(RECORDED_DIR)], counter, &dialects)
                 .unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
                 .unwrap_or_else(|| panic!("{counter} has no recorded answers"));
-            if !record.version.contains(&how.version) {
+            if !is_the_declared_version(&how.version, &record.version) {
                 wrong.push(format!(
                     "{counter} is downloaded at {} and its answers came from \"{}\"",
                     how.version, record.version

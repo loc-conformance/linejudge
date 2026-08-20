@@ -289,6 +289,18 @@ pub struct Acquisition {
     pub version: String,
 }
 
+/// Whether what a binary printed for its version is the one that was declared. It can never be an
+/// equality, since a counter prints its own name and its build details around the number: `tokei
+/// 14.0.0 compiled with serialization support: json` beside `scc version 3.7.0`. Neither end of the
+/// match may sit against a digit or a dot, or a declared `4.0.0` would answer yes to `tokei 14.0.0`.
+pub fn is_the_declared_version(declared: &str, printed: &str) -> bool {
+    let stands_alone = |beside: Option<char>| !beside.is_some_and(|c| c.is_ascii_digit() || c == '.');
+    printed.match_indices(declared).any(|(at, _)| {
+        stands_alone(printed[..at].chars().next_back())
+            && stands_alone(printed[at + declared.len()..].chars().next())
+    })
+}
+
 fn shorten(path: &Path) -> String {
     shorten_the_path(path).display().to_string()
 }
@@ -599,6 +611,17 @@ mod tests {
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert_eq!(unversioned.version_flag, None);
         assert_eq!(unversioned.read_version_or_unknown(Path::new("irrelevant")), "unknown version");
+    }
+
+    #[test]
+    fn a_declared_version_is_recognised_inside_whatever_the_counter_prints_around_it() {
+        let says = is_the_declared_version;
+        assert!(says("14.0.0", "tokei 14.0.0 compiled with serialization support: json"));
+        assert!(says("3.7.0", "scc version 3.7.0"));
+        assert!(!says("14.0.0", "tokei 13.0.0 compiled with serialization support: json"));
+        // Both ends of the match matter: one number can sit inside another from either side.
+        assert!(!says("4.0.0", "tokei 14.0.0 compiled with serialization support: json"));
+        assert!(!says("3.7", "scc version 3.7.1"));
     }
 
     #[test]

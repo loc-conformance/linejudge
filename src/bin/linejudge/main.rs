@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod explain;
+mod fetch;
 mod marks;
 #[cfg(feature = "maintenance")]
 mod record;
@@ -88,6 +89,27 @@ linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--a
 
     A counter whose analysis is the linejudge-per-line format is read rather than shown, and every
     line it reads differently from these rules is named where that line is.
+
+linejudge fetch [<counter>] [--adapters <dir>] [--dialects <dir>]
+
+    Downloads the counters of the roster, each at exactly the version its adapter declares, and
+    puts them where every other command looks for them without anybody naming a path. Naming one
+    counter fetches that one, by any part of the name that fits exactly one, and naming none
+    fetches every counter that says where it comes from.
+
+    Where it comes from is the [acquisition] block of its adapter. A github-release-asset channel
+    picks the file for this system out of the release tagged with that version, checks it against
+    the checksums the release publishes beside it, and unpacks it. A crates-io channel holds source
+    and never a built program, so it compiles the crate and needs cargo on the machine. The
+    downloading itself is whatever curl or wget this machine already has.
+
+    What arrives is asked for its version before it is kept, so a channel that hands over something
+    other than what was asked for is refused rather than quietly measured. A counter already here
+    at that version is left alone, and one that fails does not stop the others: each is named with
+    what went wrong and the exit code says whether everything arrived.
+
+    A path in counters.toml still wins over a download, since it is somebody saying which binary
+    they mean, and where one shadows what was just fetched this says so.
 
 linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <dir>]
                 [--recorded <dir>]
@@ -191,6 +213,13 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
     let shipped = create_the_shipped_dir()?;
     let dirs = resolve_dirs(&settings, folder.as_ref(), &shipped)?;
     let dialects = Dialects::read(&dirs.dialects).map_err(|faults| faults.join("\n"))?;
+    // Downloading asks nothing of the corpus or of anybody's answers to it, so neither is read.
+    if let Command::Fetch { counter } = &settings.command {
+        let adapters = Adapter::read_all(&dirs.adapters, &dialects)?;
+        let chosen = choose_the_counters_named(&mut out, &adapters, counter)?;
+        let named = read_the_counters_of(folder.as_ref())?;
+        return Ok(fetch::fetch_every_counter(&mut out, &chosen, &named)?);
+    }
     let mut corpus = read_the_corpus(&dirs.corpus)?;
     set_aside_what_was_disabled(&mut corpus, &settings.disabled)?;
     let adapters = match &settings.name_of_counter {
@@ -205,14 +234,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             counters.name_binary(counter, binary.clone());
             counters
         }
-        _ => match &folder {
-            Some(folder) => {
-                let mut counters = Counters::read(&folder.get_counters_file())?;
-                counters.resolve_against(folder.get_root());
-                counters
-            }
-            None => Counters::empty(),
-        },
+        _ => read_the_counters_of(folder.as_ref())?,
     };
     let find_binary = |counter: &str| {
         counters.find_binary(counter).map(Path::to_path_buf).or_else(|| {
@@ -394,6 +416,8 @@ enum Command {
     /// An empty name is every case, which is the ordinary run.
     Check { case: String },
     Explain { case: String },
+    /// An empty name is every counter that says where it comes from.
+    Fetch { counter: String },
     Render,
     #[cfg(feature = "maintenance")]
     Record,
@@ -423,6 +447,7 @@ impl Settings {
             }
             "check" => {}
             "explain" => settings.command = Command::Explain { case: String::new() },
+            "fetch" => settings.command = Command::Fetch { counter: String::new() },
             "render" => settings.command = Command::Render,
             #[cfg(feature = "maintenance")]
             "record" => settings.command = Command::Record,
@@ -448,7 +473,9 @@ impl Settings {
                 "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
                 "--out" => settings.out = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 _ => match &mut settings.command {
-                    Command::Check { case } | Command::Explain { case }
+                    Command::Check { case }
+                    | Command::Explain { case }
+                    | Command::Fetch { counter: case }
                         if case.is_empty() && !flag.starts_with('-') =>
                     {
                         *case = flag;
@@ -482,6 +509,23 @@ impl Settings {
         }
         if matches!(settings.command, Command::Check { .. }) && settings.out.is_some() {
             return Err("--out belongs to render".to_string());
+        }
+        if let Command::Fetch { .. } = &settings.command {
+            if settings.name_of_counter.is_some() {
+                return Err("fetch names the counter on its own, without --counter".to_string());
+            }
+            for (named, whose) in [
+                (settings.binary.is_some(), "--bin"),
+                (settings.corpus.is_some(), "--corpus"),
+                (settings.recorded.is_some(), "--recorded"),
+                (settings.known_failures.is_some(), "--known-failures"),
+                (!settings.disabled.is_empty(), "--disabled"),
+                (settings.out.is_some(), "--out"),
+            ] {
+                if named {
+                    return Err(format!("fetch downloads binaries, so {whose} is nothing to it"));
+                }
+            }
         }
         if let Command::Render = &settings.command {
             if settings.name_of_counter.is_some() || settings.binary.is_some() {
@@ -608,6 +652,49 @@ fn find_the_case_named(
                 "no case is named {name}, so this is {found}")))?;
     }
     Ok(found)
+}
+
+/// The paths a project named for itself, each resolved against the directory holding `.linejudge`
+/// so that a committed path works from any subdirectory. No folder is nobody naming anything.
+fn read_the_counters_of(folder: Option<&Folder>) -> Result<Counters, String> {
+    let Some(folder) = folder else { return Ok(Counters::empty()) };
+    let mut counters = Counters::read(&folder.get_counters_file())?;
+    counters.resolve_against(folder.get_root());
+    Ok(counters)
+}
+
+/// No name is every counter. A name is matched the way a case is: exactly, or by any part of it
+/// that fits exactly one, so that `fetch tok` is enough and the run says which counter that was.
+fn choose_the_counters_named<'a>(
+    out: &mut dyn Write,
+    adapters: &'a [Adapter],
+    name: &str,
+) -> Result<Vec<&'a Adapter>, Trouble> {
+    if name.is_empty() {
+        return Ok(adapters.iter().collect());
+    }
+    let named = |adapter: &Adapter| adapter.name_of_counter == name;
+    if let Some(exact) = adapters.iter().find(|adapter| named(adapter)) {
+        return Ok(vec![exact]);
+    }
+    let close: Vec<&Adapter> =
+        adapters.iter().filter(|one| one.name_of_counter.contains(name)).collect();
+    match close.as_slice() {
+        [] => Err(Trouble::Said(format!("no counter is named {name}"))),
+        [one] => {
+            writeln!(out, "{}", style::DETAIL.paint(&format!(
+                    "no counter is named {name}, so this is {}", one.name_of_counter)))?;
+            Ok(vec![one])
+        }
+        several => {
+            let names: Vec<&str> =
+                several.iter().map(|one| one.name_of_counter.as_str()).collect();
+            Err(Trouble::Said(format!(
+                "no counter is named {name}, and more than one contains it:\n  {}",
+                names.join("\n  ")
+            )))
+        }
+    }
 }
 
 fn anchor_every_path_of(settings: &mut Settings) {
