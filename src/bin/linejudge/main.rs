@@ -37,8 +37,9 @@ const CASES_DIR: &str = "cases";
 const DIALECTS_DIR: &str = "dialects";
 const SITE_DIR: &str = "site";
 const USAGE: &str = "\
-linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--corpus <dir>]
-                [--adapters <dir>] [--dialects <dir>] [--recorded <dir>] [--disabled <case>]
+linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <file>]
+                [--corpus <dir>] [--adapters <dir>] [--dialects <dir>] [--recorded <dir>]
+                [--disabled <case>]
 
     Runs every counter it has a binary for over every case, and answers two questions apart. The
     first is conformance: does the counter answer what its own declared rules ask for, judged for
@@ -60,6 +61,10 @@ linejudge check [--counter <name>] [--bin <path>] [--known-failures <file>] [--c
     the way cargo finds its own, and its settings.toml can name the corpus, adapters, dialects,
     recorded and known-failures paths, each meaning what the flag of the same name means. A flag
     wins over the folder.
+
+    Naming a case judges that one and nothing else, and the exit code is then its own. It is named
+    the way this report names it, or by any part of the name that fits exactly one case, so
+    'check 2150' is enough and the run says which case that was.
 
     A case whose directory name starts with 'disabled-' is set aside and named, never judged,
     since the prefix says this suite's own resolution of it is not to be trusted. --disabled sets
@@ -219,21 +224,19 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         (None, _) => None,
     };
 
+    // Naming one case narrows the corpus itself, so everything below judges and reports exactly
+    // that case and the exit code is its own.
+    let one_case = matches!(&settings.command, Command::Check { case } if !case.is_empty());
+    if let Command::Check { case } = &settings.command
+        && one_case
+    {
+        let named = find_the_case_named(&mut out, &corpus, case, "judge")?;
+        corpus.cases.retain(|one| one.name == named);
+    }
+
     if let Command::Explain { case } = &settings.command {
-        let found = match find_case(&corpus, case) {
-            Ok(found) => found,
-            Err(_) if corpus.disabled.iter().any(|name| name.contains(case.as_str())) => {
-                return Err(Trouble::Said(format!(
-                    "{case} names a disabled case, whose resolution this suite itself does not \
-                     trust, so there is nothing honest to explain"
-                )));
-            }
-            Err(message) => return Err(Trouble::Said(message)),
-        };
-        if found.name != *case {
-            writeln!(out, "{}", style::DETAIL.paint(&format!(
-                    "no case is named {case}, so this is {}", found.name)))?;
-        }
+        let named = find_the_case_named(&mut out, &corpus, case, "explain")?;
+        let found = find_case(&corpus, &named).map_err(Trouble::Said)?;
         for adapter in &adapters {
             let binary = find_binary(&adapter.name_of_counter);
             explain_one_counter(&mut out, adapter, binary.as_deref(), found, &dialects, &corpus.readings)?;
@@ -260,7 +263,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         return Ok(false);
     }
 
-    if !corpus.disabled.is_empty() {
+    if !corpus.disabled.is_empty() && !one_case {
         let what = if corpus.disabled.len() == 1 { "case is" } else { "cases are" };
         writeln!(out, "{}", style::RECORDED.paint(&format!(
                 "{} {what} set aside as disabled and not judged: {}",
@@ -335,6 +338,11 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             broken |=
                 report_the_verdicts_of_one_dialect(&mut out, &run, &judged, known_failures.as_ref())?;
         }
+        // Both of these hold a list against the whole corpus, and the corpus is one case here, so
+        // asking about one case would report every other as named by a list and missing.
+        if one_case {
+            continue;
+        }
         if let Some(record) = &record {
             report_recorded_answers_that_name_nothing(&mut out, record, &corpus)?;
         }
@@ -370,7 +378,8 @@ struct Settings {
 
 #[derive(Debug)]
 enum Command {
-    Check,
+    /// An empty name is every case, which is the ordinary run.
+    Check { case: String },
     Explain { case: String },
     Render,
     #[cfg(feature = "maintenance")]
@@ -380,7 +389,7 @@ enum Command {
 impl Settings {
     fn of(args: Vec<String>) -> Result<Settings, String> {
         let mut settings = Settings {
-            command: Command::Check,
+            command: Command::Check { case: String::new() },
             corpus: None,
             adapters: None,
             dialects: None,
@@ -426,7 +435,7 @@ impl Settings {
                 "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
                 "--out" => settings.out = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 _ => match &mut settings.command {
-                    Command::Explain { case }
+                    Command::Check { case } | Command::Explain { case }
                         if case.is_empty() && !flag.starts_with('-') =>
                     {
                         *case = flag;
@@ -458,7 +467,7 @@ impl Settings {
                 return Err("--out belongs to render".to_string());
             }
         }
-        if matches!(settings.command, Command::Check) && settings.out.is_some() {
+        if matches!(settings.command, Command::Check { .. }) && settings.out.is_some() {
             return Err("--out belongs to render".to_string());
         }
         if let Command::Render = &settings.command {
@@ -546,6 +555,31 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
     })
 }
 
+/// `check` and `explain` name a case the same way, so they refuse an unknown one the same way and
+/// both say out loud which case a fragment turned out to name.
+fn find_the_case_named(
+    out: &mut dyn Write,
+    corpus: &Corpus,
+    name: &str,
+    what: &str,
+) -> Result<String, Trouble> {
+    let found = match find_case(corpus, name) {
+        Ok(found) => found.name.clone(),
+        Err(_) if corpus.disabled.iter().any(|one| one.contains(name)) => {
+            return Err(Trouble::Said(format!(
+                "{name} names a disabled case, whose resolution this suite itself does not trust, \
+                 so there is nothing honest to {what}"
+            )));
+        }
+        Err(message) => return Err(Trouble::Said(message)),
+    };
+    if found != name {
+        writeln!(out, "{}", style::DETAIL.paint(&format!(
+                "no case is named {name}, so this is {found}")))?;
+    }
+    Ok(found)
+}
+
 fn anchor_every_path_of(settings: &mut Settings) {
     for path in [
         &mut settings.corpus,
@@ -630,6 +664,21 @@ mod tests {
         for args in [vec!["--help"], vec!["check", "--help"], vec!["check", "-h"]] {
             assert!(settings_of(&args).unwrap().wants_help);
         }
+    }
+
+    #[test]
+    fn check_takes_one_case_by_name_and_no_name_is_the_whole_corpus() {
+        let parsed = settings_of(&["check", "2150", "--counter", "tokei"]).unwrap();
+        match parsed.command {
+            Command::Check { case } => assert_eq!(case, "2150"),
+            _ => panic!("check parsed as another command"),
+        }
+        match settings_of(&["check", "--counter", "tokei"]).unwrap().command {
+            Command::Check { case } => assert!(case.is_empty()),
+            _ => panic!("check parsed as another command"),
+        }
+        let second = settings_of(&["check", "one-case", "another-case"]).unwrap_err();
+        assert!(second.contains("not a flag"), "{second}");
     }
 
     #[test]
