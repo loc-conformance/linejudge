@@ -12,8 +12,8 @@ const PARTIAL_SUFFIX: &str = ".partial";
 /// a build whose corpus changed does not read the copy an older one left behind.
 pub fn create_the_shipped_dir() -> Result<PathBuf, String> {
     let mut refused = Vec::new();
-    for root in [find_the_data_dir(), Some(env::temp_dir())].into_iter().flatten() {
-        let dir = root.join(APP_DIR).join(HASH);
+    for root in find_the_app_dirs() {
+        let dir = root.join(HASH);
         if dir.is_dir() {
             return Ok(dir);
         }
@@ -23,6 +23,18 @@ pub fn create_the_shipped_dir() -> Result<PathBuf, String> {
         }
     }
     Err(format!("what this build carries could not be written out: {}", refused.join("; ")))
+}
+
+/// Everywhere this program keeps files of its own, in the order it tries them. The temporary
+/// directory is second so that a machine with no home of any kind, which is what some build
+/// runners are, still has somewhere to put them. Whatever writes and whatever reads has to walk
+/// the same list in the same order, or one of them looks in the wrong place.
+pub fn find_the_app_dirs() -> Vec<PathBuf> {
+    [find_the_data_dir(), Some(env::temp_dir())]
+        .into_iter()
+        .flatten()
+        .map(|root| root.join(APP_DIR))
+        .collect()
 }
 
 fn write_the_shipped_files_into(dir: &Path) -> Result<(), String> {

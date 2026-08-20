@@ -6,6 +6,7 @@ pub mod corpus;
 pub mod counters;
 pub mod deriver;
 pub mod dialects;
+pub mod fetched;
 pub mod known_failures;
 pub mod linejudge_folder;
 pub mod locator;

@@ -18,9 +18,10 @@ use linejudge::adapter::Adapter;
 use linejudge::corpus::Corpus;
 use linejudge::counters::Counters;
 use linejudge::dialects::Dialects;
+use linejudge::fetched;
+use linejudge::known_failures::KnownFailures;
 use linejudge::linejudge_folder::COUNTERS_FILE;
 use linejudge::linejudge_folder::Folder;
-use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
 use linejudge::shipped::create_the_shipped_dir;
@@ -57,8 +58,8 @@ linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <fi
     declares that one and leaves every other as it is.
 
     Binaries are named in .linejudge/counters.toml, or with --bin, which needs --counter to say
-    whose binary it is, and whatever a fetch has put in .linejudge/bin/ is found under the
-    counter's own name. The .linejudge folder is looked for upward from the working directory,
+    whose binary it is, and whatever a fetch has downloaded is found without anybody naming a
+    path. The .linejudge folder is looked for upward from the working directory,
     the way cargo finds its own, and its settings.toml can name the corpus, adapters, dialects,
     recorded and known-failures paths, each meaning what the flag of the same name means. A flag
     wins over the folder.
@@ -214,10 +215,13 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         },
     };
     let find_binary = |counter: &str| {
-        counters
-            .find_binary(counter)
-            .map(Path::to_path_buf)
-            .or_else(|| folder.as_ref().and_then(|folder| folder.find_fetched_binary(counter)))
+        counters.find_binary(counter).map(Path::to_path_buf).or_else(|| {
+            adapters
+                .iter()
+                .find(|adapter| adapter.name_of_counter == counter)
+                .and_then(|adapter| adapter.acquisition.as_ref())
+                .and_then(|how| fetched::find_the_binary_of(counter, &how.version))
+        })
     };
     let known_failures = match (&dirs.known_failures, &settings.name_of_counter) {
         (Some(path), Some(_)) => Some(KnownFailures::read(path)?),

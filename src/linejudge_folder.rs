@@ -1,4 +1,3 @@
-use std::env::consts::EXE_SUFFIX;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -8,13 +7,12 @@ use serde::Deserialize;
 pub const FOLDER_NAME: &str = ".linejudge";
 pub const COUNTERS_FILE: &str = "counters.toml";
 
-const BIN_DIR: &str = "bin";
 const SETTINGS_FILE: &str = "settings.toml";
 
 /// The `.linejudge` folder, found by walking up from the working directory the way cargo finds its
 /// own. It holds whatever the run needs that was not said on the command line: `counters.toml`
-/// naming the binaries, `bin/` holding fetched ones, and `settings.toml` naming the paths. A flag
-/// wins over the folder, and the folder wins over the defaults.
+/// naming the binaries and `settings.toml` naming the paths. A flag wins over the folder, and the
+/// folder wins over the defaults.
 pub struct Folder {
     dir: PathBuf,
     settings: Settings,
@@ -58,13 +56,6 @@ impl Folder {
 
     pub fn get_counters_file(&self) -> PathBuf {
         self.dir.join(COUNTERS_FILE)
-    }
-
-    /// Where `fetch` puts what it downloads, looked in last: after `--bin` and after the counters
-    /// file, under the counter's own name, so that a fetched roster needs nobody to name it.
-    pub fn find_fetched_binary(&self, counter: &str) -> Option<PathBuf> {
-        let binary = self.dir.join(BIN_DIR).join(format!("{counter}{EXE_SUFFIX}"));
-        binary.is_file().then_some(binary)
     }
 
     /// The directory the folder sits in, which is what every relative path in it resolves
@@ -167,18 +158,4 @@ mod tests {
         assert!(refused.contains("does not parse"), "{refused}");
     }
 
-    #[test]
-    fn a_fetched_binary_is_found_under_the_counters_own_name() {
-        let root = env::temp_dir().join("linejudge-a_folder_with_a_binary");
-        let bin = root.join(FOLDER_NAME).join(BIN_DIR);
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&bin).unwrap();
-        fs::write(bin.join(format!("tokei{EXE_SUFFIX}")), "not really a binary").unwrap();
-        let folder = Folder::find(&root).unwrap().unwrap_or_else(|| panic!("nothing found"));
-        let found = folder.find_fetched_binary("tokei");
-        let missing = folder.find_fetched_binary("scc");
-        fs::remove_dir_all(&root).unwrap();
-        assert_eq!(found.unwrap(), bin.join(format!("tokei{EXE_SUFFIX}")));
-        assert!(missing.is_none());
-    }
 }

@@ -6,6 +6,7 @@ args       = ["--output", "json", "{file}"]
 [acquisition]
 channel = "crates-io"
 name    = "tokei"
+version = "14.0.0"
 
 [dialect.default]
 args = []

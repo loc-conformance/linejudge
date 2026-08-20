@@ -284,6 +284,9 @@ pub enum Reader {
 pub struct Acquisition {
     pub channel: String,
     pub name: String,
+    /// Downloaded exactly, never resolved to whatever is newest, so that two runs on different days
+    /// measure the same build and moving to another one is an act of ours with a date on it.
+    pub version: String,
 }
 
 fn shorten(path: &Path) -> String {
@@ -375,7 +378,8 @@ mod tests {
         assert_eq!(dialects, ["content", "region"]);
         assert_eq!(mezura.dialects[0].buckets, ["code", "comments", "extra"]);
         assert_eq!(mezura.dialects[1].buckets, ["code", "comments", "blanks"]);
-        assert_eq!(adapters[2].acquisition.as_ref().map(|a| a.channel.as_str()), Some("crates-io"));
+        let tokei = adapters[2].acquisition.as_ref().unwrap();
+        assert_eq!((tokei.channel.as_str(), tokei.version.as_str()), ("crates-io", "14.0.0"));
         for adapter in &adapters {
             let home = adapter.repository.as_deref().unwrap_or_default();
             assert!(home.starts_with("https://"), "{}: {home}", adapter.name_of_counter);
@@ -423,7 +427,7 @@ mod tests {
         let unread = write_an_adapter(
             "an_adapter_saying_nothing_about_reading",
             "name = \"tokei\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&unread, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(unread.parent().unwrap()).unwrap();
@@ -432,7 +436,7 @@ mod tests {
         let unused = write_an_adapter(
             "an_adapter_whose_output_nobody_reads",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n\
+             [dialect.default]\nargs = []\n\
              [dialect.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
              comments = \"Comment\"\nblanks = \"Blank\"\n",
         );
@@ -446,7 +450,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_a_broken_read_block",
             "name = \"tokei\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n\
+             [dialect.default]\nargs = []\n\
              [dialect.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
              comments = \"Comment\"\n",
         );
@@ -470,7 +474,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_under_the_wrong_name",
             "name = \"scc\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"scc\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -508,7 +512,7 @@ mod tests {
             "an_explain_command_with_no_file",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-args = [\"-t\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -528,7 +532,7 @@ mod tests {
             "a_format_with_no_command",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-output = \"linejudge-per-line\"\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&alone, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(alone.parent().unwrap()).unwrap();
@@ -539,7 +543,7 @@ mod tests {
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-args = [\"-t\", \"{file}\"]\nexplain-output = \"linejudge-per-line\"\n\
              explain-keep-from = \"line \"\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&both, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(both.parent().unwrap()).unwrap();
@@ -549,7 +553,7 @@ mod tests {
             "a_format_nobody_reads",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-args = [\"-t\", \"{file}\"]\nexplain-output = \"tokei-lines\"\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&unknown, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(unknown.parent().unwrap()).unwrap();
@@ -562,7 +566,7 @@ mod tests {
             "a_keep_from_with_no_command",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-keep-from = \"line \"\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&alone, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(alone.parent().unwrap()).unwrap();
@@ -572,7 +576,7 @@ mod tests {
             "an_empty_keep_from",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-args = [\"-t\", \"{file}\"]\nexplain-keep-from = \"\"\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&empty, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(empty.parent().unwrap()).unwrap();
@@ -589,7 +593,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_no_version_flag",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\nversion-flag = \"\"\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let unversioned = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -602,7 +606,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_no_dialect",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect]\n",
+             [dialect]\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -614,7 +618,6 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_naming_the_file_twice",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n\
              [dialect.default]\nargs = [\"{file}\"]\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
@@ -627,7 +630,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_no_file",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"--output\", \"json\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.default]\nargs = []\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -639,7 +642,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_an_unknown_dialect",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [acquisition]\nchannel = \"crates-io\"\nname = \"tokei\"\n[dialect.strict]\nargs = []\n",
+             [dialect.strict]\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();

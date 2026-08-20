@@ -302,6 +302,7 @@ mod tests {
     use std::path::Path;
     use std::slice;
 
+    use crate::adapter::Adapter;
     use crate::corpus::Corpus;
     use crate::deriver::derive_answer;
     use crate::dialects::read_the_shipped_dialects;
@@ -367,6 +368,31 @@ the line comment is swallowed by the block above it"""
                         ));
                     }
                 }
+            }
+        }
+        assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    }
+
+    // A record holds the answers of one build, and the acquisition block is the build a fetch will
+    // download. Letting the two drift apart would publish numbers measured at a version nobody ever
+    // recorded, so raising one without the other fails here.
+    #[test]
+    fn a_counter_is_downloaded_at_the_version_its_answers_were_recorded_from() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dialects = read_the_shipped_dialects();
+        let adapters = Adapter::read_all(&[root.join("adapters")], &dialects).unwrap();
+        let mut wrong = Vec::new();
+        for adapter in &adapters {
+            let counter = &adapter.name_of_counter;
+            let Some(how) = &adapter.acquisition else { continue };
+            let record = RecordedAnswers::read(&[root.join(RECORDED_DIR)], counter, &dialects)
+                .unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
+                .unwrap_or_else(|| panic!("{counter} has no recorded answers"));
+            if !record.version.contains(&how.version) {
+                wrong.push(format!(
+                    "{counter} is downloaded at {} and its answers came from \"{}\"",
+                    how.version, record.version
+                ));
             }
         }
         assert!(wrong.is_empty(), "{}", wrong.join("\n"));
