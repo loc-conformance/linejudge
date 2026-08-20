@@ -6,6 +6,7 @@ use linejudge::corpus::Corpus;
 use linejudge::dialects::Dialects;
 use maud::{DOCTYPE, Markup, html};
 
+mod badge;
 mod case;
 mod data;
 mod measure;
@@ -14,6 +15,7 @@ mod tool;
 
 pub const DATA_FILE: &str = "data.json";
 pub const INDEX_FILE: &str = "index.html";
+pub const BADGES_DIR: &str = "badges";
 pub const CASES_DIR: &str = "cases";
 pub const TOOLS_DIR: &str = "tools";
 const SCRIPT_FILE: &str = "page.js";
@@ -43,11 +45,24 @@ pub fn write_the_site(
     write(SCRIPT_FILE, SCRIPT.to_string())?;
     write(INDEX_FILE, scoreboard::render_the_scoreboard(&sweep))?;
     write_a_page_each(&out.join(CASES_DIR), &detailed, |detail| {
-        (detail.name.clone(), case::render_one_case(detail, &sweep))
+        (format!("{}.html", detail.name), case::render_one_case(detail, &sweep))
     })?;
     let tools = measure::read_every_tool(&sweep, adapters, dialects)?;
     write_a_page_each(&out.join(TOOLS_DIR), &tools, |detail| {
-        (detail.name.clone(), tool::render_one_tool(detail, &sweep))
+        (format!("{}.html", detail.name), tool::render_one_tool(detail, &sweep))
+    })?;
+    let badges: Vec<(String, String)> = sweep
+        .counters
+        .iter()
+        .flat_map(|counter| {
+            counter.dialects.iter().map(|dialect| {
+                (name_the_badge_of(&counter.name, &dialect.name),
+                 badge::render_one_badge(&dialect.answers))
+            })
+        })
+        .collect();
+    write_a_page_each(&out.join(BADGES_DIR), &badges, |(name, svg)| {
+        (format!("{name}.svg"), svg.clone())
     })?;
     let json = serde_json::to_string_pretty(&sweep)
         .map_err(|error| format!("the measurement could not be written as JSON: {error}"))?;
@@ -55,7 +70,8 @@ pub fn write_the_site(
     Ok(detailed.len())
 }
 
-/// One directory of pages, named by whatever the caller says each of them is called.
+/// One directory of files, named by whatever the caller says each of them is called. Names carry
+/// their own extension, since a badge is an SVG and everything else is a page.
 fn write_a_page_each<T>(
     dir: &Path,
     each: &[T],
@@ -65,11 +81,17 @@ fn write_a_page_each<T>(
         .map_err(|error| format!("{} could not be created: {error}", dir.display()))?;
     for one in each {
         let (name, text) = render(one);
-        let page = dir.join(format!("{name}.html"));
+        let page = dir.join(&name);
         fs::write(&page, text)
             .map_err(|error| format!("{} could not be written: {error}", page.display()))?;
     }
     Ok(())
+}
+
+/// A badge names the way of counting as well as the counter, since a counter with two of them
+/// has two answers and a single file could only ever be one of them.
+pub fn name_the_badge_of(counter: &str, dialect: &str) -> String {
+    format!("{counter}.{dialect}")
 }
 
 /// Every page of the site is this, so the stylesheet and the script are written once and named by

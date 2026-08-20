@@ -33,6 +33,7 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
             }
         }
         table .file {
+            tr .filename { td colspan="3" { (detail.file) } }
             @for (at, line) in detail.lines.iter().enumerate() {
                 tr {
                     td .ln { (format!("{:>width$}", at + 1)) }
@@ -59,7 +60,6 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
             span { span .ink-string { "string" } }
             span { span .ink-comment { "comment" } }
             span { span .ink-tag { "the tag around another language" } }
-            span { (detail.file) }
         }
     }
 }

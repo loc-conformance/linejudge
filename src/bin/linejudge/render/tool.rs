@@ -1,7 +1,9 @@
 use maud::{Markup, html};
 
 use crate::render::data::{Answer, DialectDetail, Sweep, ToolDetail, Verdict};
-use crate::render::{CASES_DIR, INDEX_FILE, format_as_one_line, wrap_the_page};
+use crate::render::{
+    BADGES_DIR, CASES_DIR, INDEX_FILE, format_as_one_line, name_the_badge_of, wrap_the_page,
+};
 
 /// A tool's page sits one directory under the root of the site.
 const UP: &str = "../";
@@ -78,8 +80,10 @@ fn render_the_worklist_of(detail: &ToolDetail, sweep: &Sweep) -> Markup {
                     @if counter.dialects.len() > 1 {
                         span .way { (dialect.name) }
                     }
+                    @let file = format!("{}.svg", name_the_badge_of(&counter.name, &dialect.name));
+                    img .badge src=(format!("{UP}{BADGES_DIR}/{file}")) alt=(file);
                     span .about {
-                        "does not simply agree on " (named.len())
+                        "does not agree on " (named.len())
                         " of " (dialect.answers.len()) " cases"
                     }
                 }
