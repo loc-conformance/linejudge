@@ -9,3 +9,36 @@ document.querySelectorAll('.chip.pick').forEach(chip => {
     });
   });
 });
+
+// The file is read back out of the table it is painted in, so the line numbers and the buckets
+// beside it are left behind and what lands on the clipboard is the file.
+document.querySelectorAll('button.copy').forEach(button => {
+  const said = button.querySelector('.said');
+  button.addEventListener('click', () => {
+    const lines = [...document.querySelectorAll('td.src')].map(cell => cell.textContent);
+    navigator.clipboard.writeText(lines.join('\n') + '\n').then(() => {
+      said.textContent = 'copied';
+      setTimeout(() => { said.textContent = 'copy'; }, 1500);
+    }, () => {
+      said.textContent = 'select it by hand';
+    });
+  });
+});
+
+// Where this page was left, so that coming back to it lands where it was left. The back button
+// alone would not be enough: the link out of a case is a plain forward navigation, and a browser
+// restores nothing on one of those. A browser that refuses storage at all loses the memory and
+// nothing else, which is why this is last and why it is wrapped.
+try {
+  const where = 'linejudge:' + location.pathname;
+  const left = sessionStorage.getItem(where);
+  if (left) {
+    const [x, y] = left.split(',');
+    scrollTo(Number(x), Number(y));
+  }
+  addEventListener('pagehide', () => {
+    sessionStorage.setItem(where, scrollX + ',' + scrollY);
+  });
+} catch (refused) {
+  // storage is off, so the page opens where a page opens
+}

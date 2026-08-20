@@ -2,20 +2,13 @@ use maud::{Markup, html};
 
 use crate::render::data::{Answer, DialectDetail, Sweep, ToolDetail, Verdict};
 use crate::render::{
-    BADGES_DIR, CASES_DIR, INDEX_FILE, format_as_one_line, name_the_badge_of, wrap_the_page,
+    BADGES_DIR, CASES_DIR, INDEX_FILE, format_as_one_line, name_the_badge_of,
+    render_the_mark_of_github, wrap_the_page,
 };
 
 /// A tool's page sits one directory under the root of the site.
 const UP: &str = "../";
 const GITHUB_HOST: &str = "github.com";
-/// GitHub's own mark, drawn rather than fetched, since the pages ask nothing of any other host.
-const GITHUB_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 \
-    0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01\
-    -.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89\
-    -3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 \
-    2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 \
-    2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8\
-    .012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z";
 
 pub fn render_one_tool(detail: &ToolDetail, sweep: &Sweep) -> String {
     let body = html! {
@@ -36,7 +29,7 @@ pub fn render_one_tool(detail: &ToolDetail, sweep: &Sweep) -> String {
         h2 { "The rules it is judged by" }
         @for dialect in &detail.dialects { (render_one_dialect(dialect)) }
     };
-    wrap_the_page(&detail.name, body, UP)
+    wrap_the_page(&format!("{} · LineJudge", detail.name), body, UP)
 }
 
 /// The counter's own home, with GitHub's mark where that is where it lives and the plain host
@@ -51,11 +44,7 @@ fn render_the_link_to(home: &str) -> Markup {
         .unwrap_or(home);
     html! {
         a .home href=(home) target="_blank" rel="noreferrer" {
-            @if host == GITHUB_HOST {
-                svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" {
-                    path d=(GITHUB_MARK) fill="currentColor" {}
-                }
-            }
+            @if host == GITHUB_HOST { (render_the_mark_of_github()) }
             span { (host) }
         }
     }

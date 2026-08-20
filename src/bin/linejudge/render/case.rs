@@ -6,6 +6,12 @@ use crate::render::{INDEX_FILE, format_as_one_line, format_the_group_title, wrap
 
 /// A case's page sits one directory under the root of the site.
 const UP: &str = "../";
+const COPY_MARK_BACK: &str = "M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 \
+    0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 \
+    1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z";
+const COPY_MARK_FRONT: &str = "M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 \
+    1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 \
+    .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z";
 
 pub fn render_one_case(detail: &CaseDetail, sweep: &Sweep) -> String {
     let answers = find_the_answers_to(detail, sweep);
@@ -20,7 +26,7 @@ pub fn render_one_case(detail: &CaseDetail, sweep: &Sweep) -> String {
         h2 { "What each tool answered" }
         @for (way, answer) in &answers { (render_one_answer(way, answer)) }
     };
-    wrap_the_page(&detail.name, body, UP)
+    wrap_the_page(&format!("{} · LineJudge", detail.name), body, UP)
 }
 
 fn render_the_file(detail: &CaseDetail) -> Markup {
@@ -33,7 +39,18 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
             }
         }
         table .file {
-            tr .filename { td colspan="3" { (detail.file) } }
+            tr .filename { td colspan="3" {
+                div .bar {
+                    span { (detail.file) }
+                    button .copy type="button" title="copy the file" {
+                        svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" {
+                            path d=(COPY_MARK_BACK) fill="currentColor" {}
+                            path d=(COPY_MARK_FRONT) fill="currentColor" {}
+                        }
+                        span .said { "copy" }
+                    }
+                }
+            } }
             @for (at, line) in detail.lines.iter().enumerate() {
                 tr {
                     td .ln { (format!("{:>width$}", at + 1)) }

@@ -296,10 +296,16 @@ tr.disabled td {
   line-height: 1.4;
 }
 
+/* The padding is what separates a label longer than the width from the numbers after it. */
 .nums .lbl {
   display: inline-block;
   min-width: 4.4rem;
+  padding-right: .8rem;
   color: #8c959f;
+}
+
+.answer .nums .lbl {
+  min-width: 7rem;
 }
 
 .nums .off {
@@ -583,21 +589,10 @@ td.bucket-of {
   text-decoration: underline;
 }
 
-h1 .home {
-  display: inline-flex;
-  align-items: center;
-  gap: .35rem;
+h1 a.home {
   margin-left: .8rem;
-  color: #57606a;
-  font-size: .85rem;
   font-weight: 400;
-  text-decoration: none;
   vertical-align: middle;
-}
-
-h1 .home:hover {
-  color: #0969da;
-  text-decoration: underline;
 }
 
 img.badge {
@@ -610,4 +605,61 @@ tr.filename td {
   border-bottom: 0.0625rem solid #d0d7de;
   color: #57606a;
   font-weight: 700;
+}
+
+/* The flex sits inside the cell and not on it, since a cell that is a flex box stops spanning. */
+tr.filename .bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+button.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .1rem .5rem;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .35rem;
+  color: #57606a;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: .78rem;
+  cursor: pointer;
+}
+
+button.copy:hover {
+  border-color: #0969da;
+  color: #0969da;
+}
+
+.under {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .3rem 1.5rem;
+  margin: 0 0 .75rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: #57606a;
+  font-size: 1.05rem;
+  font-style: italic;
+}
+
+a.home {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: #57606a;
+  font-size: .85rem;
+  text-decoration: none;
+}
+
+a.home:hover {
+  color: #0969da;
+  text-decoration: underline;
 }
