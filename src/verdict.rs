@@ -1,4 +1,7 @@
 use std::path::Path;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 use crate::adapter::{Adapter, Dialect};
 use crate::answer::Answer;
@@ -6,6 +9,8 @@ use crate::corpus::{Case, Corpus};
 use crate::deriver::derive_answer;
 use crate::dialects;
 use crate::recorded::{Exception, RecordedAnswer, RecordedAnswers, is_same_build};
+
+const AT_ONCE: usize = 8;
 
 /// Whether a counter does what its own rules say. This is the whole of what can be asked of a
 /// counter nobody here has photographed, and it never needs a recorded answer.
@@ -140,9 +145,12 @@ pub fn measure_and_judge_every_case<'a>(
         return Err(faults);
     }
 
+    let files: Vec<&Path> = prepared.iter().map(|(case, ..)| case.input_file.as_path()).collect();
+    let answers = measure_every_file(adapter, dialect, binary, &files);
+
     let mut judged = Vec::with_capacity(prepared.len());
-    for (case, real, entry, exception) in prepared {
-        let live = match adapter.measure(dialect, binary, &case.input_file) {
+    for ((case, real, entry, exception), answer) in prepared.into_iter().zip(answers) {
+        let live = match answer {
             Ok(live) => live,
             Err(message) => {
                 judged.push(Judged { case, outcome: Outcome::Broke(message) });
@@ -167,6 +175,35 @@ pub fn measure_and_judge_every_case<'a>(
         });
     }
     Ok(judged)
+}
+
+/// Runs the counter over every file at once, a few at a time, and hands the answers back in the
+/// order the files were given. Nearly all of the time is spent waiting for somebody else's program
+/// to start and finish, so the number running together is well above the number of cores.
+fn measure_every_file(
+    adapter: &Adapter,
+    dialect: &Dialect,
+    binary: &Path,
+    files: &[&Path],
+) -> Vec<Result<Option<Answer>, String>> {
+    let next = AtomicUsize::new(0);
+    let answers = Mutex::new(Vec::with_capacity(files.len()));
+    let running = AT_ONCE.min(files.len().max(1));
+    thread::scope(|scope| {
+        for _ in 0..running {
+            scope.spawn(|| {
+                loop {
+                    let at = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(file) = files.get(at) else { return };
+                    let answered = adapter.measure(dialect, binary, file);
+                    answers.lock().unwrap_or_else(|held| held.into_inner()).push((at, answered));
+                }
+            });
+        }
+    });
+    let mut answers = answers.into_inner().unwrap_or_else(|held| held.into_inner());
+    answers.sort_by_key(|(at, _)| *at);
+    answers.into_iter().map(|(_, answered)| answered).collect()
 }
 
 pub fn judge_conformance(real: &Answer, live: Option<&Answer>) -> Conformance {
