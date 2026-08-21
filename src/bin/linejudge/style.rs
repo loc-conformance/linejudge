@@ -1,6 +1,6 @@
 use colored::{Color, ColoredString, Colorize};
 
-const ASH: Color = Color::TrueColor { r: 130, g: 130, b: 130 };
+const ASH: Color = Color::TrueColor { r: 140, g: 140, b: 140 };
 const GOLD: Color = Color::TrueColor { r: 181, g: 169, b: 138 };
 const SKY: Color = Color::TrueColor { r: 110, g: 160, b: 220 };
 const VIOLET: Color = Color::TrueColor { r: 175, g: 145, b: 195 };
