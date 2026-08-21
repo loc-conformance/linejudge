@@ -11,15 +11,13 @@ repository = "https://github.com/loc-conformance/linejudge"
 name = "linejudge"
 path = "src/bin/linejudge/main.rs"
 
-# Whoever runs a counter against the corpus needs neither of these: one writes the truth of a case
-# somebody is authoring, the other rewrites this suite's own record of a counter. Gated, so that
-# `cargo install` brings the one command a consumer asked for.
 [[bin]]
 name = "propose-markers"
 path = "src/bin/propose-markers/main.rs"
 required-features = ["maintenance"]
 
 [features]
+# What this suite runs on itself: propose-markers above, and the record and bump-versions commands.
 maintenance = []
 
 [dependencies]
@@ -35,5 +33,4 @@ toml = { version = "1.1.4", default-features = false, features = ["parse", "serd
 
 [profile.release]
 debug = false
-codegen-units = 1
 strip = "symbols"
