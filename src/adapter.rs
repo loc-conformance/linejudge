@@ -1,3 +1,5 @@
+//! How to run one counter and read what it prints.
+
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
@@ -12,46 +14,42 @@ use crate::locator::{Locator, RawLocator};
 use crate::measurement::{OutputFormat, read_output};
 use crate::per_line::PerLineFormat;
 
-pub const UNKNOWN_VERSION: &str = "unknown version";
+pub(crate) const UNKNOWN_VERSION: &str = "unknown version";
 
 const ADAPTER_EXTENSION: &str = "toml";
 const FILE_PLACEHOLDER: &str = "{file}";
 const VERSION_FLAG: &str = "--version";
 
-// An Adapter symbolizes the bridge between a loc counter tool, and this program.
-// Every field of it is declared in adapters/<name_of_counter>.toml: the shape that tool prints its
-// answer in, the arguments it is run with, the flag that asks it for its version, where its binary
-// comes from, and one block per way it counts.
+/// Everything needed to run one counter and read its answer, as `adapters/<counter>.toml`
+/// declares it.
 #[derive(Debug)]
 pub struct Adapter {
-    // a 'counter' is a loc counting tool, like mezura or tokei
     pub name_of_counter: String,
-    /// Where the counter itself lives, for a report that wants to send somebody to it. `None`
-    /// asks nothing of anybody: an adapter that does not say is simply not linked.
+    /// Where the counter itself lives, for a report that links to it. `None` is not linked.
     pub repository: Option<String>,
+    /// The command line it is run with, `{file}` standing for the file, and the arguments of the
+    /// chosen way of counting appended after these.
     pub args: Vec<String>,
-    /// The command line that asks the counter for its own analysis of a file line by line, in
-    /// place of `args`, with the dialect's arguments appended the same way. `None` is a counter
-    /// with no such command, which is not a failure of any kind.
+    /// The command line that asks the counter for its own reading of a file line by line, used in
+    /// place of `args`. `None` is a counter with no such command, which is not a failure.
     pub explain_args: Option<Vec<String>>,
-    /// The format that analysis is printed in, where it is one this suite can read and compare
-    /// line by line. `None` is a counter whose analysis is text for a person and nothing more.
+    /// The format that reading is printed in, where it is one this suite can compare line by line.
+    /// `None` is a counter whose reading is text for a person and nothing more.
     pub explain_output: Option<PerLineFormat>,
-    /// What of that analysis is worth showing: only the lines holding this text, each from the
-    /// text to its end. Chooses lines and never reads them, so it is not a parser; where nothing
-    /// matches, everything is shown and the report says so.
+    /// Show only the lines of it holding this text, each from the text to its end. Where nothing
+    /// holds it, everything is shown and the report says so.
     pub explain_keep_from: Option<String>,
+    /// The flag that asks the counter for its version, `None` for one that answers no such flag.
     pub version_flag: Option<String>,
-    /// Where the binary is downloaded from. `None` is a counter that cannot be fetched: it is left
-    /// out of any scheduled sweep, loudly, and still runs for anyone holding its binary.
+    /// `None` is a counter that cannot be fetched: it is left out of any scheduled sweep, loudly,
+    /// and still runs for anyone holding its binary.
     pub acquisition: Option<Acquisition>,
     pub dialects: Vec<Dialect>,
 }
 
 impl Adapter {
-    /// The directories are layered the way the dialects are: a counter's adapter is the file named
-    /// after it, so the last directory holding that file is the one that describes the counter, and
-    /// somebody whose tool has moved a flag writes one file rather than a copy of every other.
+    /// The directories are layered: the last one holding `<counter>.toml` is the one that
+    /// describes it, so somebody whose tool moved a flag writes one file and not a copy of ours.
     pub fn read_one(
         dirs: &[PathBuf],
         name_of_counter: &str,
@@ -67,6 +65,7 @@ impl Adapter {
         }
     }
 
+    /// Reads every adapter the directories hold, layered the same way, in alphabetical order.
     pub fn read_all(dirs: &[PathBuf], dialects: &Dialects) -> Result<Vec<Adapter>, String> {
         let mut found: BTreeMap<String, PathBuf> = BTreeMap::new();
         for dir in dirs {
@@ -202,6 +201,8 @@ impl Adapter {
         })
     }
 
+    /// Runs the counter over one file and reads its answer. `None` is a counter that says there is
+    /// no such file, which is an answer of its own and not a failure.
     pub fn measure(
         &self,
         dialect: &Dialect,
@@ -228,8 +229,7 @@ impl Adapter {
     }
 
     /// Runs the counter's own per-line command and hands back what it printed, as it printed it.
-    /// `None` is an adapter that declares no such command, and an error is printed by the caller
-    /// rather than ending anything, since this output is a diagnostic for a person.
+    /// `None` is an adapter that declares no such command.
     pub fn run_explain(
         &self,
         dialect: &Dialect,
@@ -240,13 +240,13 @@ impl Adapter {
         Some(run_counter(binary, &build_command_args(base, dialect, file)))
     }
 
-    /// The command as a person would retype it, so paths under the directory the run works from
-    /// are written relative to it and the rest are left whole. It is meant to be pasted into a
-    /// shell, which is why the case is not cut down to its file name.
+    /// The command as a person would retype it, meant to be pasted into a shell. Paths under the
+    /// directory the run works from are written relative to it and the rest are left whole.
     pub fn format_command(&self, dialect: &Dialect, binary: &Path, file: &Path) -> String {
         format!("{} {}", shorten(binary), self.build_args(dialect, &shorten_the_path(file)).join(" "))
     }
 
+    /// The same for the per-line command, and `None` where the adapter declares none.
     pub fn format_explain_command(
         &self,
         dialect: &Dialect,
@@ -263,36 +263,42 @@ impl Adapter {
     }
 }
 
+/// One way this counter counts, as its adapter declares it.
 #[derive(Debug)]
 pub struct Dialect {
+    /// `default` for a counter that counts only the one way.
     pub name: String,
+    /// What is added to the counter's command line to ask for this way of counting.
     pub args: Vec<String>,
+    /// In the order its dialect file lists them.
     pub buckets: Vec<String>,
-    pub reader: Reader,
+    pub(crate) reader: Reader,
 }
 
-/// How what this way of counting prints is turned into an answer: through a reader written in
-/// `measurement`, or through the read block its own adapter declares.
 #[derive(Debug)]
-pub enum Reader {
+pub(crate) enum Reader {
     Written(OutputFormat),
     Declared(Box<Locator>),
 }
 
+/// Where a build of the counter is downloaded from.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Acquisition {
+    /// `github-release-asset` for a project that attaches built files to a release, `crates-io`
+    /// for one that publishes only source and has to be compiled.
     pub channel: String,
+    /// What the channel calls it: the `owner/repo` on GitHub, or the name of the crate.
     pub name: String,
-    /// Downloaded exactly, never resolved to whatever is newest, so that two runs on different days
-    /// measure the same build and moving to another one is an act of ours with a date on it.
+    /// Downloaded exactly, never resolved to whatever is newest, so two runs on different days
+    /// measure the same build.
     pub version: String,
 }
 
-/// Whether what a binary printed for its version is the one that was declared. It can never be an
-/// equality, since a counter prints its own name and its build details around the number: `tokei
-/// 14.0.0 compiled with serialization support: json` beside `scc version 3.7.0`. Neither end of the
-/// match may sit against a digit or a dot, or a declared `4.0.0` would answer yes to `tokei 14.0.0`.
+/// Whether a binary's version line is the version that was declared. It cannot be an equality: a
+/// counter prints its own name and build details around the number, `tokei 14.0.0 compiled with
+/// serialization support: json` beside `scc version 3.7.0`. Neither end of the match may sit
+/// against a digit or a dot, or a declared `4.0.0` would answer yes to `tokei 14.0.0`.
 pub fn is_the_declared_version(declared: &str, printed: &str) -> bool {
     let stands_alone = |beside: Option<char>| !beside.is_some_and(|c| c.is_ascii_digit() || c == '.');
     printed.match_indices(declared).any(|(at, _)| {
@@ -330,8 +336,8 @@ fn run_counter(binary: &Path, args: &[String]) -> Result<String, String> {
         .args(args)
         .output()
         .map_err(|e| format!("{} could not be run: {e}", binary.display()))?;
-    // What it said while failing is the whole of what is known about why, and a counter that wraps
-    // its refusal over the width of a terminal has one sentence in as many lines as it liked.
+    // What it printed while failing is all that is known about why, and a counter is free to have
+    // wrapped one sentence over as many lines as it liked.
     if !output.status.success() {
         let printed = String::from_utf8_lossy(&output.stderr);
         let said: Vec<&str> =
@@ -420,8 +426,8 @@ mod tests {
         assert!(whole.contains("somewhere"), "{whole}");
     }
 
-    // A counter nobody publishes anywhere has no channel to declare, and forcing one would be
-    // asking its adapter to lie. What the absence costs is only that nothing can fetch it.
+    // A counter nobody publishes anywhere has no channel to declare, and all the absence costs is
+    // that nothing can fetch it.
     #[test]
     fn an_adapter_with_no_acquisition_reads_as_a_counter_that_cannot_be_fetched() {
         let path = write_an_adapter(

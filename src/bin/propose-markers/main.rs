@@ -1,8 +1,7 @@
 #![forbid(unsafe_code)]
 
-// This is a supporting tool that helps us generate the truth.txt of every case of the corpus.
-// It paints marker lines, it does not decide them: a person says where the spans are and this
-// fills in the columns. Nothing here judges its own output, the corpus reader does.
+// Helps write the truth.txt of a case. It paints marker lines and does not decide them: a person
+// says where the spans are and this fills in the columns. Nothing here judges its own output.
 
 use std::collections::BTreeMap;
 use std::env;
@@ -370,8 +369,8 @@ fn note_label(
     Ok(())
 }
 
-/// Refuses an ambiguous text instead of guessing: the tool cannot know which occurrence is the
-/// span, that would take knowing the language, but it can count them and demand an @2.
+// Refuses an ambiguous text instead of guessing. Knowing which occurrence is the span would take
+// knowing the language, but counting them and demanding an @2 does not.
 fn find_text(
     id: &str,
     sources: &[&str],
@@ -436,10 +435,9 @@ mod tests {
 
     use super::*;
 
-    // One file holding every shape at once, so that what the single-shape tests below cannot see,
-    // the interactions between them, is covered by something a person can read whole. It is not
-    // a case and the corpus never touches it: a hand correction to a case is free to happen
-    // without breaking a test of this tool.
+    // One file holding every shape at once, which covers the interactions the single-shape tests
+    // below cannot see. It is not a case and the corpus never touches it, so correcting a case by
+    // hand cannot break a test of this tool.
     #[test]
     fn the_golden_fixture_is_painted_byte_for_byte_and_the_reader_accepts_what_came_out() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/proposer");

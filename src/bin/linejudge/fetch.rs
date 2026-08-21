@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use linejudge::adapter::{Acquisition, Adapter, is_the_declared_version};
-use linejudge::counters::Counters;
-use linejudge::fetched::{create_a_partial_dir_for, find_the_binary_of, finish_the_partial_dir};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+use crate::counters::Counters;
+use crate::fetched::{create_a_partial_dir_for, find_the_binary_of, finish_the_partial_dir};
 use crate::style;
 
 const CHECKSUM_WORDS: [&str; 2] = ["checksum", "sha256"];
@@ -17,9 +17,8 @@ const CRATES_IO: &str = "crates-io";
 const GITHUB_API: &str = "https://api.github.com/repos";
 const GITHUB_RELEASE_ASSET: &str = "github-release-asset";
 
-/// Downloads every counter that says where it comes from, at exactly the version it declares.
-/// Returns whether anything asked for could not be delivered: one counter failing never stops the
-/// others, so the answer is read at the end rather than at the first refusal.
+// Downloads every counter that says where it comes from, at exactly the version it declares. One
+// counter failing never stops the others, so whether anything went wrong is answered at the end.
 pub fn fetch_every_counter(
     out: &mut dyn Write,
     adapters: &[&Adapter],
@@ -54,9 +53,8 @@ pub fn fetch_every_counter(
     Ok(anything_failed)
 }
 
-/// A path in `counters.toml` beats a download on purpose, since it is somebody saying which binary
-/// they mean. Said here because otherwise a fetch looks like it changed what gets measured and it
-/// did not, which is a quiet way to spend an afternoon.
+// A path in `counters.toml` beats a download, since it is somebody saying which binary they mean.
+// Said out loud, or a fetch looks like it changed what gets measured when it did not.
 fn report_the_path_that_shadows(
     out: &mut dyn Write,
     counter: &str,
@@ -68,8 +66,7 @@ fn report_the_path_that_shadows(
             instead.display())))
 }
 
-/// Assembles the download beside where it will live, checks that what arrived says it is the
-/// version that was asked for, and only then puts it in place.
+// The download is assembled to one side, asked its version, and only then put in place.
 fn fetch_one_counter(
     out: &mut dyn Write,
     adapter: &Adapter,
@@ -101,9 +98,9 @@ fn fetch_one_counter(
     Ok(dir.join(format!("{counter}{EXE_SUFFIX}")))
 }
 
-/// crates.io holds source and never an executable, so this channel is a compile and it needs cargo
-/// on the machine. Cargo installs into `<root>/bin`, one level deeper than the lookup goes, so the
-/// binary is lifted out of there and the rest of what cargo wrote is left behind.
+// crates.io holds source and never an executable, so this channel is a compile and needs cargo on
+// the machine. Cargo installs into `<root>/bin`, one level deeper than the lookup goes, so the
+// binary is lifted out of there and the rest of what cargo wrote is left behind.
 fn build_from_crates_io(
     out: &mut dyn Write,
     counter: &str,
@@ -132,8 +129,8 @@ fn build_from_crates_io(
     Ok(binary)
 }
 
-/// The release is asked for by tag, the file for this machine is picked out of what it carries, and
-/// the checksums the release publishes beside it say whether the download arrived whole.
+// The release is asked for by tag, the file for this machine picked out of what it carries, and
+// the checksums published beside it say whether the download arrived whole.
 fn download_a_release_asset(
     out: &mut dyn Write,
     counter: &str,
@@ -171,10 +168,9 @@ fn download_a_release_asset(
     })
 }
 
-/// The name a release gives a file is kept as it is, since it is what the published checksums name
-/// it and what any message about it has to say. It comes off the network, so it is taken as a plain
-/// file name and nothing else: a name carrying a directory inside it would write outside the folder
-/// the download is being assembled in.
+// The name is kept as the release gives it, since that is what the published checksums name and
+// what any message has to say. It came off the network, so a name carrying a directory inside it
+// is refused: it would write outside the folder being assembled.
 fn name_the_file_of(asset: &Asset) -> Result<String, String> {
     let plain = Path::new(&asset.name).file_name().and_then(|name| name.to_str());
     match plain == Some(asset.name.as_str()) {
@@ -183,9 +179,8 @@ fn name_the_file_of(asset: &Asset) -> Result<String, String> {
     }
 }
 
-/// Every project names its published checksums differently, `checksums.txt` here and `SHA256SUMS`
-/// there, so the file is recognised by the word in it. A release that publishes none is downloaded
-/// without the check rather than refused.
+// Every project names this file differently, `checksums.txt` here and `SHA256SUMS` there, so it is
+// recognised by the word in it. A release that publishes none is downloaded without the check.
 fn find_the_checksums_among(assets: &[Asset]) -> Option<&Asset> {
     assets.iter().find(|asset| {
         let name = asset.name.to_lowercase();
@@ -193,8 +188,8 @@ fn find_the_checksums_among(assets: &[Asset]) -> Option<&Asset> {
     })
 }
 
-/// Every release has a tag and the shape of it is the project's own habit, `v3.7.0` here and
-/// `3.7.0` there, so both are asked for before giving up on the version.
+// The shape of a tag is the project's own habit, `v3.7.0` here and `3.7.0` there, so both are
+// asked for before giving up on the version.
 fn find_the_release_of(repository: &str, version: &str) -> Result<Release, String> {
     let mut refused = Vec::new();
     for tag in [format!("v{version}"), version.to_string()] {
@@ -208,8 +203,8 @@ fn find_the_release_of(repository: &str, version: &str) -> Result<Release, Strin
             Err(message) => refused.push(message),
         }
     }
-    // Both tag shapes fail the same way when the version is simply not there, and saying one 404
-    // twice reads as two different faults.
+    // Both tag shapes fail the same way when the version is not there, and one 404 said twice
+    // reads as two faults.
     refused.dedup();
     Err(format!(
         "{repository} has no release tagged v{version} or {version}: {}",
@@ -217,8 +212,8 @@ fn find_the_release_of(repository: &str, version: &str) -> Result<Release, Strin
     ))
 }
 
-/// A release carries one file per system and architecture, named however the project names them,
-/// so the file is chosen by the words in its name rather than by any agreed shape.
+// A release carries one file per system and architecture, named however the project likes, so the
+// right one is chosen by the words in its name and not by any agreed shape.
 fn find_the_asset_for_this_machine(assets: &[Asset]) -> Result<&Asset, String> {
     find_the_asset_for(assets, OS, ARCH)
 }
@@ -257,9 +252,9 @@ fn find_the_asset_for<'a>(assets: &'a [Asset], os: &str, arch: &str) -> Result<&
     }
 }
 
-/// A name with every separator made the same and a separator at each end, so that a word can be
-/// looked for whole. Looking for it as it stands is what mistakes `scc_Darwin_x86_64.tar.gz` for a
-/// Windows file, since `darwin` ends in `win`.
+// Every separator made the same, and one at each end, so a word can be looked for whole. Searching
+// the name as it stands takes `scc_Darwin_x86_64.tar.gz` for a Windows file, since `darwin` ends
+// in `win`.
 fn cut_into_words(name: &str) -> String {
     let mut cut = String::from("_");
     for letter in name.chars() {
@@ -272,7 +267,7 @@ fn cut_into_words(name: &str) -> String {
     cut
 }
 
-/// The published list is one line per file, the checksum first and the name after it.
+// The published list is one line per file, the checksum first and the name after it.
 fn find_the_checksum_of(asset: &str, published: &str) -> Option<String> {
     published.lines().find_map(|line| {
         let (checksum, named) = line.split_once(char::is_whitespace)?;
@@ -288,8 +283,7 @@ fn calculate_the_checksum_of(file: &Path) -> Result<String, String> {
     Ok(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-/// An archive holds the executable at its root or one directory down, depending on how the project
-/// builds it, so it is looked for rather than assumed.
+// An archive holds the executable at its root or one directory down, so it is looked for.
 fn find_the_file_named(named: &str, under: &Path) -> Option<PathBuf> {
     let here = under.join(named);
     if here.is_file() {
@@ -313,13 +307,12 @@ fn save_a_url(url: &str, into: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// The one place with a network, and it asks the machine rather than carrying a client of its own.
-/// curl ships with Windows and macOS and is on every ordinary Linux, and wget is what the smallest
-/// container images have instead.
-///
-/// **Only a curl that is not on the machine at all moves on to wget.** A curl that ran and was
-/// refused is the answer, and falling through would report a missing wget for what is really a
-/// plain 404, hiding the fault behind a program nobody needed.
+// The one place with a network, and it asks the machine rather than carrying a client of its own.
+// curl ships with Windows and macOS and is on every ordinary Linux; wget is what the smallest
+// container images have instead.
+//
+// Only a curl that is not on the machine moves on to wget. A curl that ran and was refused is the
+// answer: falling through would report a missing wget for what is really a plain 404.
 fn download_with_curl_or_wget(curl: &[&str], wget: &[&str]) -> Result<String, String> {
     let missing = match run_the_program("curl", curl) {
         Ok(printed) => return Ok(printed),
@@ -353,9 +346,8 @@ fn run_the_program(program: &str, args: &[&str]) -> Result<String, Refusal> {
     Ok(String::from_utf8_lossy(&finished.stdout).into_owned())
 }
 
-/// A program that is not on the machine and a program that ran and said no are different troubles:
-/// one is answered by installing something, and only one of them is worth trying another program
-/// for.
+// A program that is not installed and a program that ran and said no are different troubles, and
+// only the first is worth trying another program for.
 enum Refusal {
     Missing(String),
     Refused(String),
@@ -390,9 +382,8 @@ struct Asset {
 mod tests {
     use super::*;
 
-    // Every machine is checked from every machine, since the trap this guards against is a word
-    // read inside another word and it belongs to the names, not to whoever runs the test:
-    // "darwin" ends in "win", so a Windows run once picked the file for macOS.
+    // Every machine is checked from every machine: the trap is a word read inside another word,
+    // "darwin" ending in "win", and that belongs to the names rather than to whoever runs this.
     #[test]
     fn the_file_for_a_machine_is_picked_out_of_what_a_release_carries() {
         let assets = a_release();
@@ -482,8 +473,7 @@ AB12CD34  scc_Windows_x86_64.zip
         assert!(missing.is_none());
     }
 
-    // The two are told apart so that curl falling over a 404 is reported as the 404, instead of
-    // moving on to wget and reporting that wget is not installed.
+    // Told apart so that a curl 404 is reported as the 404, and not as a missing wget.
     #[test]
     fn a_program_this_machine_does_not_have_is_told_apart_from_one_that_ran_and_said_no() {
         match run_the_program("a-program-no-machine-has", &[]) {

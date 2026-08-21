@@ -1,7 +1,7 @@
 use linejudge::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
 
-/// What covers a stretch of a line, as the marks under it say. Both the terminal and the pages
-/// paint by this, so the alphabet is read in one place.
+// What covers a stretch of a line. The terminal and the pages both paint by this, so the marker
+// alphabet is read in one place.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Ink {
     Comment,
@@ -21,8 +21,8 @@ impl Ink {
     }
 }
 
-/// The line cut where what covers it changes, keeping every character of the source. It is walked
-/// by character rather than by byte, which it may be because a case input is ASCII.
+// Walked by character rather than by byte, which lines up with the markers only because a case
+// input is ASCII.
 pub fn cut_into_stretches(source: &str, marker: &str) -> Vec<(Ink, String)> {
     let marks: Vec<char> = marker.chars().collect();
     let mut stretches: Vec<(Ink, String)> = Vec::new();

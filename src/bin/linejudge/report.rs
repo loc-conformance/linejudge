@@ -14,8 +14,8 @@ const FILE_PLACEHOLDER: &str = "{file}";
 const ROW_WIDTH: usize = "recorded note".len() + 1;
 const REGION_ROW_WIDTH: usize = "recorded regions".len() + 1;
 
-/// One counter's one way of counting, as the report speaks about it: what ran, at which version,
-/// and whether a photograph of this build exists to hold the run against.
+// One counter's one way of counting, as the report speaks about it: what ran, at which version,
+// and whether a record of this build exists to hold the run against.
 pub struct OneRun<'a> {
     pub adapter: &'a Adapter,
     pub dialect: &'a Dialect,
@@ -24,9 +24,8 @@ pub struct OneRun<'a> {
     pub drift_is_judged: bool,
 }
 
-// Returns whether what it found should break the run: without a list of known failures that is
-// any failure the record does not already hold, and with one it is any failure the list does
-// not name.
+// Returns whether what it found should break the run: with a known-failures list, any failure the
+// list does not name; without one, any failure the record does not already hold.
 pub fn report_the_verdicts_of_one_dialect(
     out: &mut dyn Write,
     run: &OneRun,
@@ -40,8 +39,7 @@ pub fn report_the_verdicts_of_one_dialect(
             style::HEADING.paint(&format!("{}.{}", adapter.name_of_counter, dialect.name)),
             style::DETAIL.paint(&format!("[{}]", run.version)))?;
     writeln!(out, "  {}", format_summary(judged, drift_is_judged))?;
-    // Once, and never per finding: the command is the same for every case but the file, and the
-    // case is the one thing already named above every set of rows.
+    // Once, and never per finding: the command is the same for every case but the file.
     writeln!(out, "  {} {}", style::LABEL.paint("run"), style::DETAIL.paint(
             &adapter.format_command(dialect, run.binary, Path::new(FILE_PLACEHOLDER))))?;
 
@@ -148,8 +146,8 @@ pub fn report_entries_that_name_nothing(
     Ok(())
 }
 
-/// The record moves with the corpus, so an entry for a case that is neither judged nor disabled is
-/// a leftover from a rename or a removal, said out loud instead of silently never consulted.
+// An entry for a case that is neither judged nor disabled is left over from a rename or a removal,
+// and is said out loud rather than silently never consulted.
 pub fn report_recorded_answers_that_name_nothing(
     out: &mut dyn Write,
     record: &RecordedAnswers,
@@ -166,9 +164,8 @@ pub fn report_recorded_answers_that_name_nothing(
     Ok(())
 }
 
-/// The counts of one answer, the numbers apart from the buckets they are counts of. Where another
-/// answer is given to hold them against, every number that differs from it is painted as the
-/// difference it is, so that two rows of the same shape can be read by their colours alone.
+// Where another answer is given to hold these against, every number that differs is painted, so
+// two rows of the same shape can be read by their colours alone.
 pub fn paint_counts(counts: &Counts, against: Option<&Counts>) -> String {
     let mut named = vec![paint_one_count(counts.lines, "lines",
             against.is_some_and(|other| other.lines != counts.lines))];
@@ -189,9 +186,8 @@ fn write_the_name_of(
     writeln!(out, "  {}   {name}", ink.paint(what))
 }
 
-/// A finding with rows under it opens with a blank line, so that it does not run into the one
-/// before it. A finding that is no more than its name does not, so that a run of them reads as
-/// the list it is.
+// A finding with rows under it opens with a blank line so it does not run into the one above. A
+// finding that is only its name does not, so a run of them reads as the list it is.
 fn write_the_name_above_the_rows(
     out: &mut dyn Write,
     ink: &style::Style,
@@ -274,8 +270,7 @@ fn format_summary(judged: &[Judged], drift_is_judged: bool) -> String {
     let fails = measured(&|m| m.conformance == Conformance::Fails);
     let known = measured(&|m| m.is_a_known_failure());
     let unclaimed = measured(&|m| m.conformance == Conformance::Unclaimed && m.drift != Some(Drift::NoLongerClaimed));
-    // A count of none says nothing and is left to fade, so that what is there stands out from what
-    // is not.
+    // A count of none is left to fade, so what is there stands out from what is not.
     let painted = |count: usize, what: &str, ink: style::Style| {
         let text = format!("{count} {what}");
         if count == 0 { style::DETAIL.paint(&text).to_string() } else { ink.paint(&text).to_string() }

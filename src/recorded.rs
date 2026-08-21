@@ -1,3 +1,5 @@
+//! What a counter printed the last time it was measured, kept so that a change can be noticed.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
@@ -9,23 +11,24 @@ use crate::adapter::UNKNOWN_VERSION;
 use crate::answer::{Answer, Counts, RegionCounts};
 use crate::dialects::{Dialects, check_buckets};
 
+/// The directory the records are read from, one `<counter>.toml` inside it per counter.
 pub const RECORDED_DIR: &str = "recorded";
 const RECORDED_EXTENSION: &str = "toml";
 
-/// The photograph of one counter: what it printed for each case on the day it was measured, at the
-/// version written at the top. A counter this suite holds no such file for is measured all the
-/// same; the file only adds drift, the question of whether the counter still does what it did.
+/// What one counter printed for each case on the day it was measured, at the version written at
+/// the top of the file. A counter with no such record is measured all the same: the record adds
+/// only the question of whether the counter still answers the way it did.
 pub struct RecordedAnswers {
     pub counter: String,
+    /// The version line the measured binary printed, kept whole.
     pub version: String,
     answers: BTreeMap<(String, String), RecordedAnswer>,
     exceptions: BTreeMap<(String, String), Exception>,
 }
 
 impl RecordedAnswers {
-    /// Layered like the adapters and the dialects: the last directory holding a file for this
-    /// counter is the one read, and a counter no directory names has no record, which is the
-    /// ordinary state of anybody's tool but the ones measured here, and not an error.
+    /// Layered like the adapters: the last directory holding a file for this counter is the one
+    /// read. No record at all is the ordinary state of anybody's tool, and not an error.
     pub fn read(
         dirs: &[PathBuf],
         counter: &str,
@@ -107,10 +110,14 @@ impl RecordedAnswers {
         Ok(Some(RecordedAnswers { counter: raw.counter, version: raw.version, answers, exceptions }))
     }
 
+    /// What the counter printed for this case in this way of counting, and `None` where the record
+    /// says nothing about it.
     pub fn find(&self, case: &str, dialect: &str) -> Option<&RecordedAnswer> {
         self.answers.get(&(case.to_string(), dialect.to_string()))
     }
 
+    /// The exception declared for this case in this way of counting, and `None` where there is
+    /// none, which is nearly always.
     pub fn find_exception(&self, case: &str, dialect: &str) -> Option<&Exception> {
         self.exceptions.get(&(case.to_string(), dialect.to_string()))
     }
@@ -125,12 +132,15 @@ impl RecordedAnswers {
     }
 }
 
-/// What one counter printed for one case, in one of its ways of counting. `counted` is `None`
-/// where it claimed no such file. The flag says out loud whether what it printed differs from
-/// what its own rules ask for, so a flag the numbers contradict is refused instead of read.
+/// One entry of that record: what the counter printed for one case in one way of counting.
 pub struct RecordedAnswer {
+    /// What it printed, and `None` where it said there is no such file.
     pub counted: Option<Answer>,
+    /// Whether what it printed differs from what its own rules ask for. Written out rather than
+    /// worked out, so that a flag the numbers contradict is refused instead of read.
     pub is_known_failure: bool,
+    /// A sentence somebody wrote about this answer, kept exactly as long as the answer it was
+    /// written about and dropped the moment that answer moves.
     pub note: Option<String>,
 }
 
@@ -175,12 +185,13 @@ impl RecordedAnswer {
     }
 }
 
-/// A (case, way of counting) whose deliberate behavior no rule over spans can express. It replaces
-/// the answer the rules would derive, the case then passes and is counted apart, and the note is
-/// mandatory: an exception is a claim about the tool's own intent, and a claim with no reason is
-/// worth nothing.
+/// A case whose deliberate behavior in one way of counting no rule over marked spans can express.
+/// It stands in for the answer the rules would derive, so the case passes and is counted apart.
 pub struct Exception {
+    /// What the counter is held to here instead.
     pub expected: Answer,
+    /// Why, and it cannot be left out: an exception claims something about the tool's own intent,
+    /// and such a claim with no reason behind it is worth nothing.
     pub note: String,
 }
 
@@ -201,8 +212,8 @@ impl Exception {
     }
 }
 
-/// Drift is only judged between two runs of the same build, and an unknown version on either side
-/// is not the same build as anything, itself included.
+/// Whether the record and the running binary are the same build. An unknown version on either
+/// side is the same build as nothing, itself included.
 pub fn is_same_build(recorded: &str, running: &str) -> bool {
     recorded != UNKNOWN_VERSION && running != UNKNOWN_VERSION && recorded == running
 }
@@ -323,10 +334,8 @@ note = """
 the line comment is swallowed by the block above it"""
 "#;
 
-    // The roster is the three counters this suite itself declares, and completeness of their
-    // records is checked here rather than at run time, since for anybody else's counter a missing
-    // record is the ordinary state. The flags are re-checked at run time all the same, because a
-    // dialect rule can change after this test last ran on the machine that edited it.
+    // Completeness is demanded of this suite's own three counters and never at run time, where a
+    // missing record is the ordinary state of anybody else's tool.
     #[test]
     fn every_roster_counter_records_every_case_and_nothing_contradicts_the_rules() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -373,9 +382,8 @@ the line comment is swallowed by the block above it"""
         assert!(wrong.is_empty(), "{}", wrong.join("\n"));
     }
 
-    // A record holds the answers of one build, and the acquisition block is the build a fetch will
-    // download. Letting the two drift apart would publish numbers measured at a version nobody ever
-    // recorded, so raising one without the other fails here.
+    // Raising the version a fetch downloads without re-measuring would publish numbers taken from
+    // a build nobody ever recorded.
     #[test]
     fn a_counter_is_downloaded_at_the_version_its_answers_were_recorded_from() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));

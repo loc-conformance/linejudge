@@ -1,3 +1,5 @@
+//! The questions two counters are allowed to answer differently.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
@@ -5,23 +7,28 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-pub const READINGS_FILE: &str = "readings.toml";
+pub(crate) const READINGS_FILE: &str = "readings.toml";
 
-/// Every reading a truth may mark as optional, as the corpus's own file defines them: what each
-/// one is, in a sentence a refusal can quote, and the case that witnesses it. A corpus without
-/// the file defines no reading, and every truth that marks one is then refused.
+/// Every reading a truth may mark as optional, as the corpus's own file defines them. A reading is
+/// a question two counters may fairly answer differently, whether a Rust doc comment is its own
+/// language of Markdown being one.
 pub struct Readings {
     readings: BTreeMap<String, Reading>,
 }
 
+/// One such question.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Reading {
+    /// What the question is, written so that a refusal can quote it at whoever hit it.
     pub sentence: String,
+    /// The case that shows the question being asked, named as the corpus names it.
     pub witness: String,
 }
 
 impl Readings {
+    /// Reads `readings.toml` from a corpus directory. No such file is no readings, which is not an
+    /// error: it is what any corpus that has never needed one looks like.
     pub fn read(dir: &Path) -> Result<Readings, String> {
         let path = dir.join(READINGS_FILE);
         let text = match fs::read_to_string(&path) {
@@ -47,17 +54,19 @@ impl Readings {
         Ok(Readings { readings })
     }
 
+    /// The reading of that name, and `None` where this corpus defines none.
     pub fn find(&self, name: &str) -> Option<&Reading> {
         self.readings.get(name)
     }
 
+    /// Every reading by name, in alphabetical order.
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Reading)> {
         self.readings.iter()
     }
 }
 
 #[cfg(test)]
-pub fn read_the_shipped_readings() -> Readings {
+pub(crate) fn read_the_shipped_readings() -> Readings {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
     Readings::read(&dir).unwrap_or_else(|message| panic!("{message}"))
 }

@@ -6,7 +6,7 @@ use crate::render::{
     render_the_mark_of_github, wrap_the_page,
 };
 
-/// A tool's page sits one directory under the root of the site.
+// A tool's page sits one directory under the root of the site.
 const UP: &str = "../";
 const GITHUB_HOST: &str = "github.com";
 
@@ -32,8 +32,8 @@ pub fn render_one_tool(detail: &ToolDetail, sweep: &Sweep) -> String {
     wrap_the_page(&format!("{} · LineJudge", detail.name), body, UP)
 }
 
-/// The counter's own home, with GitHub's mark where that is where it lives and the plain host
-/// where it is somewhere else, since a mark that is not the host's says nothing.
+// GitHub's mark where the counter lives on GitHub, and the plain host name where it does not,
+// since a mark that is not the host's says nothing.
 fn render_the_link_to(home: &str) -> Markup {
     let host = home
         .split_once("://")
@@ -50,9 +50,9 @@ fn render_the_link_to(home: &str) -> Markup {
     }
 }
 
-/// Every case this counter does not simply agree on, which is the list its own maintainer works
-/// through. A case it broke on or does not support is here too: neither is a failure, and both are
-/// things somebody would want to see.
+// Every case this counter does not simply agree on, which is the list its maintainer works
+// through. A case it broke on or does not claim is here too: neither is a failure, and somebody
+// would want to see both.
 fn render_the_worklist_of(detail: &ToolDetail, sweep: &Sweep) -> Markup {
     let Some(counter) = sweep.counters.iter().find(|one| one.name == detail.name) else {
         return html! {};

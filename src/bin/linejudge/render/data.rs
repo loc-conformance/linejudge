@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::marks::Ink;
 
-/// What one measurement of the whole roster holds, in the shape it is published: the pages are
-/// rendered from this and `data.json` is this, so a field here is a promise to whoever reads it
-/// and not an implementation detail. Nothing of the library reaches the page except through here.
+// One measurement of the whole roster, in the shape it is published. The pages are rendered from
+// this and `data.json` is this, so a field here is a promise to whoever reads that file. Nothing
+// of the library reaches a page except through here.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Sweep {
@@ -27,7 +27,7 @@ pub struct Group {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Case {
     pub name: String,
-    /// Empty for a disabled case, whose files are never read.
+    // Empty for a disabled case, whose files are never read.
     pub trap: String,
     pub disabled: bool,
 }
@@ -52,19 +52,18 @@ pub struct Dialect {
 pub struct Answer {
     pub case: String,
     pub verdict: Verdict,
-    /// What the counter's own rules ask for. `None` only where it broke, since the run that would
-    /// have carried the derivation broke with it.
+    // What the counter's own rules ask for. `None` only where it broke, taking the derivation
+    // with it.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub wants: Option<Counts>,
-    /// What it answered. `None` where it claims no such file, or broke.
+    // What it answered. `None` where it claims no such file, or broke.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub answered: Option<Counts>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub wants_regions: Vec<Region>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub answered_regions: Vec<Region>,
-    /// The recorded note, carried only while the answer it was written about is the answer given,
-    /// since the sentence describes that answer and no other.
+    // The recorded note, carried only while the answer it was written about is the answer given.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub note: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -83,17 +82,17 @@ pub enum Verdict {
     Broke,
 }
 
-/// One case as its own page shows it, which is everything the measurement does not carry: the file
-/// itself, the spans marked in it, and how each way of counting reads every line. It is not part of
-/// the published JSON, since that document is what the tools answered and not a copy of the corpus.
+// Everything a case's own page shows that the measurement does not carry: the file itself, the
+// spans marked in it, and how each way of counting reads every line. Deliberately outside the
+// published JSON, which holds what the tools answered and not a copy of the corpus.
 #[derive(Debug, PartialEq)]
 pub struct CaseDetail {
     pub name: String,
     pub group: String,
     pub trap: String,
     pub file: String,
-    /// Every way of counting the page speaks about, as `counter.dialect`, in the order the
-    /// scoreboard shows them, and the order every line's readings are in.
+    // Every way of counting the page speaks about, as `counter.dialect`, in the order the
+    // scoreboard shows them, which is the order every line's readings are in.
     pub ways: Vec<String>,
     pub lines: Vec<Line>,
 }
@@ -104,15 +103,15 @@ pub struct Line {
     pub counted: Vec<Counted>,
 }
 
-/// A stretch of one line and what covers it, so the page can paint the file without knowing what
-/// a marker looks like.
+// A stretch of one line and what covers it, so a page can paint the file without knowing what a
+// marker looks like.
 #[derive(Debug, PartialEq)]
 pub struct Piece {
     pub ink: Ink,
     pub text: String,
 }
 
-/// Where one way of counting puts one line, and which of its rules put it there.
+// Where one way of counting puts one line, and which of its rules put it there.
 #[derive(Debug, PartialEq)]
 pub struct Counted {
     pub bucket: String,
@@ -120,15 +119,15 @@ pub struct Counted {
     pub region: Option<String>,
 }
 
-/// One counter as its own page shows it: where it comes from and what its own rules say, which is
-/// the half of the measurement that has nothing to do with any case.
+// One counter as its own page shows it: the half of the measurement that has nothing to do with
+// any case.
 #[derive(Debug, PartialEq)]
 pub struct ToolDetail {
     pub name: String,
     pub version: String,
-    /// Where the counter itself lives, as its adapter declares it, and `None` where it does not.
+    // `None` where the adapter does not say.
     pub repository: Option<String>,
-    /// Where a build of it is downloaded from, and `None` for a counter that cannot be fetched.
+    // `None` for a counter that cannot be fetched.
     pub channel: Option<String>,
     pub dialects: Vec<DialectDetail>,
 }
@@ -136,21 +135,20 @@ pub struct ToolDetail {
 #[derive(Debug, PartialEq)]
 pub struct DialectDetail {
     pub name: String,
-    /// What is put on the counter's command line to ask for this way of counting, which is the
-    /// only thing that says what its name means. Empty for a counter that has just the one.
+    // What is put on the counter's command line to ask for this way of counting, which is the only
+    // thing that says what the name of it means. Empty for a counter that has just the one.
     pub flags: Vec<String>,
     pub rules: Vec<RuleDetail>,
 }
 
-/// One rule of a dialect, with its conditions already written out in words, since the page is read
-/// by somebody who will never open the file they are parsed from.
+// One rule of a dialect, its conditions already written out in words for somebody who will never
+// open the file they came from.
 #[derive(Debug, PartialEq)]
 pub struct RuleDetail {
     pub name: String,
     pub bucket: String,
     pub when: Vec<String>,
 }
-
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Counts {

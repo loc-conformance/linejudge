@@ -7,22 +7,19 @@ use crate::dialects::check_buckets;
 
 const TOKEI_TOTAL: &str = "Total";
 
-/// Supported counters can declare their custom output format here and have a transformer function
-/// that reads their custom format and translates it to our expected format,
-/// if the delcarative 'locator' format cannot describe how we can find and count their fields
+// A reader written here, for a counter whose output the `read` block of an adapter cannot
+// describe. Anything describable declares a `read` block instead and never lands in this list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 pub enum OutputFormat {
     #[serde(rename = "tokei-json")]
     TokeiJson,
-    // The shape linejudge reads without translating anything. A counter can print this itself and
-    // needs no reader of its own in here, whatever its buckets are called and however many it has.
+    // Already the shape this suite compares, whatever a counter's buckets are called.
     #[serde(rename = "linejudge-json")]
     LinejudgeJson,
 }
 
-/// `buckets` are the names this way of counting gives its buckets, and every count read here comes
-/// back under one of them. `None` is a counter that does not claim the file, which is not the same
-/// answer as zeroes.
+// Every count read here comes back under one of `buckets`. `None` is a counter that does not claim
+// the file, which is not the same answer as zeroes.
 pub fn read_output(
     output: OutputFormat,
     buckets: &[String],
@@ -34,15 +31,13 @@ pub fn read_output(
     }
 }
 
-// A counter is free to print a number for every line it claims to have seen; it is not free to
-// claim more lines than a file can have, and a wrapped sum presented as its answer would be worse
-// than saying so.
+// A count too large for the file is said out loud rather than wrapped around and presented as an
+// answer.
 pub(crate) fn count_lines(counted: u64, whose: &str) -> Result<u32, String> {
     u32::try_from(counted).map_err(|_| format!("{whose} was counted as {counted} lines"))
 }
 
-// The format an adapter outside this repository prints, already in the shape the checker wants,
-// with the buckets carrying the dialect's own names. `null` is a file the counter does not claim.
+// `null` is a file the counter does not claim.
 fn read_linejudge(buckets: &[String], text: &str) -> Result<Option<Answer>, String> {
     let raw: Option<LinejudgeAnswer> = parse(text)?;
     let Some(raw) = raw else { return Ok(None) };
@@ -210,9 +205,8 @@ mod tests {
         assert_eq!(as_numbers_of_region(&tokei.regions[1], "blanks"), (2, 2, 0, 0));
     }
 
-    // Captured from a readme whose html fence holds a script: Markdown 6, HTML 4, JavaScript 2.
-    // The JavaScript sits two levels down, inside the HTML child's own blobs, which is where a
-    // reader that stops at the first level silently loses it.
+    // A readme whose html fence holds a script. The JavaScript sits two levels down, where a
+    // reader that stops at the first level loses it without a word.
     #[test]
     fn a_language_two_levels_down_is_read_out_of_the_blobs_and_not_lost() {
         let tokei = measure(OutputFormat::TokeiJson, &WITH_BLANKS, TOKEI_DEEP);
@@ -241,9 +235,8 @@ mod tests {
         assert!(nothing.unwrap().is_none());
     }
 
-    // A counter that sorts its lines into four buckets is read like any other, since every count is
-    // taken by its name. What decides whether it can be read is what its own document holds, and a
-    // bucket that is not in there is said out loud beside what is.
+    // Every count is taken by its name, so four buckets read like three, and a bucket the counter
+    // never printed is named beside the ones it did.
     #[test]
     fn a_bucket_a_counter_never_printed_is_refused_beside_what_it_did_print() {
         let four = ["code", "comments", "documentation", "blanks"];
@@ -257,8 +250,6 @@ mod tests {
         assert!(refused.contains("blanks, code, comments"), "{refused}");
     }
 
-    // The guard the old shape could not have: it paired three numbers with three names in the order
-    // they were listed, so this test would have passed with every count under the wrong name.
     #[test]
     fn the_order_a_dialect_lists_its_buckets_in_changes_nothing() {
         let listed = measure(OutputFormat::TokeiJson, &["code", "comments", "blanks"], TOKEI);

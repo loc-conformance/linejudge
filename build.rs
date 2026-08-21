@@ -28,7 +28,7 @@ fn main() {
     }
 
     let generated = format!(
-        "pub const HASH: &str = \"{hash:016x}\";\n\nstatic FILES: &[(&str, &str)] = &[\n{table}];\n"
+        "const HASH: &str = \"{hash:016x}\";\n\nstatic FILES: &[(&str, &str)] = &[\n{table}];\n"
     );
     let out = PathBuf::from(env::var("OUT_DIR").expect("cargo names the output directory"));
     fs::write(out.join("shipped.rs"), generated).expect("the generated table is written");

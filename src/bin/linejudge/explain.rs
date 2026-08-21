@@ -16,8 +16,8 @@ use crate::style;
 const BY_ITS_RULES: &str = "by its rules";
 const IN_ITS_REGIONS: &str = "in its regions";
 
-/// A whole name wins outright, and a fragment is enough where it names exactly one case; what a
-/// fragment matching several gets is their list, never a guess among them.
+// A whole name wins outright, and a fragment is enough where it names exactly one case. A fragment
+// matching several gets their list, never a guess among them.
 pub fn find_case<'c>(corpus: &'c Corpus, name: &str) -> Result<&'c Case, String> {
     if let Some(case) = corpus.cases.iter().find(|case| case.name == name) {
         return Ok(case);
@@ -37,9 +37,9 @@ pub fn find_case<'c>(corpus: &'c Corpus, name: &str) -> Result<&'c Case, String>
     }
 }
 
-/// One block per way this counter counts: every line of the case beside its marked spans, the
-/// rule that took it and the predicates that hold on it, and beside those whatever the counter
-/// itself can say about the file line by line.
+// One block per way this counter counts: every line of the case beside its marked spans, the rule
+// that took it and the predicates that hold on it, and whatever the counter itself says about the
+// file line by line.
 pub fn explain_one_counter(
     out: &mut dyn Write,
     adapter: &Adapter,
@@ -83,7 +83,7 @@ pub fn explain_one_counter(
     Ok(())
 }
 
-/// One counter's one way of counting, over one case, as the block being written speaks about it.
+// One counter's one way of counting, over one case.
 struct OneWay<'a> {
     counter: &'a str,
     way: &'a str,
@@ -96,18 +96,18 @@ impl OneWay<'_> {
     }
 }
 
-/// What the counter answers when it is simply run, which is the answer `check` judges. Kept apart
-/// from its line by line analysis, since a counter that has none still answers.
+// What the counter answers when it is simply run, which is the answer `check` judges. Kept apart
+// from its line by line analysis, since a counter that has none still answers.
 enum ItsAnswer {
     NotMeasured,
     Broke(String),
-    /// It says there is no such file, which is an answer of its own and never a failure.
+    // It says there is no such file, which is an answer of its own and never a failure.
     Unclaimed,
     Counted(Answer),
 }
 
-/// What the counter itself had to say about the file, which is nothing at all for one that
-/// declares no per-line command, and text for a person where it declares no format to read.
+// What the counter itself said about the file: nothing for one that declares no per-line command,
+// and text for a person where it declares no format to read.
 enum TheirAnswer {
     NoCommand,
     NoBinary,
@@ -170,9 +170,8 @@ fn read_what_the_counter_says(
     }
 }
 
-/// What the rules ask, what the counter answered, and whether those two agree. The answer is the
-/// plain run, the one `check` judges, so a counter with nothing to say line by line is still held
-/// to its own rules here instead of showing a derivation and no verdict.
+// The answer shown is the plain run, the one `check` judges, so a counter with nothing to say line
+// by line is still held to its own rules here instead of showing a derivation and no verdict.
 fn write_the_header(
     out: &mut dyn Write,
     block: &OneWay,
@@ -247,9 +246,8 @@ fn write_a_row(out: &mut dyn Write, width: usize, label: &str, text: &str) -> io
     writeln!(out, "  {}  {text}", style::LABEL.paint(&format!("{label:<width$}")))
 }
 
-/// One line per stretch of another language the two sides disagree about, and none for the ones
-/// they agree on. Two answers can name the same languages over the same lines and still differ,
-/// by putting those lines in different buckets, so the counts are what is shown and not the names.
+// Two answers can name the same languages over the same lines and still differ, by binning those
+// lines differently, so what is shown is the counts and not the names.
 fn write_the_regions_that_differ(
     out: &mut dyn Write,
     width: usize,
@@ -293,9 +291,8 @@ fn count_the_lines_of(region: &RegionCounts) -> Counts {
     Counts { lines: region.lines, buckets: region.buckets.clone() }
 }
 
-/// Every line of the case: the source painted by the spans marked under it, those markers, the
-/// bucket the rules put the line in, and where the counter reads that line differently, what it
-/// says instead.
+// Every line of the case: the source painted by its marked spans, the markers themselves, the
+// bucket the rules put the line in, and what the counter says instead where it differs.
 fn write_every_line(
     out: &mut dyn Write,
     block: &OneWay,
@@ -334,9 +331,9 @@ fn write_every_line(
     Ok(())
 }
 
-/// Shows the lines holding the declared text, each from that text to its end; the lines are
-/// chosen and cut, never read. Where nothing holds it, everything is shown and this says so,
-/// so a tool that changed what it prints falls back to the whole of it instead of to silence.
+// Shows the lines holding the declared text, each from that text to its end. Lines are chosen and
+// cut, never read. Where nothing holds it, everything is shown and this says so, so a tool that
+// changed what it prints falls back to the whole of it instead of to silence.
 fn write_what_it_printed(
     out: &mut dyn Write,
     printed: &str,
@@ -452,8 +449,7 @@ mod tests {
         assert!(text.contains("mezura could not be run: exit status 101"), "{text}");
     }
 
-    // The counts can agree while the split into embedded languages does not, and a mark with no
-    // reason under it is what that would otherwise look like.
+    // The counts can agree while the split into embedded languages does not.
     #[test]
     fn an_answer_whose_regions_alone_differ_is_marked_and_says_which_ones() {
         colored::control::set_override(false);

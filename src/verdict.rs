@@ -1,3 +1,5 @@
+//! Runs a counter over the corpus and says, per case, whether it did what its rules say.
+
 use std::path::Path;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -13,33 +15,39 @@ use crate::recorded::{Exception, RecordedAnswer, RecordedAnswers, is_same_build}
 const AT_ONCE: usize = 8;
 
 /// Whether a counter does what its own rules say. This is the whole of what can be asked of a
-/// counter nobody here has photographed, and it never needs a recorded answer.
+/// counter nothing was ever recorded about, and it needs no record at all.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Conformance {
+    /// It answered exactly what its rules ask for.
     Agrees,
+    /// It answered something else.
     Fails,
     /// The counter says there is no such file, which is an answer of its own and not a failure.
     Unclaimed,
 }
 
-/// Whether a counter still does what it did when it was photographed. Only asked where a recorded
-/// answer exists and the running build is the recorded one.
+/// Whether a counter still answers the way it did when it was last recorded. Only asked where a
+/// record exists and the running build is the recorded one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Drift {
+    /// The same answer as the record holds.
     Same,
+    /// Different numbers.
     Changed,
+    /// It used to claim the file and now says there is no such file.
     NoLongerClaimed,
+    /// It used to say there is no such file and now claims it.
     NowClaimed,
 }
 
-/// One counter's answer to one case. A counter that breaks on a case has answered it: the trouble
-/// is this case's outcome, carrying the message, and every other case is measured anyway.
+/// One counter's answer to one case.
 pub struct Judged<'a> {
     pub case: &'a Case,
     pub outcome: Outcome<'a>,
 }
 
 impl Judged<'_> {
+    /// Whether this alone should fail the build of whoever ran it.
     pub fn breaks_the_run(&self) -> bool {
         match &self.outcome {
             Outcome::Broke(_) => true,
@@ -48,29 +56,34 @@ impl Judged<'_> {
     }
 }
 
+/// What came of asking one counter about one case. Breaking is an outcome like any other, and the
+/// rest of the corpus is measured anyway.
 pub enum Outcome<'a> {
     /// A non-zero exit, a panic, or output that could not be read, with what is known about why.
     Broke(String),
+    /// It answered, and the answer was judged.
     Measured(Measured<'a>),
 }
 
+/// One judged answer.
 pub struct Measured<'a> {
-    /// What the counter ought to answer by its own rules, or by its exception where one is
-    /// declared.
+    /// What it ought to answer by its own rules, or by its exception where one is declared.
     pub real: Answer,
     /// What it answered now. `None` is a counter that claims no such file.
     pub live: Option<Answer>,
+    /// What it answered when it was last recorded, and `None` where there is no record.
     pub record: Option<&'a RecordedAnswer>,
+    /// The exception this case was judged through, and `None` for the ordinary case.
     pub exception: Option<&'a Exception>,
     pub conformance: Conformance,
-    /// `None` where there is no photograph to hold the run against, or the build differs from the
-    /// recorded one.
+    /// Whether it still answers the way it did. `None` where there is no record to hold the run
+    /// against, or the build being run is not the recorded one.
     pub drift: Option<Drift>,
 }
 
 impl Measured<'_> {
-    /// A failure that fails exactly as the photograph says is known, and known is the one failure
-    /// that does not break the run.
+    /// A failure that fails exactly as the record says, which is the one failure that does not
+    /// break the run.
     pub fn is_a_known_failure(&self) -> bool {
         self.conformance == Conformance::Fails && self.drift == Some(Drift::Same)
     }
@@ -82,18 +95,20 @@ impl Measured<'_> {
             || matches!(self.drift, Some(Drift::NoLongerClaimed | Drift::NowClaimed))
     }
 
+    /// A failure that is not a known one.
     pub fn breaks_the_run(&self) -> bool {
         self.is_a_failure() && !self.is_a_known_failure()
     }
 
+    /// Whether it agrees only because an exception was declared for this case.
     pub fn agrees_through_its_exception(&self) -> bool {
         self.exception.is_some() && self.conformance == Conformance::Agrees
     }
 }
 
-/// Runs the counter once per case, so this is as slow as the counter is, times the corpus.
-/// `Err` is never the counter's doing: it is this suite's own data refusing to judge, a case no
-/// rule can place or a recorded flag its own numbers contradict.
+/// Runs the counter once per case and judges each answer. `Err` is never the counter's doing: it
+/// is this suite's own data refusing to judge, a case no rule can place or a recorded flag its own
+/// numbers contradict.
 pub fn measure_and_judge_every_case<'a>(
     adapter: &Adapter,
     dialect: &Dialect,
@@ -177,9 +192,8 @@ pub fn measure_and_judge_every_case<'a>(
     Ok(judged)
 }
 
-/// Runs the counter over every file at once, a few at a time, and hands the answers back in the
-/// order the files were given. Nearly all of the time is spent waiting for somebody else's program
-/// to start and finish, so the number running together is well above the number of cores.
+// Answers come back in the order the files were given. Nearly all the time goes on waiting for
+// somebody else's program to start and finish, so more run at once than the machine has cores.
 fn measure_every_file(
     adapter: &Adapter,
     dialect: &Dialect,
@@ -206,6 +220,8 @@ fn measure_every_file(
     answers.into_iter().map(|(_, answered)| answered).collect()
 }
 
+/// Holds one answer against what the rules ask for. `live` is `None` for a counter that says there
+/// is no such file.
 pub fn judge_conformance(real: &Answer, live: Option<&Answer>) -> Conformance {
     match live {
         None => Conformance::Unclaimed,
@@ -214,7 +230,7 @@ pub fn judge_conformance(real: &Answer, live: Option<&Answer>) -> Conformance {
     }
 }
 
-pub fn judge_drift(record: &RecordedAnswer, live: Option<&Answer>) -> Drift {
+pub(crate) fn judge_drift(record: &RecordedAnswer, live: Option<&Answer>) -> Drift {
     match (&record.counted, live) {
         (None, None) => Drift::Same,
         (None, Some(_)) => Drift::NowClaimed,
@@ -288,8 +304,7 @@ mod tests {
         assert!(!quiet.is_a_failure());
     }
 
-    // The contradiction is found while the answers are prepared, before any binary runs, which is
-    // why a binary that does not exist can stand in for the counter here.
+    // Nothing is run, so a path to a binary that does not exist stands in for the counter.
     #[test]
     fn a_stale_failure_flag_is_refused_before_anything_is_run() {
         let dialects = read_the_shipped_dialects();
@@ -317,8 +332,8 @@ mod tests {
         assert!(faults[0].contains("does not say is-known-failure"), "{faults:?}");
     }
 
-    // The two lines derive as one comment and one code line, so a record saying the same numbers
-    // with no flag is consistent, and nothing here needs the counter to exist until it is run.
+    // The two lines derive as one comment and one code line, so a record holding those numbers
+    // with no failure flag is a consistent one.
     fn judge_a_built_corpus(
         root: &std::path::Path,
         record_text: &str,

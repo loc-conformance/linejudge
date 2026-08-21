@@ -15,9 +15,9 @@ use crate::style;
 const GROUP_SIZE: u32 = 1000;
 const SECONDS_PER_DAY: u64 = 86_400;
 
-/// Measures the whole roster and answers with what it found, never with an exit code: a failure is
-/// a finding the sweep carries, and only this suite's own data refusing to judge is an error. A
-/// counter with no binary is named on stderr and left out.
+// Answers with what it found and never with an exit code: a failure is a finding the sweep
+// carries, and only this suite's own data refusing to judge is an error. A counter with no binary
+// is named on stderr and left out.
 pub fn measure_every_counter(
     adapters: &[Adapter],
     corpus: &Corpus,
@@ -73,9 +73,9 @@ pub fn measure_every_counter(
     })
 }
 
-/// Reads every case the way the pages under the scoreboard show it, which needs no binary: the
-/// file, its marked spans, and each way of counting's own reading of every line. The ways are the
-/// ones the sweep measured, so a counter left out for want of a binary is left out here too.
+// Needs no binary: the file, its marked spans, and how each way of counting reads every line. The
+// ways are the ones the sweep measured, so a counter left out for want of a binary is left out
+// here too.
 pub fn read_every_case(
     sweep: &data::Sweep,
     corpus: &Corpus,
@@ -135,8 +135,8 @@ pub fn read_every_case(
     Ok(detailed)
 }
 
-/// Reads what every counter's own page shows: where it comes from, and for each of its ways of
-/// counting the rules it is judged by, written out in words.
+// What a counter's own page shows: where it comes from, and the rules each of its ways of counting
+// is judged by, written out in words.
 pub fn read_every_tool(
     sweep: &data::Sweep,
     adapters: &[Adapter],
@@ -180,16 +180,15 @@ pub fn read_every_tool(
     Ok(detailed)
 }
 
-/// What one condition of a rule asks, in words. The dialect files write these as `in-comment` and
-/// `!in-string`, which say enough to whoever writes one and nothing to whoever opens the page.
+// What one condition asks, in words. The dialect files write these as `in-comment` and
+// `!in-string`, which say enough to whoever writes one and nothing to whoever opens the page.
 fn say_what_a_condition_asks(condition: &Condition) -> String {
     let (predicate, holds) = match condition {
         Condition::Holds(predicate) => (predicate, true),
         Condition::Fails(predicate) => (predicate, false),
     };
-    // These ask about the line as a whole and are answered by any one character of it, so a line
-    // can be inside a comment and inside a string at once. Whitespace outside a string or a
-    // comment is not residue, and a word is one letter or one digit.
+    // These ask about the line as a whole and any one character answers them, so a line can be
+    // inside a comment and inside a string at once.
     let (yes, no) = match predicate {
         Predicate::Blank => (
             "the line is nothing but spaces and tabs",
@@ -272,8 +271,8 @@ fn build_one_answer(judged: &Judged, command: String) -> data::Answer {
     }
 }
 
-/// The command as anybody can retype it: the counter by its bare name and the case by its path
-/// inside the corpus, never the local paths this run happened to resolve.
+// The command as anybody can retype it: the counter by its bare name and the case by its path
+// inside the corpus, never the local paths this run happened to resolve.
 fn format_the_command_for(
     adapter: &Adapter,
     dialect: &Dialect,
@@ -433,8 +432,8 @@ mod tests {
 
     const TRUTH: &str = "/* a block\nCCcccccccc\n*/ int x = 1;\nUU ... . . ..\n";
 
-    // The rules want 3, so a live answer of 5 or 4 fails and its record was photographed at 5:
-    // whether the note survives is then decided by live alone.
+    // The rules want 3 and the record holds 5, so an answer of 5 or 4 fails either way and what
+    // decides whether the note survives is the live answer alone.
     fn judged(recorded_code: u32, live_code: Option<u32>) -> Judged<'static> {
         let live = live_code.map(answer_of);
         let record = RecordedAnswer {

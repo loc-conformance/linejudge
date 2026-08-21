@@ -9,10 +9,9 @@ pub const COUNTERS_FILE: &str = "counters.toml";
 
 const SETTINGS_FILE: &str = "settings.toml";
 
-/// The `.linejudge` folder, found by walking up from the working directory the way cargo finds its
-/// own. It holds whatever the run needs that was not said on the command line: `counters.toml`
-/// naming the binaries and `settings.toml` naming the paths. A flag wins over the folder, and the
-/// folder wins over the defaults.
+// The `.linejudge` folder, found by walking up from the working directory the way cargo finds its
+// own. It holds what was not said on the command line: `counters.toml` naming the binaries and
+// `settings.toml` naming the paths. A flag beats the folder, the folder beats the defaults.
 pub struct Folder {
     dir: PathBuf,
     settings: Settings,
@@ -58,8 +57,8 @@ impl Folder {
         self.dir.join(COUNTERS_FILE)
     }
 
-    /// The directory the folder sits in, which is what every relative path in it resolves
-    /// against, so that a committed path works from any subdirectory.
+    // Every relative path in the folder resolves against this, so a committed path works from any
+    // subdirectory.
     pub fn get_root(&self) -> &Path {
         self.dir.parent().unwrap_or(&self.dir)
     }

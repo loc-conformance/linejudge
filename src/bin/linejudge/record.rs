@@ -16,12 +16,10 @@ use crate::style;
 
 const EXTENSION: &str = "toml";
 
-/// Runs the counter over every case and writes its file under `recorded/` from scratch, since a
-/// new release of a tool must not mean editing eighty entries by hand.
-///
-/// A note is a sentence somebody wrote about what this counter does on this case, so it is kept
-/// exactly as long as the answer it was written about and dropped the moment that answer moves.
-/// Every note dropped is named, because the sentence is still owed by a person.
+// Runs the counter over every case and writes its file under `recorded/` from scratch, so a new
+// release of a tool does not mean editing eighty entries by hand. A note is kept exactly as long
+// as the answer it was written about, and every note dropped is named, since somebody still owes
+// the replacement sentence.
 pub fn record_one_counter(
     out: &mut dyn Write,
     adapter: &Adapter,
@@ -96,18 +94,18 @@ pub fn record_one_counter(
     Ok(())
 }
 
-/// One block of the file being written, as the run found it.
+// One block of the file being written.
 struct Recorded {
     counted: Option<Answer>,
     is_known_failure: bool,
-    /// Whether the case holds another language at all: where it does, the regions are written out
-    /// even when the counter found none, so that "it looked and saw nothing" is on the page.
+    // Where the case holds another language, the regions are written out even when the counter
+    // found none, so that "it looked and saw nothing" is on the page.
     wants_regions: bool,
     note: Option<String>,
 }
 
-/// The note and whether one was thrown away, which is what a person is told so they can write the
-/// sentence the new answer needs.
+// The note, and whether one was thrown away, which is what a person is told so they can write the
+// sentence the new answer needs.
 fn decide_the_note(held: Option<&RecordedAnswer>, live: &Option<Answer>) -> (Option<String>, bool) {
     let Some(held) = held else { return (None, false) };
     match held.counted == *live {
@@ -199,9 +197,9 @@ fn write_the_regions(
     let _ = writeln!(text, "]");
 }
 
-/// The note is written back with its own line breaks, so a sentence somebody wrapped by hand stays
-/// wrapped. A note carrying the delimiter itself would produce a file this program cannot read,
-/// which is refused here rather than written out.
+// The note keeps its own line breaks, so a sentence wrapped by hand stays wrapped. A note carrying
+// the delimiter would produce a file this program cannot read, so it is refused rather than
+// written out.
 fn write_the_note(
     text: &mut String,
     key: &(String, String),
@@ -219,8 +217,8 @@ fn format_counts(counts: &Counts, buckets: &[String]) -> String {
     format!("{{ {} }}", name_the_numbers_of(counts, buckets).join(", "))
 }
 
-/// In the order the dialect declares its buckets, so that its file and this one read the same way
-/// down the page.
+// In the order the dialect declares its buckets, so its file and this one read the same way down
+// the page.
 fn name_the_numbers_of(counts: &Counts, buckets: &[String]) -> Vec<String> {
     let mut named = vec![format!("lines = {}", counts.lines)];
     named.extend(

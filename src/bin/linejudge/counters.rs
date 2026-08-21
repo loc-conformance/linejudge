@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 
 const BOM: &str = "\u{feff}";
 
-/// Where each counter's binary sits, named once so that neither a person nor a workflow has to
-/// write the path again.
+// Where each counter's binary sits, as `.linejudge/counters.toml` names them.
 #[derive(Debug)]
 pub struct Counters {
     binaries: BTreeMap<String, PathBuf>,
@@ -17,8 +16,8 @@ impl Counters {
         Counters { binaries: BTreeMap::new() }
     }
 
-    /// A file that is not there is not an error, and every other way of failing to read one is,
-    /// since a file that is there and unreadable is a file somebody wrote on purpose.
+    // No file names no counter and is not an error. A file that is there and cannot be read is
+    // one somebody wrote on purpose, so that is.
     pub fn read(path: &Path) -> Result<Counters, String> {
         let text = match fs::read_to_string(path) {
             Ok(text) => text,
@@ -40,8 +39,8 @@ impl Counters {
         self.binaries.insert(counter.to_string(), binary);
     }
 
-    /// A relative path in a committed counters file, `target/release/...` say, means it from the
-    /// file's own project however deep the working directory sits.
+    // A relative path in a committed counters file means it from that file's own project, however
+    // deep the working directory sits.
     pub fn resolve_against(&mut self, root: &Path) {
         for binary in self.binaries.values_mut() {
             if binary.is_relative() {

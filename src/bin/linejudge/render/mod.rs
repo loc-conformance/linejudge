@@ -25,8 +25,8 @@ const STYLE_FILE: &str = "page.css";
 const STYLE: &str = include_str!("page.css");
 const SCRIPT: &str = include_str!("page.js");
 
-/// Measures the whole roster and writes what a static host serves: the scoreboard, a page per
-/// case under it, and the measurement behind them as JSON.
+// Measures the whole roster and writes what a static host serves: the scoreboard, a page per case
+// under it, and the measurement behind them as JSON.
 pub fn write_the_site(
     adapters: &[Adapter],
     corpus: &Corpus,
@@ -41,8 +41,8 @@ pub fn write_the_site(
     write_every_file(&sweep, &cases, &tools, out)
 }
 
-/// Everything the site is, written out of what was already measured. Apart from the measuring, so
-/// that what the pages point at can be checked without a counter on the machine.
+// Kept apart from the measuring, so what the pages point at can be checked with no counter on the
+// machine.
 fn write_every_file(
     sweep: &Sweep,
     cases: &[CaseDetail],
@@ -83,8 +83,7 @@ fn write_every_file(
     Ok(cases.len())
 }
 
-/// One directory of files, named by whatever the caller says each of them is called. Names carry
-/// their own extension, since a badge is an SVG and everything else is a page.
+// The names carry their own extension, since a badge is an SVG and everything else is a page.
 fn write_a_page_each<T>(
     dir: &Path,
     each: &[T],
@@ -101,15 +100,15 @@ fn write_a_page_each<T>(
     Ok(())
 }
 
-/// A badge names the way of counting as well as the counter, since a counter with two of them
-/// has two answers and a single file could only ever be one of them.
+// A badge names the way of counting as well as the counter, since a counter with two of them has
+// two answers and one file could only ever be one of them.
 pub fn name_the_badge_of(counter: &str, dialect: &str) -> String {
     format!("{counter}.{dialect}")
 }
 
-/// Every page of the site is this, so the stylesheet and the script are written once and named by
-/// each page rather than carried inside all of them. `up` is what a page has to climb to reach
-/// the root of the site, which is nothing for the scoreboard and one step for a case.
+// Every page is this, so the stylesheet and the script are written once and linked rather than
+// carried inside each one. `up` is what a page climbs to reach the root of the site: nothing for
+// the scoreboard, one step for a case.
 fn wrap_the_page(title: &str, body: Markup, up: &str) -> String {
     let page = html! {
         (DOCTYPE)
@@ -129,7 +128,7 @@ fn wrap_the_page(title: &str, body: Markup, up: &str) -> String {
     page.into_string()
 }
 
-/// GitHub's own mark, drawn rather than fetched, since the pages ask nothing of any other host.
+// GitHub's own mark, drawn rather than fetched, since the pages ask nothing of any other host.
 const GITHUB_MARK: &str = "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 \
     0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01\
     -.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89\
@@ -146,8 +145,7 @@ pub fn render_the_mark_of_github() -> Markup {
     }
 }
 
-/// Runs of whitespace in a case's own words become single spaces, since a trap and a note are
-/// written across several lines in their files and read as one sentence here.
+// A trap and a note are written across several lines in their files and read as one sentence here.
 fn format_as_one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -173,9 +171,8 @@ mod tests {
     use super::*;
 
     // Each page is rendered by a function that knows nothing of where the others were written, so
-    // a name built in one place and a directory made in another are only ever held together by
-    // this. It has already been wrong once: a tool's page linked its failures as `cases/<name>`
-    // when the page sits one directory down and needed `../cases/<name>`.
+    // a name built in one place and a directory made in another are held together by nothing but
+    // this.
     #[test]
     fn every_page_points_only_at_files_the_site_actually_holds() {
         let out = env::temp_dir().join("linejudge-every_page_points_at_what_is_there");

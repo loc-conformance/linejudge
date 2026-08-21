@@ -1,3 +1,5 @@
+//! The corpus this build carries, for a project that depends on the crate and has no checkout.
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -7,9 +9,9 @@ include!(concat!(env!("OUT_DIR"), "/shipped.rs"));
 const APP_DIR: &str = "linejudge";
 const PARTIAL_SUFFIX: &str = ".partial";
 
-/// The corpus, the adapters, the dialects and the recorded answers this build carries, written out
-/// where a counter can be pointed at them. The directory is named after a hash of its contents, so
-/// a build whose corpus changed does not read the copy an older one left behind.
+/// Writes out the corpus, the adapters, the dialects and the recorded answers this build carries.
+/// The directory is named after a hash of its contents, so a build whose corpus changed does not
+/// read the copy an older one left behind.
 pub fn create_the_shipped_dir() -> Result<PathBuf, String> {
     let mut refused = Vec::new();
     for root in find_the_app_dirs() {
@@ -25,10 +27,9 @@ pub fn create_the_shipped_dir() -> Result<PathBuf, String> {
     Err(format!("what this build carries could not be written out: {}", refused.join("; ")))
 }
 
-/// Everywhere this program keeps files of its own, in the order it tries them. The temporary
-/// directory is second so that a machine with no home of any kind, which is what some build
-/// runners are, still has somewhere to put them. Whatever writes and whatever reads has to walk
-/// the same list in the same order, or one of them looks in the wrong place.
+/// Everywhere linejudge keeps files of its own, best first, ending at the temporary directory so a
+/// build runner with no home still has somewhere. Whatever writes and whatever reads has to walk
+/// this list in this order.
 pub fn find_the_app_dirs() -> Vec<PathBuf> {
     [find_the_data_dir(), Some(env::temp_dir())]
         .into_iter()
@@ -50,8 +51,8 @@ fn write_the_shipped_files_into(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Written to one side and moved into place, so that a run stopped halfway through leaves no
-/// directory that the next one would find and trust.
+// Written to one side and moved into place, so a run stopped halfway leaves no directory the next
+// one would find and trust.
 fn write_the_shipped_files_beside(dir: &Path) -> Result<(), String> {
     let partial = dir.with_file_name(format!("{HASH}{PARTIAL_SUFFIX}"));
     let _ = fs::remove_dir_all(&partial);

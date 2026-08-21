@@ -1,28 +1,39 @@
+//! The hand-verified strings and comments of one case, as its `truth.txt` writes them.
+//!
+//! Under a copy of every source line comes one marker character per character: `S` `s` `Z` for a
+//! string's opening symbol, its bytes and its closing symbol, `C` `c` `U` for a comment's, and `.`
+//! for a byte in neither. Whitespace outside a span stays as it is, and a blank line a span runs
+//! across carries a lone `s` or `c`.
+//!
+//! A tag opening a stretch of another language is marked `>` and the tag closing it `<`, with the
+//! language written past the markers of every line the opening tag covers. A region with no tag of
+//! its own is named where its span opens. Which lines belong to a region is worked out here and
+//! never declared.
+
 const ALPHABET: &str = "SsZCcU.>< \t";
+/// The three characters that mark a comment.
 pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
 const KINDS: [Marks; 2] = [STRING_MARKS, COMMENT_MARKS];
 const OPTIONAL_WORD: &str = "optional";
+/// Marks a character that is in neither a string nor a comment.
 pub const RESIDUE: char = '.';
+/// The three characters that mark a string.
 pub const STRING_MARKS: Marks = Marks { name: "string", opener: 'S', interior: 's', closer: 'Z' };
+/// Marks the tag that closes a stretch of another language.
 pub const TAG_CLOSES: char = '<';
+/// Marks the tag that opens a stretch of another language.
 pub const TAG_OPENS: char = '>';
 
-/// The hand-verified spans of one case, read from its `truth.txt`: under a copy of every source
-/// line, one marker character per character, `S` `s` `Z` for a string's opening symbol, its bytes
-/// and its closing symbol, `C` `c` `U` for a comment's, `.` for a byte outside every span,
-/// whitespace outside spans kept as it stands, and a blank line that a span is open across carrying
-/// a lone `s` or `c`. A tag that opens a stretch of another language is marked `>` and the tag that
-/// closes it `<`, with the language named after the markers of every line the opening tag covers; a
-/// region with no tag is the same name on the line where its span opens. Which lines belong to a
-/// region is computed, never declared.
+/// One case's `truth.txt`, already read.
 #[derive(Debug)]
 pub struct Truth {
+    /// One entry per line of the input, in order from the first.
     pub lines: Vec<TruthLine>,
 }
 
 impl Truth {
-    /// The input is the one file the truth describes, and every refusal names what went stale:
-    /// a copy that no longer matches the input is the loud failure the copies exist for.
+    /// Reads the marker file against the input it describes. The copies of the source inside
+    /// `truth.txt` are there so an input edited without its markers fails loudly.
     pub fn read(marked: &str, input: &str) -> Result<Truth, Vec<String>> {
         let mut faults = Vec::new();
         let mut lines = Vec::new();
@@ -90,9 +101,8 @@ impl Truth {
         })
     }
 
-    /// Every reading this truth marks as optional, each named once, which is the set of questions
-    /// a dialect has to have answered before its answer for this file can be worked out.
-    pub fn find_optional_readings(&self) -> Vec<&str> {
+    // The questions a dialect has to have answered before this file's answer can be worked out.
+    pub(crate) fn find_optional_readings(&self) -> Vec<&str> {
         let mut found: Vec<&str> = self
             .lines
             .iter()
@@ -105,11 +115,13 @@ impl Truth {
     }
 }
 
+/// One line of the input beside the markers under it.
 #[derive(Debug)]
 pub struct TruthLine {
-    /// Kept beside the marker because the rules need to know what a character is, a letter or a
-    /// space, and the marker only says which string or comment it belongs to.
+    /// The line itself. The rules need to know whether a character is a letter or a space, which
+    /// the marker does not say: it says only which string or comment the character belongs to.
     pub source: String,
+    /// One character per character of the source, from the alphabet this module describes.
     pub marker: String,
     /// Every region this line is inside, the outermost first. A counter that does not count an
     /// optional region on its own still needs the region around it, so the whole stack is kept.
@@ -117,10 +129,9 @@ pub struct TruthLine {
 }
 
 impl TruthLine {
-    /// Which region this line counts towards: the innermost one this counter counts on its own,
-    /// where `counted_readings` names the readings it does count. A counter that leaves one out
-    /// gives the line to the region around it, and `None` means the file itself.
-    pub fn find_region(&self, counted_readings: &[&str]) -> Option<&RegionClaim> {
+    // The innermost region this counter counts on its own, `counted_readings` naming the readings
+    // it does count. A counter that leaves one out gives the line to the region around it.
+    pub(crate) fn find_region(&self, counted_readings: &[&str]) -> Option<&RegionClaim> {
         self.regions.iter().rev().find(|claim| match &claim.reading {
             None => true,
             Some(reading) => counted_readings.contains(&reading.as_str()),
@@ -128,13 +139,13 @@ impl TruthLine {
     }
 }
 
+/// A stretch of one language inside the case, as one of its lines sees it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegionClaim {
+    /// Named as a counter names it, so `JavaScript` rather than `js`.
     pub language: String,
-    /// The reading under which this stretch is a language of its own, where counting it apart and
-    /// leaving it to the code around it are both fair, and `None` where it is not in question. It
-    /// names the question a counter answers, `rust-doc-comment` rather than `Markdown`, because two
-    /// counters can answer differently about a doc comment and the same about a Vue template.
+    /// The reading under which this stretch counts as a language of its own, and `None` where that
+    /// is not in question. It names the question, `rust-doc-comment` rather than `Markdown`.
     pub reading: Option<String>,
 }
 
@@ -142,13 +153,18 @@ pub struct RegionClaim {
 /// whoever reads it take the alphabet from the same place.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Marks {
+    /// What to call this kind in a refusal, `string` or `comment`.
     pub name: &'static str,
+    /// Marks the opening symbol, `S` or `C`.
     pub opener: char,
+    /// Marks the bytes between the symbols, `s` or `c`.
     pub interior: char,
+    /// Marks the closing symbol, `Z` or `U`.
     pub closer: char,
 }
 
 impl Marks {
+    /// Whether this mark is one of the three.
     pub fn owns(&self, mark: char) -> bool {
         self.find_role(mark).is_some()
     }
@@ -191,9 +207,8 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
     if !excess.starts_with(' ') {
         return Err(format!("the marker under [{source}] runs past the end of the line"));
     }
-    // Whatever sits past the columns is read as a label, and the one thing that lands there
-    // without anybody writing it is the whitespace an editor leaves behind, which no eye can see
-    // in the file. It gets named for what it is instead of failing as an empty label.
+    // Trailing whitespace is the one thing that lands past the columns without anybody typing it,
+    // and it is invisible in the file, so it is named rather than reported as an empty label.
     if excess.trim().is_empty() {
         return Err(format!("the marker under [{source}] ends in trailing whitespace"));
     }
@@ -209,11 +224,8 @@ fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>)
     Ok((marker, Some(RegionClaim { language: language.to_string(), reading })))
 }
 
-// A span ends at its closing symbol where it has one, and where it has none, a line comment or a
-// character literal written `\"`, it ends where its own bytes stop: at the end of its line, or at
-// the first byte that is not its interior. So a mark that is not this span's says only that the
-// span was over, which leaves one thing a marker cannot explain and this refuses, the bytes or
-// the closing symbol of a span where no such span is open.
+// A line comment has no closing symbol, so a span can also end simply by running out of its own
+// marks. That leaves one mistake worth refusing: the bytes or the closer of a span nothing opened.
 fn check_span_structure(lines: &[RawLine], faults: &mut Vec<String>) {
     let mut open: Option<Marks> = None;
     for line in lines {
@@ -250,9 +262,9 @@ fn check_span_structure(lines: &[RawLine], faults: &mut Vec<String>) {
     }
 }
 
-/// A label is `HTML` where the region is not in question and `HTML (optional vue-template)` where
-/// it is. The reading is demanded rather than defaulted: a bare `(optional)` would leave every
-/// dialect answering one question for two different ones.
+// A label is `HTML`, or `HTML (optional vue-template)` where the language is in question. The
+// reading has to be named: a bare `(optional)` would have every dialect answering one question
+// for two different ones.
 fn split_reading_off(named: &str) -> Result<(&str, Option<String>), String> {
     let Some((language, bracketed)) = named.split_once('(') else { return Ok((named, None)) };
     let Some(inside) = bracketed.strip_suffix(')') else {
@@ -271,14 +283,12 @@ fn split_reading_off(named: &str) -> Result<(&str, Option<String>), String> {
     Ok((language.trim(), Some(reading.to_string())))
 }
 
-// Regions nest, a php page holding markup that holds a script being the everyday file, and every
-// line belongs to the innermost one: the tags are a stack, and a tag's own lines belong to the
-// region that encloses the tag, which for a top-level tag is the file itself.
+// Regions nest, a php page holding markup holding a script, and a line belongs to the innermost
+// one. The tags are a stack, and a tag's own lines belong to whatever encloses the tag.
 //
-// Every line of a tag that opens names its language, a tag written over two lines naming it twice,
-// so nothing here is worked out from where a line sits: the same language again is the tag above
-// carrying on, a different one is a region opening inside it, and no language at all is refused.
-// Two regions of one language cannot nest, since a boundary from a language to itself is not one.
+// Every line of an opening tag names its language, so a tag written over two lines names it twice.
+// Nothing is worked out from where a line sits: the same language again is the tag above carrying
+// on, a different one opens a region inside it, and no language at all is refused.
 fn assign_regions(lines: &[RawLine]) -> Result<Vec<Vec<RegionClaim>>, Vec<String>> {
     let mut faults = Vec::new();
     let mut regions: Vec<Vec<RegionClaim>> = lines.iter().map(|_| Vec::new()).collect();
@@ -326,11 +336,8 @@ fn assign_regions(lines: &[RawLine]) -> Result<Vec<Vec<RegionClaim>>, Vec<String
     if faults.is_empty() { Ok(regions) } else { Err(faults) }
 }
 
-// A label on a span-opening line claims the consecutive lines wholly covered by that kind that
-// either continue the span opened above it, its closing symbol included, or open a new one with
-// the same bytes, so a `///` block ends where a plain `//` begins. Inside a tagged region the
-// claim nests, the innermost language winning as everywhere; only two labeled spans running into
-// each other have no meaning.
+// A label on a line that opens a span claims the lines below it that carry on the same span or
+// open another with the same symbol, so a `///` block ends where a plain `//` begins.
 fn claim_labeled_spans(
     lines: &[RawLine],
     regions: &mut [Vec<RegionClaim>],
@@ -374,9 +381,8 @@ fn begins_inside(line: &RawLine, marks: Marks) -> bool {
     line.marker.starts_with([marks.interior, marks.closer])
 }
 
-/// The kind and the opening bytes of the last span the line opens. Only the last one can still be
-/// open on the next line, so a line holding a string and then a doc comment carries its region with
-/// the comment, and a line holding two comments is signed by the second of them.
+// Only the last span a line opens can still be open on the next one, so that is the one whose
+// label carries over.
 fn read_last_opener(line: &RawLine) -> Option<(Marks, String)> {
     let mut last: Option<(Marks, String)> = None;
     let mut running = false;
@@ -395,8 +401,8 @@ fn read_last_opener(line: &RawLine) -> Option<(Marks, String)> {
     last
 }
 
-/// The source bytes under the line's first run of opening marks of this kind: `///` under `CCC`,
-/// `"""` under `SSS`. What tells a doc comment from the plain comment beside it.
+// The bytes under the first run of opening marks, `///` under `CCC`. What tells a doc comment
+// from the plain comment beside it.
 fn read_opening_bytes(line: &RawLine, marks: Marks) -> String {
     line.source
         .chars()
@@ -534,8 +540,6 @@ mod tests {
     }
 
     // The everyday three-language file: a page's html holding a script, here in php's clothing.
-    // Every line belongs to the innermost region, and a tag's own lines belong to the region
-    // that encloses the tag, which for a top-level tag is the file itself.
     #[test]
     fn a_tag_pair_inside_a_tag_pair_nests_and_the_innermost_language_wins() {
         let input = "?>\n<div>\n<script>\nx\n</script>\n</div>\n<?php\n";
@@ -596,8 +600,6 @@ mod tests {
         assert!(refused[0].contains("opens no tag and no span"), "{refused:?}");
     }
 
-    // The one thing that lands past the columns without anybody writing it, and it is invisible in
-    // the file, so the refusal has to name it instead of reporting an empty label.
     #[test]
     fn a_marker_row_ending_in_whitespace_is_blamed_on_the_whitespace_and_not_on_a_label() {
         let refused = Truth::read("int x = 1;\n... . . .. \n", "int x = 1;\n").unwrap_err();
@@ -608,8 +610,6 @@ mod tests {
         assert!(refused[0].contains("ends in trailing whitespace"), "{refused:?}");
     }
 
-    // The refusal is what a case author meets, and before it existed they met a marker reported as
-    // running past the end of a line they had not touched.
     #[test]
     fn an_input_holding_a_character_above_ascii_is_refused_and_says_so() {
         let input = "let x = 1; // καλά\n";
@@ -680,9 +680,8 @@ mod tests {
         assert_eq!(read.lines.len(), 1, "the same line with nothing left over is read");
     }
 
-    // A pair written inside an open comment, which a language whose comments nest allows, is that
-    // comment's bytes like everything else in it: marking it as a comment of its own leaves the
-    // outer one closed too early, and the lines under it holding bytes that belong to nothing.
+    // Marking the inner pair as a comment of its own closes the outer one too early, and the lines
+    // under it are then bytes belonging to nothing.
     #[test]
     fn a_comment_pair_inside_an_open_comment_is_that_comment_s_bytes() {
         let input = "/* outer\n   /* inner */\n   still inside\n*/\n";

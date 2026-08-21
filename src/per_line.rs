@@ -1,3 +1,5 @@
+//! A counter's own account of where it put every line of a file.
+
 use std::collections::BTreeMap;
 
 use serde::Deserialize;
@@ -7,27 +9,27 @@ use crate::dialects::check_buckets;
 
 const KNOWN_FORMAT: u32 = 1;
 
-/// The shape a counter prints its line by line reading in. One name today, and it is the uniform
-/// one: a counter that prints it needs no reader of its own in here.
+/// The shape a counter prints that account in. There is one, and it is the same for every counter:
+/// a tool that prints it needs no reader written for it here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 pub enum PerLineFormat {
+    /// The JSON document this module reads, declared in an adapter as `linejudge-per-line`.
     #[serde(rename = "linejudge-per-line")]
     LinejudgePerLine,
 }
 
-/// What one counter says about one file, line by line: the bucket it put every physical line in,
-/// in order from the first, and the totals it printed for the whole file. A document holds more
-/// than this, and everything else in it belongs to the counter that printed it.
+/// What one counter says about one file, line by line.
 #[derive(Debug, PartialEq, Eq)]
 pub struct PerLineAnswer {
+    /// The bucket it put each physical line in, in order from the first.
     pub buckets_of_lines: Vec<String>,
+    /// The totals it printed for the file as a whole.
     pub counts: Counts,
 }
 
-/// Reads that document, given the buckets this way of counting has and how many lines the file
-/// really holds. Everything the format promises is checked here and refused by name, so a counter
-/// that answers a seventeen line file with eighteen verdicts is told what is wrong with its
-/// document instead of being lined up against the file and compared to the wrong lines.
+/// Reads such a document, given the buckets this way of counting has and how many lines the file
+/// really holds. A counter that answers a seventeen line file with eighteen verdicts is told what
+/// is wrong with its document instead of being compared against the wrong lines.
 pub fn read_per_line(
     text: &str,
     buckets: &[String],
@@ -92,8 +94,8 @@ pub fn read_per_line(
     })
 }
 
-/// Unknown fields are kept out of this on purpose: everything a counter says beyond the format's
-/// own promises rides along in the document and is nobody else's to read.
+// No `deny_unknown_fields`, deliberately: whatever a counter says beyond what the format promises
+// is its own business and rides along unread.
 #[derive(Deserialize)]
 struct RawDocument {
     format: u32,

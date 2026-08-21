@@ -16,9 +16,8 @@ pub const REGION: Style = Style::of(Color::Cyan);
 pub const RULE: Style = Style::of(VIOLET);
 pub const STRING: Style = Style::of(Color::Green);
 
-/// One colour and whatever else a terminal cell can carry. Whether any of it is printed at all is
-/// not decided here: `colored` looks at the terminal, at NO_COLOR and at CLICOLOR_FORCE once, and
-/// a run whose output is a file or a pipe comes out as plain text.
+// Whether any of this is printed at all is not decided here: `colored` looks at the terminal, at
+// NO_COLOR and at CLICOLOR_FORCE, so output to a file or a pipe comes out as plain text.
 #[derive(Clone, Copy)]
 pub struct Style {
     color: Option<Color>,

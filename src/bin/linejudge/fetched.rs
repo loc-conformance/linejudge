@@ -2,14 +2,14 @@ use std::env::consts::EXE_SUFFIX;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::shipped::find_the_app_dirs;
+use linejudge::shipped::find_the_app_dirs;
 
 const BIN_DIR: &str = "bin";
 const PARTIAL_SUFFIX: &str = ".partial";
 
-/// A downloaded counter lives where this program keeps its own files rather than in anybody's
-/// tree, and the version is part of the directory name because two projects that pinned two
-/// versions must not overwrite one another.
+// A downloaded counter lives where linejudge keeps its own files and never in anybody's tree. The
+// version is part of the directory name, so two projects that pinned two versions do not overwrite
+// one another.
 pub fn find_the_binary_of(counter: &str, version: &str) -> Option<PathBuf> {
     let named = format!("{counter}{EXE_SUFFIX}");
     find_the_app_dirs()
@@ -18,8 +18,8 @@ pub fn find_the_binary_of(counter: &str, version: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// Where a download is assembled, which is beside where it will end up and never the place itself,
-/// so that a fetch stopped halfway leaves no directory the next run would find and trust.
+// A download is assembled beside where it will end up and never in the place itself, so a fetch
+// stopped halfway leaves no directory the next run would find and trust.
 pub fn create_a_partial_dir_for(counter: &str, version: &str) -> Result<PathBuf, String> {
     let mut refused = Vec::new();
     for root in find_the_app_dirs() {
@@ -33,9 +33,9 @@ pub fn create_a_partial_dir_for(counter: &str, version: &str) -> Result<PathBuf,
     Err(format!("there is nowhere to put what is downloaded: {}", refused.join("; ")))
 }
 
-/// Renames what was assembled to the name the lookup goes by, which is the moment a download counts
-/// as done. Anything already sitting under that name is thrown away first, since a directory that
-/// exists without the binary in it would be found and answer nothing.
+// Renaming it to the name the lookup goes by is the moment a download counts as done. Anything
+// already under that name is thrown away first: a directory without the binary in it would be
+// found and answer nothing.
 pub fn finish_the_partial_dir(partial: &Path) -> Result<PathBuf, String> {
     let name = partial
         .file_name()

@@ -8,22 +8,22 @@ use crate::measurement::count_lines;
 
 const LINES: &str = "lines";
 
-/// Where each number sits in a counter's own JSON, declared in the adapter instead of read by a
-/// reader written here. A block whose paths are absolute reads the document as it stands; a block
-/// that names `each` reads its paths relative to every element that path matches and adds them up.
+// Where each number sits in a counter's own JSON, as the `read` block of an adapter declares it.
+// Paths are read against the document as it stands, or, where the block names `each`, against
+// every element that path matches, and then added up.
 #[derive(Debug)]
 pub struct Locator {
     each: Option<NamedPath>,
-    /// A path that has to match at least one element, or the counter claims no such file. An
-    /// `each` block needs none, since matching nothing already means that.
+    // A path that has to match something, or the counter claims no such file. An `each` block
+    // needs none: matching nothing already means that.
     claims: Option<NamedPath>,
     counts: BTreeMap<String, NamedPath>,
     regions: Option<RegionLocator>,
 }
 
 impl Locator {
-    /// Everything a read block is held to is decided here: its count paths are exactly `lines`
-    /// and this dialect's buckets, and every path parses.
+    // Everything a read block is held to: its count paths are exactly `lines` and this dialect's
+    // buckets, and every path parses.
     pub fn of(raw: RawLocator, buckets: &[String]) -> Result<Locator, String> {
         check_count_names(&raw.counts, buckets)?;
         let each = raw.each.map(|path| parse_elements_path("each", &path)).transpose()?;
@@ -119,8 +119,8 @@ struct RegionLocator {
     counts: BTreeMap<String, NamedPath>,
 }
 
-/// The block as the adapter file writes it: the paths as text, `lines` and the buckets flattened
-/// beside the fields with meanings of their own.
+// The block as the adapter file writes it, with `lines` and the buckets sitting flat beside the
+// fields that have a meaning of their own.
 #[derive(Deserialize)]
 pub struct RawLocator {
     each: Option<String>,
@@ -138,7 +138,7 @@ pub struct RawRegionLocator {
     counts: BTreeMap<String, String>,
 }
 
-/// The path kept beside its own text, so a refusal can say `total.extra` instead of describing it.
+// The path kept beside its own text, so a refusal can say `total.extra` instead of describing it.
 #[derive(Debug)]
 struct NamedPath {
     shown: String,

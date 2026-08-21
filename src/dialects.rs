@@ -1,3 +1,5 @@
+//! The rules that say where each line of a file goes, one set per way of counting.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -5,8 +7,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 const DIALECT_EXTENSION: &str = "toml";
-pub const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
-pub const PREDICATES: [(&str, Predicate); 7] = [
+pub(crate) const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
+pub(crate) const PREDICATES: [(&str, Predicate); 7] = [
     ("blank", Predicate::Blank),
     ("has-residue", Predicate::HasResidue),
     ("in-comment", Predicate::InComment),
@@ -23,10 +25,8 @@ pub struct Dialects {
 }
 
 impl Dialects {
-    /// The directories are layered, and a later one replaces every dialect an earlier one gave the
-    /// counters it names. The folder is the unit and not the file: it is what a tool's own
-    /// maintainer owns, and half of theirs beside half of ours would be a set of rules that neither
-    /// of them wrote.
+    /// Layered per counter, and the whole folder is the unit: a later directory naming a counter
+    /// replaces all of that counter's dialects, never half of them.
     pub fn read(dirs: &[PathBuf]) -> Result<Dialects, Vec<String>> {
         let mut dialects: Vec<Dialect> = Vec::new();
         let mut faults = Vec::new();
@@ -41,8 +41,8 @@ impl Dialects {
             }
         }
         dialects.sort_by(|a, b| (&a.counter, &a.name).cmp(&(&b.counter, &b.name)));
-        // Emptiness belongs to the layered set and not to one layer of it: a directory naming no
-        // counter adds nothing, and the run still has every dialect this build carries.
+        // Only the layered set has to be non-empty. One directory naming no counter adds nothing
+        // and takes nothing away.
         if dialects.is_empty() && faults.is_empty() {
             let named: Vec<String> = dirs.iter().map(|dir| dir.display().to_string()).collect();
             faults.push(format!("{} holds no dialect file", named.join(" or ")));
@@ -50,7 +50,7 @@ impl Dialects {
         if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults) }
     }
 
-    /// One folder per counter, one file per way it counts: `<counter>/<dialect>.toml`.
+    // One folder per counter, one file per way it counts: `<counter>/<dialect>.toml`.
     fn read_one_directory(dir: &Path) -> Result<Vec<Dialect>, Vec<String>> {
         let entries = match fs::read_dir(dir) {
             Ok(entries) => entries,
@@ -98,10 +98,12 @@ impl Dialects {
         if faults.is_empty() { Ok(dialects) } else { Err(faults) }
     }
 
+    /// One counter's one way of counting, and `None` where no directory declared it.
     pub fn find(&self, counter: &str, dialect: &str) -> Option<&Dialect> {
         self.dialects.iter().find(|d| d.counter == counter && d.name == dialect)
     }
 
+    /// Every dialect, by counter and then by name.
     pub fn iter(&self) -> impl Iterator<Item = &Dialect> {
         self.dialects.iter()
     }
@@ -111,21 +113,21 @@ impl Dialects {
 /// put each line in one of them, and its answer to each reading a case can mark as optional.
 pub struct Dialect {
     pub counter: String,
+    /// `default` for a counter that counts only the one way.
     pub name: String,
     /// The file this dialect was read from, so a refusal can say where the missing answer goes.
     pub file: PathBuf,
+    /// In the order the file lists them.
     pub buckets: Vec<String>,
     pub rules: Vec<Rule>,
-    /// What this way of counting says about each reading a case can mark as optional: `true` where
-    /// it counts that stretch as a language of its own, `false` where it leaves those lines to the
-    /// code around them. A reading missing from the map is a question this dialect has not
-    /// answered, which is refused rather than read as either answer.
+    /// Its answer to each reading a case can mark as optional: `true` where it counts that stretch
+    /// as a language of its own, `false` where it leaves those lines to the code around them. A
+    /// reading missing here is refused rather than read as either answer.
     pub optional_readings: BTreeMap<String, bool>,
 }
 
 impl Dialect {
-    /// Everything a dialect file is held to is decided here, and a file that breaks more than one
-    /// rule says so once for each.
+    /// Reads one dialect file. A file that breaks more than one rule is told so once for each.
     pub fn read(path: &Path) -> Result<Dialect, Vec<String>> {
         let text = fs::read_to_string(path)
             .map_err(|e| vec![format!("{} could not be read: {e}", path.display())])?;
@@ -206,11 +208,11 @@ impl Dialect {
     }
 }
 
-/// A rule takes a line when all of its conditions hold, and puts that line in its bucket. The
-/// rules are not tried in order and neither are the conditions: a rule's conditions say everything
-/// about when it applies, and two rules taking the same line is allowed only where they name the
-/// same bucket.
+/// A rule takes a line when all of its conditions hold, and puts it in its bucket. Rules are not
+/// tried in order, so two of them taking the same line is allowed only where they name the same
+/// bucket.
 pub struct Rule {
+    /// What the file calls it, which is how a report names the rule that took a line.
     pub name: String,
     pub when: Vec<Condition>,
     pub bucket: String,
@@ -218,28 +220,34 @@ pub struct Rule {
 
 /// A question a rule asks, and whether it needs the answer to be yes or no.
 pub enum Condition {
+    /// The rule needs this to be true of the line.
     Holds(Predicate),
+    /// The rule needs this to be false of the line.
     Fails(Predicate),
 }
 
-/// What a rule can ask about a line: about its own characters, about the strings and comments
-/// covering them, and about a string or comment that opened on an earlier line and is still open
-/// here. Residue means what is left of a line when its strings and comments are taken away, and a
-/// word means a letter, a digit, or any character above ASCII.
+/// What a rule can ask about a line. The *residue* of a line is what is left once its strings and
+/// comments are taken away, and a *word* is a letter, a digit, or any character above ASCII.
 #[derive(Clone, Copy, Debug)]
 pub enum Predicate {
+    /// The line holds nothing but whitespace.
     Blank,
+    /// Something of the line is outside every string and comment, whitespace not counting.
     HasResidue,
+    /// Any part of the line is inside a comment, one that opened on an earlier line included.
     InComment,
     /// The line is inside a string that opened with three quotes at the start of a line, spaces
     /// before them allowed. Only scc asks this.
     InDocString,
+    /// Any part of the line is inside a string, one that opened on an earlier line included.
     InString,
+    /// The part inside a comment holds a word.
     WordInComment,
+    /// The residue holds a word, so a line of nothing but punctuation answers no.
     WordInResidue,
 }
 
-pub fn check_buckets(found: &BTreeMap<String, u32>, wanted: &[String]) -> Result<(), String> {
+pub(crate) fn check_buckets(found: &BTreeMap<String, u32>, wanted: &[String]) -> Result<(), String> {
     for name in wanted {
         if !found.contains_key(name) {
             return Err(format!("has no {name} bucket, and this dialect has {}", wanted.join(", ")));
@@ -288,7 +296,7 @@ struct RawRule {
 }
 
 #[cfg(test)]
-pub fn read_the_shipped_dialects() -> Dialects {
+pub(crate) fn read_the_shipped_dialects() -> Dialects {
     let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("dialects")];
     Dialects::read(&dirs).unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
 }

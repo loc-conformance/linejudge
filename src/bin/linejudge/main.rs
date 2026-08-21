@@ -1,7 +1,10 @@
 #![forbid(unsafe_code)]
 
+mod counters;
 mod explain;
 mod fetch;
+mod fetched;
+mod linejudge_folder;
 mod marks;
 #[cfg(feature = "maintenance")]
 mod record;
@@ -17,18 +20,16 @@ use std::vec::IntoIter;
 
 use linejudge::adapter::Adapter;
 use linejudge::corpus::Corpus;
-use linejudge::counters::Counters;
 use linejudge::dialects::Dialects;
-use linejudge::fetched;
 use linejudge::known_failures::KnownFailures;
-use linejudge::linejudge_folder::COUNTERS_FILE;
-use linejudge::linejudge_folder::Folder;
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
 use linejudge::shipped::create_the_shipped_dir;
 use linejudge::verdict::measure_and_judge_every_case;
 
+use crate::counters::Counters;
 use crate::explain::{explain_one_counter, find_case};
+use crate::linejudge_folder::{COUNTERS_FILE, Folder};
 use crate::report::OneRun;
 use crate::report::{
     report_entries_that_name_nothing, report_recorded_answers_that_name_nothing,
@@ -147,8 +148,8 @@ fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
         Ok(broken) if broken => ExitCode::FAILURE,
         Ok(_) => ExitCode::SUCCESS,
-        // A report cut short by 'linejudge check | head' is not a run that failed, and complaining
-        // about it would mean writing into the pipe that has just gone away.
+        // A report cut short by `linejudge check | head` is not a run that failed, and complaining
+        // would mean writing into the pipe that just went away.
         Err(Trouble::Writing(trouble)) if trouble.kind() == ErrorKind::BrokenPipe => {
             ExitCode::SUCCESS
         }
@@ -163,8 +164,7 @@ fn main() -> ExitCode {
     }
 }
 
-/// A command the build does not carry is a command nobody is told about, so the help text of a
-/// plain build names only what a plain build can run.
+// The help of a plain build names only what a plain build can run.
 fn get_the_usage() -> String {
     #[cfg(not(feature = "maintenance"))]
     return USAGE.to_string();
@@ -200,10 +200,9 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         Ok(here) => Folder::find(&here)?,
         Err(_) => None,
     };
-    // The run moves to the folder's root, so that a relative path inside an adapter's args, a
-    // wrapper script say, resolves against the project wherever the command was typed, by the same
-    // rule the counters file already follows. A path given as a flag means it from where it was
-    // typed, so those are pinned down first.
+    // The run moves to the folder's root, so a relative path inside an adapter's args resolves
+    // against the project wherever the command was typed. A path given as a flag means it from
+    // where it was typed, so those are pinned down first.
     if let Some(folder) = &folder {
         anchor_every_path_of(&mut settings);
         env::set_current_dir(folder.get_root()).map_err(|e| {
@@ -226,8 +225,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         Some(name) => vec![Adapter::read_one(&dirs.adapters, name, &dialects)?],
         None => Adapter::read_all(&dirs.adapters, &dialects)?,
     };
-    // With --bin there is no reason to open the counters file, the desired counter tool has been
-    // named.
+    // With --bin the binary is already named, so the counters file is not opened at all.
     let counters = match (&settings.name_of_counter, &settings.binary) {
         (Some(counter), Some(binary)) => {
             let mut counters = Counters::empty();
@@ -255,8 +253,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         (None, _) => None,
     };
 
-    // Naming one case narrows the corpus itself, so everything below judges and reports exactly
-    // that case and the exit code is its own.
+    // Naming one case narrows the corpus itself, so everything below judges that case alone.
     let one_case = matches!(&settings.command, Command::Check { case } if !case.is_empty());
     if let Command::Check { case } = &settings.command
         && one_case
@@ -373,8 +370,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             broken |=
                 report_the_verdicts_of_one_dialect(&mut out, &run, &judged, known_failures.as_ref())?;
         }
-        // Both of these hold a list against the whole corpus, and the corpus is one case here, so
-        // asking about one case would report every other as named by a list and missing.
+        // Both hold a list against the whole corpus, and the corpus is one case here, so asking
+        // would report every other case as named by a list and missing.
         if one_case {
             continue;
         }
@@ -385,8 +382,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             report_entries_that_name_nothing(&mut out, adapter, &corpus, known_failures)?;
         }
     }
-    // A run that counted nothing and said everything was fine is the one failure a green build
-    // hides, and a name misspelled in the counters file is all it takes.
+    // A run that counted nothing and reported success is the one failure a green build hides, and
+    // a name misspelled in the counters file is all it takes.
     if ran == 0 {
         return Err(Trouble::Said(format!(
             "no counter was run: name a binary with --bin, or in .linejudge/{COUNTERS_FILE} beside \
@@ -413,10 +410,10 @@ struct Settings {
 
 #[derive(Debug)]
 enum Command {
-    /// An empty name is every case, which is the ordinary run.
+    // An empty name is every case, which is the ordinary run.
     Check { case: String },
     Explain { case: String },
-    /// An empty name is every counter that says where it comes from.
+    // An empty name is every counter that says where it comes from.
     Fetch { counter: String },
     Render,
     #[cfg(feature = "maintenance")]
@@ -456,8 +453,8 @@ impl Settings {
                 return Err(format!("{command} is not a command of this program\n\n{usage}"));
             }
         }
-        // The flag is recognised before its value is taken, so a misspelled last flag is told it is
-        // misspelled instead of being told it was given nothing.
+        // The flag is recognised before its value is taken, so a misspelled last flag is told it
+        // is misspelled instead of being told it was given nothing.
         while let Some(flag) = args.next() {
             match flag.as_str() {
                 "--help" | "-h" => settings.wants_help = true,
@@ -570,8 +567,8 @@ impl Settings {
     }
 }
 
-/// A corpus is replaced whole, since half of one corpus beside half of another is neither. The
-/// other three are layered over what this build carries, the last directory winning per counter.
+// A corpus is replaced whole, since half of one beside half of another is neither. The other three
+// are layered over what this build carries, the last directory winning per counter.
 struct Dirs {
     corpus: PathBuf,
     adapters: Vec<PathBuf>,
@@ -596,8 +593,8 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
         dirs
     };
     Ok(Dirs {
-        // A record is the photograph of one corpus, so a corpus of somebody else's leaves the
-        // carried records out rather than judging against answers to cases nobody loaded.
+        // A record answers one corpus, so somebody else's corpus leaves the carried records out
+        // rather than judging against answers to cases nobody loaded.
         recorded: match corpus.is_some() {
             true => recorded.into_iter().collect(),
             false => layer(RECORDED_DIR, recorded),
@@ -612,9 +609,8 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
     })
 }
 
-/// Hands the page to whatever the machine opens an HTML file with. Nothing is checked and nothing
-/// is waited for: the pages are written either way, and a machine with no browser at all is not a
-/// run that failed.
+// Nothing is checked and nothing is waited for: the pages are written either way, and a machine
+// with no browser is not a run that failed.
 fn open_the_page(page: &Path) {
     let mut opener = if cfg!(target_os = "windows") {
         // The empty argument is the window title, which start takes from the first quoted one.
@@ -629,8 +625,8 @@ fn open_the_page(page: &Path) {
     let _ = opener.arg(page).spawn();
 }
 
-/// `check` and `explain` name a case the same way, so they refuse an unknown one the same way and
-/// both say out loud which case a fragment turned out to name.
+// `check` and `explain` name a case the same way, so they refuse an unknown one the same way and
+// both say which case a fragment turned out to name.
 fn find_the_case_named(
     out: &mut dyn Write,
     corpus: &Corpus,
@@ -654,8 +650,8 @@ fn find_the_case_named(
     Ok(found)
 }
 
-/// The paths a project named for itself, each resolved against the directory holding `.linejudge`
-/// so that a committed path works from any subdirectory. No folder is nobody naming anything.
+// Each path is resolved against the directory holding `.linejudge`, so a committed one works from
+// any subdirectory. No folder means nobody named anything.
 fn read_the_counters_of(folder: Option<&Folder>) -> Result<Counters, String> {
     let Some(folder) = folder else { return Ok(Counters::empty()) };
     let mut counters = Counters::read(&folder.get_counters_file())?;
@@ -663,8 +659,8 @@ fn read_the_counters_of(folder: Option<&Folder>) -> Result<Counters, String> {
     Ok(counters)
 }
 
-/// No name is every counter. A name is matched the way a case is: exactly, or by any part of it
-/// that fits exactly one, so that `fetch tok` is enough and the run says which counter that was.
+// No name is every counter. A name is matched the way a case is: exactly, or by any part of it
+// that fits exactly one, so `fetch tok` is enough and the run says which counter that was.
 fn choose_the_counters_named<'a>(
     out: &mut dyn Write,
     adapters: &'a [Adapter],

@@ -4,7 +4,7 @@ use crate::marks::Ink;
 use crate::render::data::{Answer, CaseDetail, Counts, Region, Sweep, Verdict};
 use crate::render::{INDEX_FILE, format_as_one_line, format_the_group_title, wrap_the_page};
 
-/// A case's page sits one directory under the root of the site.
+// A case's page sits one directory under the root of the site.
 const UP: &str = "../";
 const COPY_MARK_BACK: &str = "M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 \
     0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 \
@@ -133,8 +133,7 @@ fn render_the_verdict_of(answer: &Answer) -> Markup {
     }
 }
 
-/// Every count, and where another answer is given to hold them against, the ones that differ from
-/// it are painted as the differences they are.
+// Where another answer is given to hold these against, the numbers that differ are painted.
 fn format_the_counts(counts: &Counts, against: Option<&Counts>) -> Markup {
     let differs = |name: &str, value: u32| {
         against.is_some_and(|other| other.buckets.get(name) != Some(&value))

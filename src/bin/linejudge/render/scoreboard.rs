@@ -19,8 +19,8 @@ pub fn render_the_scoreboard(sweep: &Sweep) -> String {
         .iter()
         .map(|group| group.cases.iter().filter(|case| !case.disabled).count())
         .sum();
-    // The width of the cases column is written here and in `page.css`: the stylesheet sizes the
-    // column and this is what the table is told it needs at its narrowest.
+    // The width of the cases column is written here and in `page.css`, and the two have to agree:
+    // the stylesheet sizes the column, this is the table's own narrowest width.
     let width = CASES_COLUMN_REM + TOOL_COLUMN_REM * sweep.counters.len();
     let body = html! {
         (render_the_header(sweep, counted))
@@ -213,8 +213,7 @@ fn render_one_failure(answer: &Answer) -> Markup {
     }
 }
 
-/// The lines and every bucket whose two sides disagree, as (name, wanted, answered), so a cell
-/// shows only what moved.
+// The lines and every bucket whose two sides disagree, so a cell shows only what moved.
 fn find_the_differing_counts(wants: &Counts, answered: &Counts) -> Vec<(String, u32, u32)> {
     let mut differing = Vec::new();
     if wants.lines != answered.lines {
@@ -239,9 +238,9 @@ fn format_one_row(differing: &[(String, u32, u32)], answered_side: bool) -> Mark
     }
 }
 
-/// Regions can differ without their headline moving: the same language over the same lines with
-/// the lines binned differently inside it. So a whole side missing is said in one line, and
-/// otherwise each language whose two sides disagree gets a row naming exactly what moved.
+// Regions can differ without their headline moving: the same language over the same lines, binned
+// differently inside it. So a whole side missing is said in one line, and otherwise each language
+// whose two sides disagree gets a row naming what moved.
 fn render_the_region_rows(wants: &[Region], answered: &[Region]) -> Markup {
     if wants.is_empty() || answered.is_empty() {
         return html! {
@@ -305,8 +304,8 @@ fn format_the_regions_of(regions: &[Region]) -> String {
         .join(" · ")
 }
 
-/// The version as the column head shows it: most tools open their version line by repeating
-/// their own name, which the head has just said in bold.
+// Most tools open their version line by repeating their own name, which the column head has just
+// said in bold.
 fn format_the_version_of(counter: &Counter) -> &str {
     counter
         .version

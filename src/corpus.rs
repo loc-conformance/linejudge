@@ -1,3 +1,5 @@
+//! The cases: one small input file each, with its strings and comments marked by hand.
+
 use std::fmt;
 use std::fs;
 use std::io::{self, ErrorKind};
@@ -8,7 +10,7 @@ use serde::Deserialize;
 use crate::readings::{READINGS_FILE, Readings};
 use crate::truth::Truth;
 
-pub const DISABLED_PREFIX: &str = "disabled-";
+pub(crate) const DISABLED_PREFIX: &str = "disabled-";
 
 const CASE_FILE: &str = "case.toml";
 const GROUP_SIZE: u32 = 1000;
@@ -18,18 +20,22 @@ const TRUTH_FILE: &str = "truth.txt";
 /// Every case of the corpus, read from a directory holding one directory per group, each named
 /// after a whole thousand, with the cases of that thousand inside it.
 pub struct Corpus {
+    /// In the order their numbers put them.
     pub cases: Vec<Case>,
-    /// The group directory names in numeric order, for anything that presents the corpus in its
-    /// own sections. Which group a case belongs to is the thousand its number falls in.
+    /// The group directory names in numeric order. Which group a case belongs to is the thousand
+    /// its number falls in.
     pub groups: Vec<String>,
     /// The cases set aside by the `disabled-` prefix on their directory, named without it. Their
     /// files are not read at all, since a case is usually disabled because something in it is
-    /// broken, and a broken truth would otherwise fail the whole corpus.
+    /// broken and would otherwise fail the whole corpus.
     pub disabled: Vec<String>,
+    /// The questions this corpus lets two counters answer differently.
     pub readings: Readings,
 }
 
 impl Corpus {
+    /// Reads every case under the directory. Failures are collected rather than stopped at, so a
+    /// corpus with three broken cases reports all three.
     pub fn read(dir: &Path) -> Result<Corpus, Vec<Fault>> {
         let readings = match Readings::read(dir) {
             Ok(readings) => readings,
@@ -100,17 +106,21 @@ impl Corpus {
     }
 }
 
-/// `name` is the case's own directory name, number and words together, and it is how a case is
-/// named in the report and in a known-failures file. The group it sits in is no part of it, so
-/// moving a case between groups is a renumbering and nothing else.
+/// One case: a small input file, the spans marked in it, and what it is trying to catch.
 pub struct Case {
+    /// The directory name, number and words together, which is how the report and a
+    /// known-failures file name it. The group is no part of it, so moving a case between groups
+    /// is a renumbering and nothing else.
     pub name: String,
+    /// The one file a counter is ever pointed at, `input.<extension>` inside the case directory.
     pub input_file: PathBuf,
+    /// What this case is trying to catch, written for a person, and empty for a disabled case.
     pub trap: String,
     pub truth: Truth,
 }
 
 impl Case {
+    /// Reads one case directory, given the readings its corpus defines.
     pub fn read(dir: &Path, readings: &Readings) -> Result<Case, Vec<Fault>> {
         let name = get_name_of(dir);
         let one = |message: String| vec![Fault { case: name.clone(), message }];
@@ -175,8 +185,10 @@ impl Case {
     }
 }
 
+/// Something wrong with the corpus itself, never with a counter.
 #[derive(Debug)]
 pub struct Fault {
+    /// The case it was found in, or the name of the file when it was found outside a case.
     pub case: String,
     pub message: String,
 }
@@ -197,8 +209,8 @@ fn get_name_of(path: &Path) -> String {
         .unwrap_or_else(|| path.display().to_string())
 }
 
-/// Sorted by the number each name begins with and not by the name, so that a group or a case whose
-/// number is one digit longer than its neighbours still sits where the number says.
+// Sorted by the number a name begins with rather than by the name, so a case one digit longer
+// than its neighbours still sits where its number says.
 fn find_the_directories_in(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
     let mut found: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|entry| entry.ok())
@@ -222,9 +234,7 @@ fn find_the_first_number_of(group: &str) -> Result<u32, String> {
     }
 }
 
-/// A case filed under the wrong group would keep working and stop being findable by anybody
-/// reading the corpus by number, so the group a case sits in has to agree with the case's own
-/// number.
+// A case filed under the wrong group would keep working and stop being findable by number.
 fn check_the_number_of(case: &str, first: u32, group: &str) -> Result<(), String> {
     match find_the_number_in(case) {
         Some(number) if (first..first.saturating_add(GROUP_SIZE)).contains(&number) => Ok(()),
@@ -240,8 +250,8 @@ fn find_the_number_in(name: &str) -> Option<u32> {
     name.split('-').next()?.parse().ok()
 }
 
-/// A case is one directory holding one `input.<extension>`, and that file is the whole of what a
-/// counter is ever pointed at.
+// A case holds exactly one `input.<extension>`, and its extension is what tells a counter which
+// language to read it as.
 fn find_input_file_in(dir: &Path) -> Result<PathBuf, String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("the case could not be opened: {e}"))?;
     let mut found: Vec<PathBuf> = entries
@@ -280,9 +290,8 @@ fn check_witnesses(readings: &Readings, cases: &[Case], faults: &mut Vec<Fault>)
     }
 }
 
-/// A case file holds the trap and nothing else. What each counter once printed lives in that
-/// counter's own file under `recorded/`, so a case left holding an answer block is a case the
-/// move missed, and the unknown field refuses it loudly.
+// A case file holds the trap and nothing else. What a counter printed lives under `recorded/`, so
+// an answer block written here is refused rather than ignored.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawCase {

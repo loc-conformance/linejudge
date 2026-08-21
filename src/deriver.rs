@@ -1,3 +1,5 @@
+//! Works out the answer a counter should give, from a case's marks and that counter's rules.
+
 use std::collections::BTreeMap;
 
 use crate::answer::{Answer, Counts, RegionCounts};
@@ -8,18 +10,19 @@ use crate::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
 
 const DOC_STRING_SYMBOLS: [&str; 2] = ["\"\"\"", "'''"];
 
-/// The answer, and one true or false per rule of that counter saying whether the rule decided a
-/// line of this file. The second is here because "is this rule ever used" is a question about all
-/// the cases together, which no single file can answer.
+/// What one dialect makes of one case.
 pub struct Derivation {
+    /// The answer the counter should give.
     pub real: Answer,
+    /// One entry per rule of the dialect, saying whether it took a line of this file. Whether a
+    /// rule is ever used at all is a question about the whole corpus, so the tally is handed back
+    /// to be summed.
     pub rules_that_fired: Vec<bool>,
 }
 
-/// The answer this counter should give for this file, worked out from its marked strings and
-/// comments and from the counter's own rules. Two things are refused: a line that no rule puts
-/// anywhere, and a line that two rules put in different buckets. The rules are not tried in order,
-/// so there is no first one to win, and either case means the rules are wrong, not the file.
+/// Works out the answer this counter should give for this file. Two things are refused: a line no
+/// rule puts anywhere, and a line two rules put in different buckets. The rules are not tried in
+/// order, so there is no first one to win, and either case means the rules are wrong, not the file.
 pub fn derive_answer(
     truth: &Truth,
     dialect: &Dialect,
@@ -80,8 +83,8 @@ pub struct ExplainedLine {
     pub region: Option<String>,
 }
 
-/// The same derivation as `derive_answer`, kept line by line instead of summed: every line goes
-/// through the same `judge_line`, so what this says and what the counts say cannot part.
+/// The same work as [`derive_answer`], kept line by line instead of summed, for a person asking
+/// why the counts came out the way they did. Both go through one function, so the two cannot part.
 pub fn explain_every_line(
     truth: &Truth,
     dialect: &Dialect,
@@ -122,8 +125,7 @@ pub fn explain_every_line(
     if faults.is_empty() { Ok(lines) } else { Err(faults) }
 }
 
-/// One field per `Predicate`, answered for a single line by reading its characters together with
-/// the marks under them.
+// One field per `Predicate`, answered for a single line.
 struct Facts {
     blank: bool,
     has_residue: bool,
@@ -234,9 +236,8 @@ fn collect_counted_readings(dialect: &Dialect) -> Vec<&str> {
         .collect()
 }
 
-/// True or false for every line of the file. A doc string is a string that opens with three quotes
-/// at the start of a line and lasts until that string closes, so a line in the middle of one holds
-/// nothing that says so, and the only way to answer is to read the file from the top.
+// A line in the middle of a doc string holds nothing saying it is in one, so the whole file has to
+// be read from the top and the answer kept per line.
 fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<bool> {
     let mut open = false;
     let mut lines = Vec::with_capacity(truth.lines.len());
@@ -280,9 +281,8 @@ fn add_one_line(counts: &mut Counts, bucket: &str) {
     *counts.buckets.entry(bucket.to_string()).or_default() += 1;
 }
 
-// The characters of a tag like <script> count as ordinary ones here. A tag decides which language
-// the lines inside it belong to; it does not change what its own line is, and all three counters
-// call that line code.
+// A tag like <script> decides which language the lines inside it belong to, and does not change
+// what its own line is: all three counters call that line code.
 fn is_residue(mark: char) -> bool {
     matches!(mark, RESIDUE | TAG_OPENS | TAG_CLOSES)
 }
@@ -416,8 +416,6 @@ mod tests {
         assert_eq!(doc_line_of("mezura", "region").as_deref(), Some("TypeScript"));
     }
 
-    // The heading of an explanation and the counts of the derivation both come out of judge_line,
-    // and this is the assertion that they cannot part.
     #[test]
     fn every_line_is_explained_by_the_same_rules_that_count_it() {
         let input = "\"\"\"\nnotes\n\"\"\"\nx = 1\n";

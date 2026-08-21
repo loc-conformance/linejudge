@@ -3,14 +3,13 @@ use crate::render::data::{Answer, Verdict};
 const HEIGHT: usize = 20;
 const LABEL: &str = "conformance";
 const LABEL_WIDTH: usize = 90;
-/// A block is this wide whatever its number, so the blocks of one badge are even, and a shorter
-/// one only for a single digit, which would otherwise swim in its own colour.
+// A block is this wide whatever its number, so the blocks of one badge are even. Only a single
+// digit gets a narrower one, which would otherwise swim in its own colour.
 const BLOCK: usize = 40;
 const NARROW_BLOCK: usize = 34;
 
-/// One badge for one way of counting: the label, then a block per state it is in, each carrying
-/// its count. A block whose count is nought is left out, apart from the green one, which is what
-/// the badge is for and stays even at nought.
+// One badge for one way of counting: the label, then a block per state, each carrying its count. A
+// block of nought is left out, apart from the green one, which is what the badge is for and stays.
 pub fn render_one_badge(answers: &[Answer]) -> String {
     let of = |wanted: &dyn Fn(&Answer) -> bool| answers.iter().filter(|a| wanted(a)).count();
     let blocks: Vec<(usize, &str, &str)> = [
@@ -61,7 +60,7 @@ pub fn render_one_badge(answers: &[Answer]) -> String {
     )
 }
 
-/// What a symbol means, for whoever hears the badge read out instead of seeing it.
+// What a symbol means, for whoever hears the badge read out instead of seeing it.
 fn name_of(symbol: &str) -> &'static str {
     match symbol {
         "✓" => "agree",
@@ -106,8 +105,8 @@ mod tests {
         assert!(badge.contains("1 agree, 1 fail and nobody has reviewed them, 1 fail"), "{badge}");
     }
 
-    // Five narrow blocks and the label, which is what the width has to add up to, since a width
-    // that does not match what is drawn crops the last block or hangs empty colour off the end.
+    // A width that does not match what is drawn crops the last block or hangs empty colour off
+    // the end.
     #[test]
     fn the_width_of_the_badge_is_the_width_of_what_is_drawn() {
         let badge = render_one_badge(&[
