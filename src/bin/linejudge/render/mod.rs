@@ -102,8 +102,8 @@ fn write_a_page_each<T>(
 
 // A badge names the way of counting as well as the counter, since a counter with two of them has
 // two answers and one file could only ever be one of them.
-pub fn name_the_badge_of(counter: &str, dialect: &str) -> String {
-    format!("{counter}.{dialect}")
+pub fn name_the_badge_of(name_of_counter: &str, name_of_dialect: &str) -> String {
+    format!("{name_of_counter}.{name_of_dialect}")
 }
 
 // Every page is this, so the stylesheet and the script are written once and linked rather than
@@ -162,7 +162,8 @@ mod tests {
     use std::collections::BTreeMap;
     use std::env;
 
-    use crate::marks::Ink;
+    use linejudge::truth::Covering;
+
     use crate::render::data::{
         Answer, Case, Counted, Counter, Counts, Dialect, DialectDetail, Group, Line, Piece,
         RuleDetail, Verdict,
@@ -235,13 +236,13 @@ mod tests {
     }
 
     fn a_sweep() -> Sweep {
-        let answer = |case: &str, verdict: Verdict| {
+        let answer = |name_of_case: &str, verdict: Verdict| {
             let counts = |code: u32| Counts {
                 lines: 3,
                 buckets: BTreeMap::from([("code".to_string(), code)]),
             };
             Answer {
-                case: case.to_string(),
+                case: name_of_case.to_string(),
                 verdict,
                 wants: (verdict != Verdict::Broke).then(|| counts(3)),
                 answered: matches!(verdict, Verdict::Agrees | Verdict::Fails).then(|| counts(2)),
@@ -250,7 +251,7 @@ mod tests {
                 note: (verdict == Verdict::Fails).then(|| "the /* opens a comment".to_string()),
                 exception: None,
                 broke: (verdict == Verdict::Broke).then(|| "it exited 2".to_string()),
-                command: format!("tokei cases/{case}/input.c"),
+                command: format!("tokei cases/{name_of_case}/input.c"),
             }
         };
         let way = |name: &str, first: Verdict, second: Verdict| Dialect {
@@ -314,8 +315,8 @@ mod tests {
                 .to_vec(),
             lines: vec![Line {
                 pieces: vec![
-                    Piece { ink: Ink::Plain, text: "a = 1; ".to_string() },
-                    Piece { ink: Ink::Comment, text: "// two".to_string() },
+                    Piece { covering: Covering::Residue, text: "a = 1; ".to_string() },
+                    Piece { covering: Covering::Comment, text: "// two".to_string() },
                 ],
                 counted: ["code", "comments", "code"]
                     .iter()

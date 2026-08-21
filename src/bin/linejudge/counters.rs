@@ -31,12 +31,12 @@ impl Counters {
         })
     }
 
-    pub fn find_binary(&self, counter: &str) -> Option<&Path> {
-        self.binaries.get(counter).map(|p| p.as_path())
+    pub fn find_binary(&self, name_of_counter: &str) -> Option<&Path> {
+        self.binaries.get(name_of_counter).map(|p| p.as_path())
     }
 
-    pub fn name_binary(&mut self, counter: &str, binary: PathBuf) {
-        self.binaries.insert(counter.to_string(), binary);
+    pub fn name_binary(&mut self, name_of_counter: &str, binary: PathBuf) {
+        self.binaries.insert(name_of_counter.to_string(), binary);
     }
 
     // A relative path in a committed counters file means it from that file's own project, however

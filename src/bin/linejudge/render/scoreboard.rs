@@ -137,12 +137,12 @@ fn render_one_tally(answers: &[Answer]) -> Markup {
     }
 }
 
-fn render_one_cell(counter: &Counter, case: &str) -> Markup {
+fn render_one_cell(counter: &Counter, name_of_case: &str) -> Markup {
     let multi = counter.dialects.len() > 1;
     html! {
         td {
             @for (at, dialect) in counter.dialects.iter().enumerate() {
-                @let answer = dialect.answers.iter().find(|answer| answer.case == case);
+                @let answer = dialect.answers.iter().find(|one| one.case == name_of_case);
                 @if multi {
                     div .dv data-group=(counter.name) data-value=(dialect.name) hidden[at > 0] {
                         @if let Some(answer) = answer { (render_one_answer(answer)) }

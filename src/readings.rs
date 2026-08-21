@@ -12,12 +12,13 @@ pub(crate) const READINGS_FILE: &str = "readings.toml";
 /// Every reading a truth may mark as optional, as the corpus's own file defines them. A reading is
 /// a question two counters may fairly answer differently, whether a Rust doc comment is its own
 /// language of Markdown being one.
+#[derive(Debug)]
 pub struct Readings {
     readings: BTreeMap<String, Reading>,
 }
 
 /// One such question.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Reading {
     /// What the question is, written so that a refusal can quote it at whoever hit it.

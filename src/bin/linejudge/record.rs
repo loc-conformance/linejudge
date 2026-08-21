@@ -35,12 +35,9 @@ pub fn record_one_counter(
     let mut broke = Vec::new();
     let mut dropped = Vec::new();
 
-    for way in &adapter.dialects {
-        let rules = dialects
-            .find(counter, &way.name)
-            .ok_or_else(|| format!("{counter}.{} has no dialect file", way.name))?;
+    for way in &adapter.invocations {
         let judged =
-            measure_and_judge_every_case(adapter, way, rules, binary, corpus, None, &version)
+            measure_and_judge_every_case(adapter, way, dialects, binary, corpus, None, &version)
                 .map_err(|faults| faults.join("\n"))?;
         for one in judged {
             let outcome = match one.outcome {
@@ -115,7 +112,7 @@ fn decide_the_note(held: Option<&RecordedAnswer>, live: &Option<Answer>) -> (Opt
 }
 
 fn format_the_file(
-    counter: &str,
+    name_of_counter: &str,
     version: &str,
     corpus: &Corpus,
     adapter: &Adapter,
@@ -123,10 +120,11 @@ fn format_the_file(
     measured: &BTreeMap<(String, String), Recorded>,
     held: Option<&RecordedAnswers>,
 ) -> Result<String, String> {
-    let mut text = format!("counter = {}\nversion = {}\n", quote(counter), quote(version));
+    let mut text =
+        format!("counter = {}\nversion = {}\n", quote(name_of_counter), quote(version));
     for case in &corpus.cases {
-        for way in &adapter.dialects {
-            let buckets = match dialects.find(counter, &way.name) {
+        for way in &adapter.invocations {
+            let buckets = match dialects.find(name_of_counter, &way.name) {
                 Some(rules) => &rules.buckets,
                 None => continue,
             };

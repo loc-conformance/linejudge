@@ -14,6 +14,9 @@ use crate::locator::{Locator, RawLocator};
 use crate::measurement::{OutputFormat, read_output};
 use crate::per_line::PerLineFormat;
 
+/// The directory the adapters are read from, one `<counter>.toml` inside it per counter.
+pub const ADAPTERS_DIR: &str = "adapters";
+
 pub(crate) const UNKNOWN_VERSION: &str = "unknown version";
 
 const ADAPTER_EXTENSION: &str = "toml";
@@ -44,7 +47,8 @@ pub struct Adapter {
     /// `None` is a counter that cannot be fetched: it is left out of any scheduled sweep, loudly,
     /// and still runs for anyone holding its binary.
     pub acquisition: Option<Acquisition>,
-    pub dialects: Vec<Dialect>,
+    /// One per way this counter counts, each named after the dialect holding its rules.
+    pub invocations: Vec<Invocation>,
 }
 
 impl Adapter {
@@ -171,7 +175,12 @@ impl Adapter {
                     }
                 },
             };
-            ways.push(Dialect { name, args: dialect.args, buckets: found.buckets.clone(), reader });
+            ways.push(Invocation {
+                name,
+                args: dialect.args,
+                buckets: found.buckets.clone(),
+                reader,
+            });
         }
         if ways.is_empty() {
             return Err(format!("{} names no way of counting to run", path.display()));
@@ -197,7 +206,7 @@ impl Adapter {
                 None => Some(VERSION_FLAG.to_string()),
             },
             acquisition: raw.acquisition,
-            dialects: ways,
+            invocations: ways,
         })
     }
 
@@ -205,14 +214,14 @@ impl Adapter {
     /// no such file, which is an answer of its own and not a failure.
     pub fn measure(
         &self,
-        dialect: &Dialect,
+        invocation: &Invocation,
         binary: &Path,
         file: &Path,
     ) -> Result<Option<Answer>, String> {
-        let args = self.build_args(dialect, file);
+        let args = self.build_args(invocation, file);
         let printed = run_counter(binary, &args)?;
-        match &dialect.reader {
-            Reader::Written(format) => read_output(*format, &dialect.buckets, &printed),
+        match &invocation.reader {
+            Reader::Written(format) => read_output(*format, &invocation.buckets, &printed),
             Reader::Declared(locator) => locator.read(&printed),
         }
         .map_err(|e| format!("{} on {}: {e}", self.name_of_counter, file.display()))
@@ -232,40 +241,42 @@ impl Adapter {
     /// `None` is an adapter that declares no such command.
     pub fn run_explain(
         &self,
-        dialect: &Dialect,
+        invocation: &Invocation,
         binary: &Path,
         file: &Path,
     ) -> Option<Result<String, String>> {
         let base = self.explain_args.as_ref()?;
-        Some(run_counter(binary, &build_command_args(base, dialect, file)))
+        Some(run_counter(binary, &build_command_args(base, invocation, file)))
     }
 
     /// The command as a person would retype it, meant to be pasted into a shell. Paths under the
     /// directory the run works from are written relative to it and the rest are left whole.
-    pub fn format_command(&self, dialect: &Dialect, binary: &Path, file: &Path) -> String {
-        format!("{} {}", shorten(binary), self.build_args(dialect, &shorten_the_path(file)).join(" "))
+    pub fn format_command(&self, invocation: &Invocation, binary: &Path, file: &Path) -> String {
+        let args = self.build_args(invocation, &shorten_the_path(file));
+        format!("{} {}", shorten(binary), args.join(" "))
     }
 
     /// The same for the per-line command, and `None` where the adapter declares none.
     pub fn format_explain_command(
         &self,
-        dialect: &Dialect,
+        invocation: &Invocation,
         binary: &Path,
         file: &Path,
     ) -> Option<String> {
         let base = self.explain_args.as_ref()?;
-        let args = build_command_args(base, dialect, &shorten_the_path(file));
+        let args = build_command_args(base, invocation, &shorten_the_path(file));
         Some(format!("{} {}", shorten(binary), args.join(" ")))
     }
 
-    fn build_args(&self, dialect: &Dialect, file: &Path) -> Vec<String> {
-        build_command_args(&self.args, dialect, file)
+    fn build_args(&self, invocation: &Invocation, file: &Path) -> Vec<String> {
+        build_command_args(&self.args, invocation, file)
     }
 }
 
-/// One way this counter counts, as its adapter declares it.
+/// How this counter is asked for one of its ways of counting, and how what it prints is read. The
+/// rules that way of counting is judged by are the [`crate::dialects::Dialect`] of the same name.
 #[derive(Debug)]
-pub struct Dialect {
+pub struct Invocation {
     /// `default` for a counter that counts only the one way.
     pub name: String,
     /// What is added to the counter's command line to ask for this way of counting.
@@ -320,12 +331,12 @@ fn name_every_one_of(dirs: &[PathBuf]) -> String {
     dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>().join(" or ")
 }
 
-fn build_command_args(base: &[String], dialect: &Dialect, file: &Path) -> Vec<String> {
+fn build_command_args(base: &[String], invocation: &Invocation, file: &Path) -> Vec<String> {
     let mut args: Vec<String> = base
         .iter()
         .map(|a| a.replace(FILE_PLACEHOLDER, &file.display().to_string()))
         .collect();
-    args.extend(dialect.args.iter().cloned());
+    args.extend(invocation.args.iter().cloned());
     args
 }
 
@@ -392,20 +403,20 @@ mod tests {
         let names: Vec<&str> = adapters.iter().map(|a| a.name_of_counter.as_str()).collect();
         assert_eq!(names, ["mezura", "scc", "tokei"]);
         let mezura = &adapters[0];
-        let dialects: Vec<&str> = mezura.dialects.iter().map(|d| d.name.as_str()).collect();
+        let dialects: Vec<&str> = mezura.invocations.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(dialects, ["content", "region"]);
-        assert_eq!(mezura.dialects[0].buckets, ["code", "comments", "extra"]);
-        assert_eq!(mezura.dialects[1].buckets, ["code", "comments", "blanks"]);
+        assert_eq!(mezura.invocations[0].buckets, ["code", "comments", "extra"]);
+        assert_eq!(mezura.invocations[1].buckets, ["code", "comments", "blanks"]);
         let tokei = adapters[2].acquisition.as_ref().unwrap();
         assert_eq!((tokei.channel.as_str(), tokei.version.as_str()), ("crates-io", "14.0.0"));
         for adapter in &adapters {
             let home = adapter.repository.as_deref().unwrap_or_default();
             assert!(home.starts_with("https://"), "{}: {home}", adapter.name_of_counter);
         }
-        for dialect in mezura.dialects.iter().chain(&adapters[1].dialects) {
+        for dialect in mezura.invocations.iter().chain(&adapters[1].invocations) {
             assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
         }
-        assert!(matches!(adapters[2].dialects[0].reader, Reader::Written(OutputFormat::TokeiJson)));
+        assert!(matches!(adapters[2].invocations[0].reader, Reader::Written(OutputFormat::TokeiJson)));
     }
 
     #[test]
@@ -416,13 +427,13 @@ mod tests {
         let here = env::current_dir().unwrap();
 
         let under = here.join("cases").join("0400-a_case").join("input.c");
-        let printed = tokei.format_command(&tokei.dialects[0], Path::new("tokei"), &under);
+        let printed = tokei.format_command(&tokei.invocations[0], Path::new("tokei"), &under);
         assert!(printed.contains(&format!("cases{}0400-a_case", std::path::MAIN_SEPARATOR)),
                 "{printed}");
         assert!(!printed.contains(&here.display().to_string()), "{printed}");
 
         let elsewhere = Path::new("/somewhere/of/its/own/input.c");
-        let whole = tokei.format_command(&tokei.dialects[0], Path::new("tokei"), elsewhere);
+        let whole = tokei.format_command(&tokei.invocations[0], Path::new("tokei"), elsewhere);
         assert!(whole.contains("somewhere"), "{whole}");
     }
 
@@ -503,7 +514,7 @@ mod tests {
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let mezura = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[0];
-        let args = mezura.build_args(&mezura.dialects[1], Path::new("a/case/input.rs"));
+        let args = mezura.build_args(&mezura.invocations[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
     }
@@ -514,7 +525,7 @@ mod tests {
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
         let scc = &adapters[1];
         let command = scc
-            .format_explain_command(&scc.dialects[0], Path::new("scc.exe"), Path::new("input.py"))
+            .format_explain_command(&scc.invocations[0], Path::new("scc.exe"), Path::new("input.py"))
             .unwrap();
         assert_eq!(command, "scc.exe -t --no-cocomo -f csv input.py");
         assert_eq!(scc.explain_keep_from.as_deref(), Some("line "));
@@ -522,7 +533,7 @@ mod tests {
         assert!(tokei.explain_args.is_none());
         assert!(
             tokei
-                .format_explain_command(&tokei.dialects[0], Path::new("t.exe"), Path::new("a.py"))
+                .format_explain_command(&tokei.invocations[0], Path::new("t.exe"), Path::new("a.py"))
                 .is_none()
         );
 

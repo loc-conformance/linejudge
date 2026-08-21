@@ -194,8 +194,8 @@ mod tests {
     }
 
     fn a_sweep() -> Sweep {
-        let answer = |case: &str, verdict: Verdict, note: Option<&str>| Answer {
-            case: case.to_string(),
+        let answer = |name_of_case: &str, verdict: Verdict, note: Option<&str>| Answer {
+            case: name_of_case.to_string(),
             verdict,
             wants: Some(Counts { lines: 1, buckets: BTreeMap::new() }),
             answered: None,

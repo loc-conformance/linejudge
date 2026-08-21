@@ -26,14 +26,14 @@ pub fn fetch_every_counter(
 ) -> io::Result<bool> {
     let mut anything_failed = false;
     for adapter in adapters {
-        let counter = &adapter.name_of_counter;
-        writeln!(out, "\n{}", style::HEADING.paint(counter))?;
+        let name_of_counter = &adapter.name_of_counter;
+        writeln!(out, "\n{}", style::HEADING.paint(name_of_counter))?;
         let Some(how) = &adapter.acquisition else {
             writeln!(out, "  {}", style::DETAIL.paint(
                     "its adapter does not say where to download it from, so it is skipped"))?;
             continue;
         };
-        let arrived = match find_the_binary_of(counter, &how.version) {
+        let arrived = match find_the_binary_of(name_of_counter, &how.version) {
             Some(there) => Ok((there, "is already here")),
             None => fetch_one_counter(out, adapter, how).map(|binary| (binary, "is ready")),
         };
@@ -42,7 +42,7 @@ pub fn fetch_every_counter(
                 writeln!(out, "  {} {}",
                         style::AGREES.paint(&format!("{} {standing}", how.version)),
                         style::DETAIL.paint(&binary.display().to_string()))?;
-                report_the_path_that_shadows(out, counter, named)?;
+                report_the_path_that_shadows(out, name_of_counter, named)?;
             }
             Err(refused) => {
                 anything_failed = true;
@@ -57,10 +57,10 @@ pub fn fetch_every_counter(
 // Said out loud, or a fetch looks like it changed what gets measured when it did not.
 fn report_the_path_that_shadows(
     out: &mut dyn Write,
-    counter: &str,
+    name_of_counter: &str,
     named: &Counters,
 ) -> io::Result<()> {
-    let Some(instead) = named.find_binary(counter) else { return Ok(()) };
+    let Some(instead) = named.find_binary(name_of_counter) else { return Ok(()) };
     writeln!(out, "  {}", style::RECORDED.paint(&format!(
             "counters.toml names {}, so that is what a run measures and not this",
             instead.display())))
@@ -72,11 +72,11 @@ fn fetch_one_counter(
     adapter: &Adapter,
     how: &Acquisition,
 ) -> Result<PathBuf, String> {
-    let counter = &adapter.name_of_counter;
-    let partial = create_a_partial_dir_for(counter, &how.version)?;
+    let name_of_counter = &adapter.name_of_counter;
+    let partial = create_a_partial_dir_for(name_of_counter, &how.version)?;
     let assembled = match how.channel.as_str() {
-        CRATES_IO => build_from_crates_io(out, counter, how, &partial),
-        GITHUB_RELEASE_ASSET => download_a_release_asset(out, counter, how, &partial),
+        CRATES_IO => build_from_crates_io(out, name_of_counter, how, &partial),
+        GITHUB_RELEASE_ASSET => download_a_release_asset(out, name_of_counter, how, &partial),
         other => Err(format!(
             "{other} is not a channel this program knows: it knows {CRATES_IO} and \
              {GITHUB_RELEASE_ASSET}"
@@ -89,13 +89,13 @@ fn fetch_one_counter(
     if !is_the_declared_version(&how.version, &printed) {
         let _ = fs::remove_dir_all(&partial);
         return Err(format!(
-            "{counter} {} was asked for and what arrived says it is \"{printed}\", so the channel \
-             handed over something else",
+            "{name_of_counter} {} was asked for and what arrived says it is \"{printed}\", so the \
+             channel handed over something else",
             how.version
         ));
     }
     let dir = finish_the_partial_dir(&partial)?;
-    Ok(dir.join(format!("{counter}{EXE_SUFFIX}")))
+    Ok(dir.join(format!("{name_of_counter}{EXE_SUFFIX}")))
 }
 
 // crates.io holds source and never an executable, so this channel is a compile and needs cargo on
@@ -103,7 +103,7 @@ fn fetch_one_counter(
 // binary is lifted out of there and the rest of what cargo wrote is left behind.
 fn build_from_crates_io(
     out: &mut dyn Write,
-    counter: &str,
+    name_of_counter: &str,
     how: &Acquisition,
     into: &Path,
 ) -> Result<PathBuf, String> {
@@ -114,7 +114,7 @@ fn build_from_crates_io(
             .map(str::to_string);
     let asked: Vec<&str> = installing.iter().map(String::as_str).collect();
     run_the_program("cargo", &asked).map_err(Refusal::into_words)?;
-    let named = format!("{counter}{EXE_SUFFIX}");
+    let named = format!("{name_of_counter}{EXE_SUFFIX}");
     let built = root.join("bin").join(&named);
     if !built.is_file() {
         return Err(format!(
@@ -133,7 +133,7 @@ fn build_from_crates_io(
 // the checksums published beside it say whether the download arrived whole.
 fn download_a_release_asset(
     out: &mut dyn Write,
-    counter: &str,
+    name_of_counter: &str,
     how: &Acquisition,
     into: &Path,
 ) -> Result<PathBuf, String> {
@@ -162,7 +162,7 @@ fn download_a_release_asset(
         format!("{downloaded} could not be unpacked: {}", refused.into_words())
     })?;
     let _ = fs::remove_file(&archive);
-    let named = format!("{counter}{EXE_SUFFIX}");
+    let named = format!("{name_of_counter}{EXE_SUFFIX}");
     find_the_file_named(&named, into).ok_or_else(|| {
         format!("{downloaded} holds no {named}, so this counter is packed under another name")
     })

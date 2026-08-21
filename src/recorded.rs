@@ -10,6 +10,7 @@ use serde::Deserialize;
 use crate::adapter::UNKNOWN_VERSION;
 use crate::answer::{Answer, Counts, RegionCounts};
 use crate::dialects::{Dialects, check_buckets};
+use crate::faults::Faults;
 
 /// The directory the records are read from, one `<counter>.toml` inside it per counter.
 pub const RECORDED_DIR: &str = "recorded";
@@ -18,6 +19,7 @@ const RECORDED_EXTENSION: &str = "toml";
 /// What one counter printed for each case on the day it was measured, at the version written at
 /// the top of the file. A counter with no such record is measured all the same: the record adds
 /// only the question of whether the counter still answers the way it did.
+#[derive(Debug)]
 pub struct RecordedAnswers {
     pub counter: String,
     /// The version line the measured binary printed, kept whole.
@@ -31,10 +33,10 @@ impl RecordedAnswers {
     /// read. No record at all is the ordinary state of anybody's tool, and not an error.
     pub fn read(
         dirs: &[PathBuf],
-        counter: &str,
+        name_of_counter: &str,
         dialects: &Dialects,
-    ) -> Result<Option<RecordedAnswers>, Vec<String>> {
-        let named = format!("{counter}.{RECORDED_EXTENSION}");
+    ) -> Result<Option<RecordedAnswers>, Faults> {
+        let named = format!("{name_of_counter}.{RECORDED_EXTENSION}");
         let Some(path) = dirs.iter().rev().map(|dir| dir.join(&named)).find(|path| path.is_file())
         else {
             return Ok(None);
@@ -43,14 +45,14 @@ impl RecordedAnswers {
             Ok(text) => text,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
             Err(error) => {
-                return Err(vec![format!("{} could not be read: {error}", path.display())]);
+                return Err(format!("{} could not be read: {error}", path.display()).into());
             }
         };
         let raw: RawRecorded = toml::from_str(&text)
-            .map_err(|e| vec![format!("{} does not parse: {e}", path.display())])?;
+            .map_err(|e| format!("{} does not parse: {e}", path.display()))?;
         let where_it_is = path.display();
         let mut faults = Vec::new();
-        if raw.counter != counter {
+        if raw.counter != name_of_counter {
             faults.push(format!(
                 "{where_it_is} says it records {}, and a counter's answers are the file named \
                  after it",
@@ -68,7 +70,7 @@ impl RecordedAnswers {
         for (case, blocks) in raw.answer {
             for (dialect, block) in blocks {
                 let key = format!("answer.{case}.{dialect}");
-                let buckets = match find_buckets(dialects, counter, &dialect) {
+                let buckets = match find_buckets(dialects, name_of_counter, &dialect) {
                     Ok(buckets) => buckets,
                     Err(message) => {
                         faults.push(format!("{where_it_is}: {key} {message}"));
@@ -88,7 +90,7 @@ impl RecordedAnswers {
         for (case, blocks) in raw.exception {
             for (dialect, block) in blocks {
                 let key = format!("exception.{case}.{dialect}");
-                let buckets = match find_buckets(dialects, counter, &dialect) {
+                let buckets = match find_buckets(dialects, name_of_counter, &dialect) {
                     Ok(buckets) => buckets,
                     Err(message) => {
                         faults.push(format!("{where_it_is}: {key} {message}"));
@@ -105,21 +107,21 @@ impl RecordedAnswers {
             }
         }
         if !faults.is_empty() {
-            return Err(faults);
+            return Err(faults.into());
         }
         Ok(Some(RecordedAnswers { counter: raw.counter, version: raw.version, answers, exceptions }))
     }
 
     /// What the counter printed for this case in this way of counting, and `None` where the record
     /// says nothing about it.
-    pub fn find(&self, case: &str, dialect: &str) -> Option<&RecordedAnswer> {
-        self.answers.get(&(case.to_string(), dialect.to_string()))
+    pub fn find(&self, name_of_case: &str, name_of_dialect: &str) -> Option<&RecordedAnswer> {
+        self.answers.get(&(name_of_case.to_string(), name_of_dialect.to_string()))
     }
 
     /// The exception declared for this case in this way of counting, and `None` where there is
     /// none, which is nearly always.
-    pub fn find_exception(&self, case: &str, dialect: &str) -> Option<&Exception> {
-        self.exceptions.get(&(case.to_string(), dialect.to_string()))
+    pub fn find_exception(&self, name_of_case: &str, name_of_dialect: &str) -> Option<&Exception> {
+        self.exceptions.get(&(name_of_case.to_string(), name_of_dialect.to_string()))
     }
 
     /// Every case this file speaks about, answers and exceptions together, for the report line
@@ -133,6 +135,7 @@ impl RecordedAnswers {
 }
 
 /// One entry of that record: what the counter printed for one case in one way of counting.
+#[derive(Debug)]
 pub struct RecordedAnswer {
     /// What it printed, and `None` where it said there is no such file.
     pub counted: Option<Answer>,
@@ -187,6 +190,7 @@ impl RecordedAnswer {
 
 /// A case whose deliberate behavior in one way of counting no rule over marked spans can express.
 /// It stands in for the answer the rules would derive, so the case passes and is counted apart.
+#[derive(Debug)]
 pub struct Exception {
     /// What the counter is held to here instead.
     pub expected: Answer,
@@ -220,12 +224,12 @@ pub fn is_same_build(recorded: &str, running: &str) -> bool {
 
 fn find_buckets<'a>(
     dialects: &'a Dialects,
-    counter: &str,
-    dialect: &str,
+    name_of_counter: &str,
+    name_of_dialect: &str,
 ) -> Result<&'a [String], String> {
-    match dialects.find(counter, dialect) {
+    match dialects.find(name_of_counter, name_of_dialect) {
         Some(found) => Ok(&found.buckets),
-        None => Err(format!("is a block of no way of counting {counter} has")),
+        None => Err(format!("is a block of no way of counting {name_of_counter} has")),
     }
 }
 
@@ -555,7 +559,7 @@ the line comment is swallowed by the block above it"""
         assert!(!is_same_build("unknown version", "unknown version"));
     }
 
-    fn read_a_record(name: &str, text: &str) -> Result<Option<RecordedAnswers>, Vec<String>> {
+    fn read_a_record(name: &str, text: &str) -> Result<Option<RecordedAnswers>, Faults> {
         let dir = env::temp_dir().join(format!("linejudge-{name}"));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -566,7 +570,7 @@ the line comment is swallowed by the block above it"""
         read
     }
 
-    fn read_a_broken_record(name: &str, text: &str) -> Vec<String> {
+    fn read_a_broken_record(name: &str, text: &str) -> Faults {
         match read_a_record(name, text) {
             Ok(_) => panic!("the record was read without a fault"),
             Err(faults) => faults,

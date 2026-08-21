@@ -1,14 +1,17 @@
 //! The cases: one small input file each, with its strings and comments marked by hand.
 
-use std::fmt;
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::faults::Faults;
 use crate::readings::{READINGS_FILE, Readings};
 use crate::truth::Truth;
+
+/// The directory the cases are read from, one directory per group inside it.
+pub const CASES_DIR: &str = "cases";
 
 pub(crate) const DISABLED_PREFIX: &str = "disabled-";
 
@@ -19,6 +22,7 @@ const TRUTH_FILE: &str = "truth.txt";
 
 /// Every case of the corpus, read from a directory holding one directory per group, each named
 /// after a whole thousand, with the cases of that thousand inside it.
+#[derive(Debug)]
 pub struct Corpus {
     /// In the order their numbers put them.
     pub cases: Vec<Case>,
@@ -34,35 +38,52 @@ pub struct Corpus {
 }
 
 impl Corpus {
+    /// The case a fragment of a name points at: the one named exactly that, or failing that the
+    /// one case whose name holds it. Names are long, `1150-doc_comment_opening_after_code`, and
+    /// nobody types them whole.
+    ///
+    /// `Err` carries every case the fragment fits, so it is empty where the fragment fits none and
+    /// holds more than one where it is ambiguous. Nothing is ever guessed between them.
+    pub fn find_case(&self, fragment: &str) -> Result<&Case, Vec<&Case>> {
+        if let Some(exact) = self.cases.iter().find(|case| case.name == fragment) {
+            return Ok(exact);
+        }
+        let fitting: Vec<&Case> =
+            self.cases.iter().filter(|case| case.name.contains(fragment)).collect();
+        match fitting.as_slice() {
+            [one] => Ok(one),
+            _ => Err(fitting),
+        }
+    }
+
     /// Reads every case under the directory. Failures are collected rather than stopped at, so a
     /// corpus with three broken cases reports all three.
-    pub fn read(dir: &Path) -> Result<Corpus, Vec<Fault>> {
+    pub fn read(dir: &Path) -> Result<Corpus, Faults> {
         let readings = match Readings::read(dir) {
             Ok(readings) => readings,
-            Err(message) => {
-                return Err(vec![Fault { case: READINGS_FILE.to_string(), message }]);
-            }
+            Err(message) => return Err(format!("{READINGS_FILE}: {message}").into()),
         };
         let groups = match find_the_directories_in(dir) {
             Ok(groups) => groups,
             Err(error) => {
-                return Err(vec![Fault {
-                    case: dir.display().to_string(),
-                    message: format!("the corpus directory could not be opened: {error}"),
-                }]);
+                let where_it_is = dir.display();
+                return Err(
+                    format!("{where_it_is}: the corpus directory could not be opened: {error}")
+                        .into(),
+                );
             }
         };
 
         let mut cases = Vec::new();
         let mut named_groups = Vec::new();
         let mut disabled = Vec::new();
-        let mut faults = Vec::new();
+        let mut faults: Vec<String> = Vec::new();
         for group in groups {
             let group_name = get_name_of(&group);
             let first = match find_the_first_number_of(&group_name) {
                 Ok(first) => first,
                 Err(message) => {
-                    faults.push(Fault { case: group_name, message });
+                    faults.push(format!("{group_name}: {message}"));
                     continue;
                 }
             };
@@ -70,8 +91,9 @@ impl Corpus {
             let inside = match find_the_directories_in(&group) {
                 Ok(inside) => inside,
                 Err(error) => {
-                    let message = format!("the group directory could not be opened: {error}");
-                    faults.push(Fault { case: group_name, message });
+                    faults.push(format!(
+                        "{group_name}: the group directory could not be opened: {error}"
+                    ));
                     continue;
                 }
             };
@@ -80,14 +102,14 @@ impl Corpus {
                 let disabled_name = find_disabled_name(&name);
                 let named = disabled_name.clone().unwrap_or(name);
                 if let Err(message) = check_the_number_of(&named, first, &group_name) {
-                    faults.push(Fault { case: named, message });
+                    faults.push(format!("{named}: {message}"));
                     continue;
                 }
                 match disabled_name {
                     Some(name) => disabled.push(name),
                     None => match Case::read(&path, &readings) {
                         Ok(case) => cases.push(case),
-                        Err(mut found) => faults.append(&mut found),
+                        Err(found) => faults.extend(found.iter().cloned()),
                     },
                 }
             }
@@ -98,15 +120,15 @@ impl Corpus {
         if faults.is_empty() {
             check_witnesses(&readings, &cases, &mut faults);
         }
-        if faults.is_empty() {
-            Ok(Corpus { cases, groups: named_groups, disabled, readings })
-        } else {
-            Err(faults)
+        match faults.is_empty() {
+            true => Ok(Corpus { cases, groups: named_groups, disabled, readings }),
+            false => Err(faults.into()),
         }
     }
 }
 
 /// One case: a small input file, the spans marked in it, and what it is trying to catch.
+#[derive(Debug)]
 pub struct Case {
     /// The directory name, number and words together, which is how the report and a
     /// known-failures file name it. The group is no part of it, so moving a case between groups
@@ -121,9 +143,9 @@ pub struct Case {
 
 impl Case {
     /// Reads one case directory, given the readings its corpus defines.
-    pub fn read(dir: &Path, readings: &Readings) -> Result<Case, Vec<Fault>> {
+    pub fn read(dir: &Path, readings: &Readings) -> Result<Case, Faults> {
         let name = get_name_of(dir);
-        let one = |message: String| vec![Fault { case: name.clone(), message }];
+        let one = |message: String| Faults::from(format!("{name}: {message}"));
 
         let input_file = match find_input_file_in(dir) {
             Ok(path) => path,
@@ -154,48 +176,29 @@ impl Case {
         let truth = match Truth::read(&marked, &text) {
             Ok(truth) => truth,
             Err(messages) => {
-                return Err(messages
-                    .into_iter()
-                    .map(|message| Fault {
-                        case: name.clone(),
-                        message: format!("{TRUTH_FILE}: {message}"),
-                    })
-                    .collect());
+                let named: Vec<String> = messages
+                    .iter()
+                    .map(|message| format!("{name}: {TRUTH_FILE}: {message}"))
+                    .collect();
+                return Err(named.into());
             }
         };
         for reading in truth.find_optional_readings() {
             if readings.find(reading).is_none() {
-                faults.push(Fault {
-                    case: name.clone(),
-                    message: format!(
-                        "{TRUTH_FILE} marks the reading {reading}, which {READINGS_FILE} does \
-                         not define"
-                    ),
-                });
+                faults.push(format!(
+                    "{name}: {TRUTH_FILE} marks the reading {reading}, which {READINGS_FILE} does \
+                     not define"
+                ));
             }
         }
         if raw.trap.trim().is_empty() {
-            faults.push(Fault { case: name.clone(), message: "the trap says nothing".to_string() });
+            faults.push(format!("{name}: the trap says nothing"));
         }
         if !faults.is_empty() {
-            return Err(faults);
+            return Err(faults.into());
         }
 
         Ok(Case { name, input_file, trap: raw.trap, truth })
-    }
-}
-
-/// Something wrong with the corpus itself, never with a counter.
-#[derive(Debug)]
-pub struct Fault {
-    /// The case it was found in, or the name of the file when it was found outside a case.
-    pub case: String,
-    pub message: String,
-}
-
-impl fmt::Display for Fault {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.case, self.message)
     }
 }
 
@@ -235,14 +238,14 @@ fn find_the_first_number_of(group: &str) -> Result<u32, String> {
 }
 
 // A case filed under the wrong group would keep working and stop being findable by number.
-fn check_the_number_of(case: &str, first: u32, group: &str) -> Result<(), String> {
-    match find_the_number_in(case) {
+fn check_the_number_of(name_of_case: &str, first: u32, group: &str) -> Result<(), String> {
+    match find_the_number_in(name_of_case) {
         Some(number) if (first..first.saturating_add(GROUP_SIZE)).contains(&number) => Ok(()),
         Some(_) => Err(format!(
             "it sits in {group}, whose cases are numbered {first} to {}",
             first.saturating_add(GROUP_SIZE - 1)
         )),
-        None => Err(format!("{case} has to be named <number>-<words>")),
+        None => Err(format!("{name_of_case} has to be named <number>-<words>")),
     }
 }
 
@@ -271,9 +274,9 @@ fn find_input_file_in(dir: &Path) -> Result<PathBuf, String> {
     }
 }
 
-fn check_witnesses(readings: &Readings, cases: &[Case], faults: &mut Vec<Fault>) {
+fn check_witnesses(readings: &Readings, cases: &[Case], faults: &mut Vec<String>) {
     for (name, reading) in readings.iter() {
-        let one = |message: String| Fault { case: READINGS_FILE.to_string(), message };
+        let one = |message: String| format!("{READINGS_FILE}: {message}");
         match cases.iter().find(|case| case.name == reading.witness) {
             None => faults.push(one(format!(
                 "{name} names {} as its witness, and there is no case of that name",
@@ -326,6 +329,22 @@ mod tests {
     }
 
     #[test]
+    fn a_fragment_names_a_case_where_it_fits_exactly_one_and_never_guesses() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
+        let corpus = Corpus::read(&dir).unwrap_or_else(|faults| panic!("{faults:?}"));
+
+        let whole = "1150-doc_comment_opening_after_code";
+        assert_eq!(corpus.find_case(whole).unwrap_or_else(|_| panic!("{whole}")).name, whole);
+        assert_eq!(corpus.find_case("1150").unwrap_or_else(|_| panic!("1150")).name, whole);
+        assert!(corpus.find_case("no_case_is_called_this").unwrap_err().is_empty());
+
+        // A whole name that is also part of a longer one is still the exact match, never the
+        // ambiguity: the two doc-comment cases below share the shorter name as a prefix.
+        let many = corpus.find_case("doc_comment").unwrap_err();
+        assert!(many.len() > 1, "{:?}", many.iter().map(|c| &c.name).collect::<Vec<_>>());
+    }
+
+    #[test]
     fn a_case_that_carries_no_truth_is_refused() {
         let root = env::temp_dir().join("linejudge-a_case_with_no_truth");
         let dir = root.join(A_GROUP).join("0400-a_case_built_by_a_test");
@@ -337,7 +356,7 @@ mod tests {
             .err()
             .unwrap_or_else(|| panic!("it was read anyway"));
         fs::remove_dir_all(&root).unwrap();
-        assert!(faults[0].message.contains("is not there"), "{faults:?}");
+        assert!(faults[0].contains("is not there"), "{faults:?}");
     }
 
     #[test]
@@ -346,7 +365,7 @@ mod tests {
             + "\n[answer.tokei.default]\n\
                counted = { lines = 2, code = 1, comments = 1, blanks = 0 }\n";
         let faults = read_a_broken_case("a_case_still_holding_answers", &case);
-        assert!(faults[0].message.contains("unknown field `answer`"), "{faults:?}");
+        assert!(faults[0].contains("unknown field `answer`"), "{faults:?}");
     }
 
     #[test]
@@ -388,9 +407,9 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
 
         assert_eq!(misfiled.len(), 1, "{misfiled:?}");
-        assert_eq!(misfiled[0].case, "1400-a_case_of_another_thousand");
-        assert!(misfiled[0].message.contains("numbered 0 to 999"), "{misfiled:?}");
-        assert!(ungrouped[0].message.contains("whole thousand"), "{ungrouped:?}");
+        assert!(misfiled[0].starts_with("1400-a_case_of_another_thousand:"), "{misfiled:?}");
+        assert!(misfiled[0].contains("numbered 0 to 999"), "{misfiled:?}");
+        assert!(ungrouped[0].contains("whole thousand"), "{ungrouped:?}");
     }
 
     #[test]
@@ -423,7 +442,7 @@ mod tests {
         .err()
         .unwrap_or_else(|| panic!("the case was read anyway"));
         let wanted = "marks the reading js-jsdoc, which readings.toml does not define";
-        assert!(faults.iter().any(|f| f.message.contains(wanted)), "{faults:?}");
+        assert!(faults.iter().any(|fault| fault.contains(wanted)), "{faults:?}");
     }
 
     #[test]
@@ -447,12 +466,12 @@ mod tests {
 
         fs::write(root.join("readings.toml"), reading("0500-not_here")).unwrap();
         let missing = read_and_refuse();
-        assert!(missing[0].message.contains("there is no case of that name"), "{missing:?}");
+        assert!(missing[0].contains("there is no case of that name"), "{missing:?}");
 
         fs::write(root.join("readings.toml"), reading("0400-a_case_built_by_a_test")).unwrap();
         let unmarked = read_and_refuse();
         fs::remove_dir_all(&root).unwrap();
-        assert!(unmarked[0].message.contains("marks no such reading"), "{unmarked:?}");
+        assert!(unmarked[0].contains("marks no such reading"), "{unmarked:?}");
     }
 
     fn build_and_read_the_case(
@@ -461,7 +480,7 @@ mod tests {
         input_file: &str,
         input: &str,
         marked: &str,
-    ) -> Result<Corpus, Vec<Fault>> {
+    ) -> Result<Corpus, Faults> {
         let root = env::temp_dir().join(format!("linejudge-{name}"));
         let dir = root.join(A_GROUP).join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(&root);
@@ -474,7 +493,7 @@ mod tests {
         read
     }
 
-    fn read_a_broken_case(name: &str, declaration: &str) -> Vec<Fault> {
+    fn read_a_broken_case(name: &str, declaration: &str) -> Faults {
         let read = build_and_read_the_case(
             name,
             declaration,

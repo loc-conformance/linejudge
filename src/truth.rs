@@ -10,6 +10,8 @@
 //! its own is named where its span opens. Which lines belong to a region is worked out here and
 //! never declared.
 
+use crate::faults::Faults;
+
 const ALPHABET: &str = "SsZCcU.>< \t";
 /// The three characters that mark a comment.
 pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
@@ -34,7 +36,7 @@ pub struct Truth {
 impl Truth {
     /// Reads the marker file against the input it describes. The copies of the source inside
     /// `truth.txt` are there so an input edited without its markers fails loudly.
-    pub fn read(marked: &str, input: &str) -> Result<Truth, Vec<String>> {
+    pub fn read(marked: &str, input: &str) -> Result<Truth, Faults> {
         let mut faults = Vec::new();
         let mut lines = Vec::new();
         let mut rows = marked.lines().peekable();
@@ -42,11 +44,11 @@ impl Truth {
         for source in input.lines() {
             let Some(copy) = rows.next() else {
                 faults.push("the truth ends before its input does".to_string());
-                return Err(faults);
+                return Err(faults.into());
             };
             if copy != source {
                 faults.push(format!("a copy differs from the input: [{source}] against [{copy}]"));
-                return Err(faults);
+                return Err(faults.into());
             }
             if !source.is_ascii() {
                 faults.push(format!(
@@ -54,7 +56,7 @@ impl Truth {
                      markers are written one to a byte and read one to a character, and the two \
                      agree only there"
                 ));
-                return Err(faults);
+                return Err(faults.into());
             }
             if source.is_empty() {
                 let marker = match rows.peek() {
@@ -66,7 +68,7 @@ impl Truth {
             }
             let Some(row) = rows.next() else {
                 faults.push(format!("no marker line under [{source}]"));
-                return Err(faults);
+                return Err(faults.into());
             };
             match split_marker(row, source) {
                 Ok((marker, label)) => {
@@ -84,7 +86,7 @@ impl Truth {
             check_span_structure(&lines, &mut faults);
         }
         if !faults.is_empty() {
-            return Err(faults);
+            return Err(faults.into());
         }
 
         let regions = assign_regions(&lines)?;
@@ -129,6 +131,24 @@ pub struct TruthLine {
 }
 
 impl TruthLine {
+    /// The line cut where what covers it changes, keeping every character of the source, so a
+    /// report can paint the line without reading the alphabet itself.
+    ///
+    /// Walked by character rather than by byte, which lines up with the markers only because a
+    /// case input is ASCII.
+    pub fn cut_into_stretches(&self) -> Vec<(Covering, String)> {
+        let marks: Vec<char> = self.marker.chars().collect();
+        let mut stretches: Vec<(Covering, String)> = Vec::new();
+        for (at, letter) in self.source.chars().enumerate() {
+            let covering = Covering::of(marks.get(at).copied().unwrap_or(RESIDUE));
+            match stretches.last_mut() {
+                Some((last, text)) if *last == covering => text.push(letter),
+                _ => stretches.push((covering, letter.to_string())),
+            }
+        }
+        stretches
+    }
+
     // The innermost region this counter counts on its own, `counted_readings` naming the readings
     // it does count. A counter that leaves one out gives the line to the region around it.
     pub(crate) fn find_region(&self, counted_readings: &[&str]) -> Option<&RegionClaim> {
@@ -136,6 +156,31 @@ impl TruthLine {
             None => true,
             Some(reading) => counted_readings.contains(&reading.as_str()),
         })
+    }
+}
+
+/// What covers one stretch of a line, as the marks under it say.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Covering {
+    /// A comment, symbols included.
+    Comment,
+    /// A string, symbols included.
+    String,
+    /// A tag that opens or closes a stretch of another language.
+    Tag,
+    /// Neither, which is what the rules call the residue of a line.
+    Residue,
+}
+
+impl Covering {
+    /// What one marker character says about the byte under it.
+    pub fn of(mark: char) -> Covering {
+        match mark {
+            _ if STRING_MARKS.owns(mark) => Covering::String,
+            _ if COMMENT_MARKS.owns(mark) => Covering::Comment,
+            TAG_OPENS | TAG_CLOSES => Covering::Tag,
+            _ => Covering::Residue,
+        }
     }
 }
 
@@ -416,6 +461,34 @@ fn read_opening_bytes(line: &RawLine, marks: Marks) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_line_is_cut_where_what_covers_it_changes_and_keeps_every_character() {
+        let input = "a = \"one\"; // two\n";
+        let truth = Truth::read("a = \"one\"; // two\n... SsssZ. CCcccc\n", input).unwrap();
+        let cut = truth.lines[0].cut_into_stretches();
+        let rebuilt: String = cut.iter().map(|(_, text)| text.as_str()).collect();
+        assert_eq!(rebuilt, "a = \"one\"; // two");
+        let covered: Vec<Covering> = cut.iter().map(|(covering, _)| *covering).collect();
+        assert_eq!(
+            covered,
+            [Covering::Residue, Covering::String, Covering::Residue, Covering::Comment]
+        );
+    }
+
+    // A marker shorter than its line is refused when a case is read, so the only way to meet one
+    // here is a line with no marker at all, which is every character outside every span.
+    #[test]
+    fn a_line_with_no_marks_under_it_is_one_stretch_of_residue() {
+        let line = TruthLine {
+            source: "int x = 1;".to_string(),
+            marker: String::new(),
+            regions: Vec::new(),
+        };
+        let cut = line.cut_into_stretches();
+        assert_eq!(cut.len(), 1);
+        assert_eq!(cut[0], (Covering::Residue, "int x = 1;".to_string()));
+    }
 
     #[test]
     fn a_valid_truth_pairs_every_line_and_derives_its_tagged_region() {

@@ -1,14 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use linejudge::adapter::{Adapter, Dialect};
+use linejudge::adapter::{Adapter, Invocation};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::deriver::explain_every_line;
 use linejudge::dialects::{Condition, Dialects, Predicate};
 use linejudge::recorded::RecordedAnswers;
 use linejudge::verdict::{Conformance, Judged, Outcome, measure_and_judge_every_case};
 
-use crate::marks::cut_into_stretches;
 use crate::render::data::{self, Verdict};
 use crate::style;
 
@@ -37,14 +36,11 @@ pub fn measure_every_counter(
         let record = RecordedAnswers::read(recorded, name, dialects)
             .map_err(|faults| faults.join("\n"))?;
         let mut measured = Vec::new();
-        for dialect in &adapter.dialects {
-            let Some(rules) = dialects.find(name, &dialect.name) else {
-                return Err(format!("{name}.{} names no dialect file to judge by", dialect.name));
-            };
+        for dialect in &adapter.invocations {
             let judged = measure_and_judge_every_case(
                 adapter,
                 dialect,
-                rules,
+                dialects,
                 &binary,
                 corpus,
                 record.as_ref(),
@@ -105,9 +101,10 @@ pub fn read_every_case(
             .iter()
             .enumerate()
             .map(|(at, line)| data::Line {
-                pieces: cut_into_stretches(&line.source, &line.marker)
+                pieces: line
+                    .cut_into_stretches()
                     .into_iter()
-                    .map(|(ink, text)| data::Piece { ink, text })
+                    .map(|(covering, text)| data::Piece { covering, text })
                     .collect(),
                 counted: read_by_way
                     .iter()
@@ -153,7 +150,7 @@ pub fn read_every_tool(
             ways.push(data::DialectDetail {
                 name: dialect.name.clone(),
                 flags: adapter
-                    .and_then(|one| one.dialects.iter().find(|way| way.name == dialect.name))
+                    .and_then(|one| one.invocations.iter().find(|way| way.name == dialect.name))
                     .map(|way| way.args.clone())
                     .unwrap_or_default(),
                 rules: rules
@@ -275,7 +272,7 @@ fn build_one_answer(judged: &Judged, command: String) -> data::Answer {
 // inside the corpus, never the local paths this run happened to resolve.
 fn format_the_command_for(
     adapter: &Adapter,
-    dialect: &Dialect,
+    dialect: &Invocation,
     corpus: &Corpus,
     case: &Case,
 ) -> String {
@@ -315,12 +312,12 @@ fn collect_the_groups_of(corpus: &Corpus) -> Vec<data::Group> {
         .collect()
 }
 
-fn find_the_group_of<'a>(case: &str, groups: &'a [String]) -> Option<&'a str> {
-    groups.iter().find(|group| is_in_the_group(case, group)).map(String::as_str)
+fn find_the_group_of<'a>(name_of_case: &str, groups: &'a [String]) -> Option<&'a str> {
+    groups.iter().find(|group| is_in_the_group(name_of_case, group)).map(String::as_str)
 }
 
-fn is_in_the_group(case: &str, group: &str) -> bool {
-    match (find_the_number_in(case), find_the_number_in(group)) {
+fn is_in_the_group(name_of_case: &str, group: &str) -> bool {
+    match (find_the_number_in(name_of_case), find_the_number_in(group)) {
         (Some(number), Some(first)) => {
             (first..first.saturating_add(GROUP_SIZE)).contains(&number)
         }

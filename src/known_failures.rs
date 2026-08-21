@@ -10,6 +10,7 @@ const DIALECT_SEPARATOR: char = ':';
 /// The cases a counter already fails, one per line in its own repository, so its build breaks on a
 /// failure nobody has seen before and on nothing else. A case is named the way the report names
 /// it, so a line of the report is a line of this file.
+#[derive(Debug)]
 pub struct KnownFailures {
     named: BTreeSet<(Option<String>, String)>,
 }
@@ -47,9 +48,11 @@ impl KnownFailures {
     }
 
     /// Whether this case is allowed to fail in this way of counting.
-    pub fn names(&self, dialect: &str, case: &str) -> bool {
-        self.named.contains(&(None, case.to_string()))
-            || self.named.contains(&(Some(dialect.to_string()), case.to_string()))
+    pub fn names(&self, name_of_dialect: &str, name_of_case: &str) -> bool {
+        self.named.contains(&(None, name_of_case.to_string()))
+            || self
+                .named
+                .contains(&(Some(name_of_dialect.to_string()), name_of_case.to_string()))
     }
 
     /// Every line of the list, as the dialect it named and the case it named, for a report that

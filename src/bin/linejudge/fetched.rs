@@ -10,20 +10,21 @@ const PARTIAL_SUFFIX: &str = ".partial";
 // A downloaded counter lives where linejudge keeps its own files and never in anybody's tree. The
 // version is part of the directory name, so two projects that pinned two versions do not overwrite
 // one another.
-pub fn find_the_binary_of(counter: &str, version: &str) -> Option<PathBuf> {
-    let named = format!("{counter}{EXE_SUFFIX}");
+pub fn find_the_binary_of(name_of_counter: &str, version: &str) -> Option<PathBuf> {
+    let named = format!("{name_of_counter}{EXE_SUFFIX}");
     find_the_app_dirs()
         .into_iter()
-        .map(|root| name_the_dir_under(&root, counter, version).join(&named))
+        .map(|root| name_the_dir_under(&root, name_of_counter, version).join(&named))
         .find(|path| path.is_file())
 }
 
 // A download is assembled beside where it will end up and never in the place itself, so a fetch
 // stopped halfway leaves no directory the next run would find and trust.
-pub fn create_a_partial_dir_for(counter: &str, version: &str) -> Result<PathBuf, String> {
+pub fn create_a_partial_dir_for(name_of_counter: &str, version: &str) -> Result<PathBuf, String> {
     let mut refused = Vec::new();
     for root in find_the_app_dirs() {
-        let dir = root.join(BIN_DIR).join(format!("{counter}-{version}{PARTIAL_SUFFIX}"));
+        let named = format!("{name_of_counter}-{version}{PARTIAL_SUFFIX}");
+        let dir = root.join(BIN_DIR).join(named);
         let _ = fs::remove_dir_all(&dir);
         match fs::create_dir_all(&dir) {
             Ok(()) => return Ok(dir),
@@ -49,8 +50,8 @@ pub fn finish_the_partial_dir(partial: &Path) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-fn name_the_dir_under(root: &Path, counter: &str, version: &str) -> PathBuf {
-    root.join(BIN_DIR).join(format!("{counter}-{version}"))
+fn name_the_dir_under(root: &Path, name_of_counter: &str, version: &str) -> PathBuf {
+    root.join(BIN_DIR).join(format!("{name_of_counter}-{version}"))
 }
 
 #[cfg(test)]

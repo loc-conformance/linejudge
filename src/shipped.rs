@@ -74,6 +74,10 @@ fn find_the_data_dir() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::adapter::ADAPTERS_DIR;
+    use crate::corpus::CASES_DIR;
+    use crate::dialects::DIALECTS_DIR;
+    use crate::recorded::RECORDED_DIR;
 
     #[test]
     fn what_is_written_out_is_what_the_repository_holds() {
@@ -97,6 +101,20 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:?}");
         assert_eq!(cases, 83, "the corpus that was carried holds {cases} cases");
         assert_eq!(HASH.len(), 16);
+    }
+
+    // The four names live twice: once in build.rs, which cannot import them because it runs before
+    // the library is compiled, and once as the constants a consumer joins onto the directory. This
+    // is what holds the two lists together.
+    #[test]
+    fn what_was_carried_sits_under_exactly_the_four_named_directories() {
+        let mut top: Vec<&str> =
+            FILES.iter().filter_map(|(relative, _)| relative.split('/').next()).collect();
+        top.sort_unstable();
+        top.dedup();
+        let mut named = [ADAPTERS_DIR, CASES_DIR, DIALECTS_DIR, RECORDED_DIR];
+        named.sort_unstable();
+        assert_eq!(top, named);
     }
 
     #[test]

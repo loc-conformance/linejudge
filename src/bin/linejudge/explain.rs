@@ -1,40 +1,32 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use linejudge::adapter::{Adapter, Dialect as Way};
+use linejudge::adapter::{Adapter, Invocation};
 use linejudge::answer::{Answer, Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::deriver::{ExplainedLine, derive_answer, explain_every_line};
 use linejudge::dialects::Dialects;
 use linejudge::per_line::{PerLineAnswer, PerLineFormat, read_per_line};
 use linejudge::readings::Readings;
+use linejudge::truth::{Covering, TruthLine};
 
-use crate::marks::{Ink, cut_into_stretches};
 use crate::report::paint_counts;
 use crate::style;
 
 const BY_ITS_RULES: &str = "by its rules";
 const IN_ITS_REGIONS: &str = "in its regions";
 
-// A whole name wins outright, and a fragment is enough where it names exactly one case. A fragment
-// matching several gets their list, never a guess among them.
 pub fn find_case<'c>(corpus: &'c Corpus, name: &str) -> Result<&'c Case, String> {
-    if let Some(case) = corpus.cases.iter().find(|case| case.name == name) {
-        return Ok(case);
-    }
-    let close: Vec<&Case> =
-        corpus.cases.iter().filter(|case| case.name.contains(name)).collect();
-    match close.as_slice() {
-        [] => Err(format!("no case is named {name}")),
-        [one] => Ok(one),
+    corpus.find_case(name).map_err(|fitting| match fitting.as_slice() {
+        [] => format!("no case is named {name}"),
         several => {
             let named: Vec<&str> = several.iter().map(|case| case.name.as_str()).collect();
-            Err(format!(
+            format!(
                 "no case is named {name}, and more than one contains it:\n  {}",
                 named.join("\n  ")
-            ))
+            )
         }
-    }
+    })
 }
 
 // One block per way this counter counts: every line of the case beside its marked spans, the rule
@@ -48,7 +40,7 @@ pub fn explain_one_counter(
     dialects: &Dialects,
     readings: &Readings,
 ) -> io::Result<()> {
-    for way in &adapter.dialects {
+    for way in &adapter.invocations {
         let block = OneWay { counter: &adapter.name_of_counter, way: &way.name, case };
         let Some(dialect) = dialects.find(&adapter.name_of_counter, &way.name) else {
             writeln!(out, "\n{} on {}: no dialect file, nothing to derive with",
@@ -61,8 +53,8 @@ pub fn explain_one_counter(
             Ok(both) => both,
             Err(faults) => {
                 writeln!(out, "\n{} on {}:", block.key(), case.name)?;
-                for fault in faults {
-                    writeln!(out, "  {}", style::DIFFERS.paint(&fault))?;
+                for fault in faults.iter() {
+                    writeln!(out, "  {}", style::DIFFERS.paint(fault))?;
                 }
                 continue;
             }
@@ -135,7 +127,7 @@ impl TheirAnswer {
     }
 }
 
-fn run_the_counter(adapter: &Adapter, way: &Way, binary: Option<&Path>, case: &Case) -> ItsAnswer {
+fn run_the_counter(adapter: &Adapter, way: &Invocation, binary: Option<&Path>, case: &Case) -> ItsAnswer {
     let Some(binary) = binary else { return ItsAnswer::NotMeasured };
     match adapter.measure(way, binary, &case.input_file) {
         Ok(Some(answer)) => ItsAnswer::Counted(answer),
@@ -146,7 +138,7 @@ fn run_the_counter(adapter: &Adapter, way: &Way, binary: Option<&Path>, case: &C
 
 fn read_what_the_counter_says(
     adapter: &Adapter,
-    way: &Way,
+    way: &Invocation,
     binary: Option<&Path>,
     case: &Case,
 ) -> TheirAnswer {
@@ -304,7 +296,7 @@ fn write_every_line(
     let width = case.truth.lines.len().to_string().len();
     for (at, (line, truth_line)) in explained.iter().zip(&case.truth.lines).enumerate() {
         writeln!(out)?;
-        let source = paint_by_marks(&truth_line.source, &truth_line.marker);
+        let source = paint_by_marks(truth_line);
         writeln!(out, "  {:>width$}  {source}", at + 1)?;
         if !truth_line.marker.trim().is_empty() {
             writeln!(out, "  {:>width$}  {}", "", style::DETAIL.paint(&truth_line.marker))?;
@@ -360,14 +352,14 @@ fn write_what_it_printed(
     Ok(())
 }
 
-fn paint_by_marks(text: &str, marker: &str) -> String {
-    cut_into_stretches(text, marker)
+fn paint_by_marks(line: &TruthLine) -> String {
+    line.cut_into_stretches()
         .iter()
-        .map(|(ink, stretch)| match ink {
-            Ink::Comment => style::COMMENT.paint(stretch).to_string(),
-            Ink::String => style::STRING.paint(stretch).to_string(),
-            Ink::Tag => style::REGION.paint(stretch).to_string(),
-            Ink::Plain => stretch.clone(),
+        .map(|(covering, stretch)| match covering {
+            Covering::Comment => style::COMMENT.paint(stretch).to_string(),
+            Covering::String => style::STRING.paint(stretch).to_string(),
+            Covering::Tag => style::REGION.paint(stretch).to_string(),
+            Covering::Residue => stretch.clone(),
         })
         .collect()
 }
@@ -512,8 +504,13 @@ mod tests {
     fn a_painted_line_keeps_every_byte_of_the_source() {
         colored::control::set_override(false);
         let source = "a = \"one\"; // two";
-        assert_eq!(source, paint_by_marks(source, "... SsssZ. CCcccc"));
-        assert_eq!(source, paint_by_marks(source, ""));
+        let marked = |marker: &str| TruthLine {
+            source: source.to_string(),
+            marker: marker.to_string(),
+            regions: Vec::new(),
+        };
+        assert_eq!(source, paint_by_marks(&marked("... SsssZ. CCcccc")));
+        assert_eq!(source, paint_by_marks(&marked("")));
     }
 
     #[test]

@@ -5,7 +5,6 @@ mod explain;
 mod fetch;
 mod fetched;
 mod linejudge_folder;
-mod marks;
 #[cfg(feature = "maintenance")]
 mod record;
 mod render;
@@ -18,9 +17,9 @@ use std::path::{self, Path, PathBuf};
 use std::process::{self, ExitCode};
 use std::vec::IntoIter;
 
-use linejudge::adapter::Adapter;
-use linejudge::corpus::Corpus;
-use linejudge::dialects::Dialects;
+use linejudge::adapter::{ADAPTERS_DIR, Adapter};
+use linejudge::corpus::{CASES_DIR, Corpus};
+use linejudge::dialects::{DIALECTS_DIR, Dialects};
 use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
@@ -36,9 +35,6 @@ use crate::report::{
     report_the_verdicts_of_one_dialect,
 };
 
-const ADAPTERS_DIR: &str = "adapters";
-const CASES_DIR: &str = "cases";
-const DIALECTS_DIR: &str = "dialects";
 const SITE_DIR: &str = "site";
 const USAGE: &str = "\
 linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <file>]
@@ -234,13 +230,13 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         }
         _ => read_the_counters_of(folder.as_ref())?,
     };
-    let find_binary = |counter: &str| {
-        counters.find_binary(counter).map(Path::to_path_buf).or_else(|| {
+    let find_binary = |name_of_counter: &str| {
+        counters.find_binary(name_of_counter).map(Path::to_path_buf).or_else(|| {
             adapters
                 .iter()
-                .find(|adapter| adapter.name_of_counter == counter)
+                .find(|adapter| adapter.name_of_counter == name_of_counter)
                 .and_then(|adapter| adapter.acquisition.as_ref())
-                .and_then(|how| fetched::find_the_binary_of(counter, &how.version))
+                .and_then(|how| fetched::find_the_binary_of(name_of_counter, &how.version))
         })
     };
     let known_failures = match (&dirs.known_failures, &settings.name_of_counter) {
@@ -350,16 +346,11 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
                     "recorded at [{}] and running [{version}], so what changed since the record \
                      is not judged", record.version)))?;
         }
-        for dialect in &adapter.dialects {
-            let Some(rules) = dialects.find(name, &dialect.name) else {
-                return Err(Trouble::Said(format!(
-                    "{name}.{} names no dialect file to judge by", dialect.name
-                )));
-            };
+        for dialect in &adapter.invocations {
             let judged = measure_and_judge_every_case(
                 adapter,
                 dialect,
-                rules,
+                &dialects,
                 &binary,
                 &corpus,
                 record.as_ref(),
@@ -718,7 +709,7 @@ fn read_the_corpus(dir: &Path) -> Result<Corpus, String> {
     let corpus = Corpus::read(dir).map_err(|faults| {
         let what = if faults.len() == 1 { "fault" } else { "faults" };
         let mut report = format!("the cases could not be read, {} {what}:", faults.len());
-        for fault in &faults {
+        for fault in faults.iter() {
             report.push_str(&format!("\n  {fault}"));
         }
         report

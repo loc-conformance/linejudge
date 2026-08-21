@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::answer::{Answer, Counts, RegionCounts};
 use crate::dialects::{Condition, Dialect, OPTIONAL_SECTION, PREDICATES, Predicate, Rule};
+use crate::faults::Faults;
 use crate::readings::Readings;
 use crate::truth::{Truth, TruthLine};
 use crate::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
@@ -27,11 +28,11 @@ pub fn derive_answer(
     truth: &Truth,
     dialect: &Dialect,
     readings: &Readings,
-) -> Result<Derivation, Vec<String>> {
+) -> Result<Derivation, Faults> {
     let key = format!("{}.{}", dialect.counter, dialect.name);
     let mut faults = check_readings_are_answered(truth, dialect, readings);
     if !faults.is_empty() {
-        return Err(faults);
+        return Err(faults.into());
     }
     let counted = collect_counted_readings(dialect);
 
@@ -57,7 +58,7 @@ pub fn derive_answer(
         }
     }
     if !faults.is_empty() {
-        return Err(faults);
+        return Err(faults.into());
     }
 
     let regions = regions
@@ -85,15 +86,19 @@ pub struct ExplainedLine {
 
 /// The same work as [`derive_answer`], kept line by line instead of summed, for a person asking
 /// why the counts came out the way they did. Both go through one function, so the two cannot part.
+///
+/// One entry per line of the input, in the file's own order, so it lines up with
+/// [`Truth::lines`](crate::truth::Truth::lines). A line no rule can place is an `Err` and never a
+/// shorter list.
 pub fn explain_every_line(
     truth: &Truth,
     dialect: &Dialect,
     readings: &Readings,
-) -> Result<Vec<ExplainedLine>, Vec<String>> {
+) -> Result<Vec<ExplainedLine>, Faults> {
     let key = format!("{}.{}", dialect.counter, dialect.name);
     let faults = check_readings_are_answered(truth, dialect, readings);
     if !faults.is_empty() {
-        return Err(faults);
+        return Err(faults.into());
     }
     let counted = collect_counted_readings(dialect);
 
@@ -122,7 +127,7 @@ pub fn explain_every_line(
             region: line.find_region(&counted).map(|claim| claim.language.clone()),
         });
     }
-    if faults.is_empty() { Ok(lines) } else { Err(faults) }
+    if faults.is_empty() { Ok(lines) } else { Err(faults.into()) }
 }
 
 // One field per `Predicate`, answered for a single line.

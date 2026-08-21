@@ -1,6 +1,7 @@
 use maud::{Markup, html};
 
-use crate::marks::Ink;
+use linejudge::truth::Covering;
+
 use crate::render::data::{Answer, CaseDetail, Counts, Region, Sweep, Verdict};
 use crate::render::{INDEX_FILE, format_as_one_line, format_the_group_title, wrap_the_page};
 
@@ -67,7 +68,7 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
                     }
                     td .src {
                         @for piece in &line.pieces {
-                            span class=(name_the_ink(piece.ink)) { (piece.text) }
+                            span class=(name_the_ink(piece.covering)) { (piece.text) }
                         }
                     }
                 }
@@ -178,12 +179,12 @@ fn name_the_rules_of(counted: &crate::render::data::Counted) -> String {
     }
 }
 
-fn name_the_ink(ink: Ink) -> &'static str {
-    match ink {
-        Ink::Comment => "ink-comment",
-        Ink::String => "ink-string",
-        Ink::Tag => "ink-tag",
-        Ink::Plain => "ink-plain",
+fn name_the_ink(covering: Covering) -> &'static str {
+    match covering {
+        Covering::Comment => "ink-comment",
+        Covering::String => "ink-string",
+        Covering::Tag => "ink-tag",
+        Covering::Residue => "ink-plain",
     }
 }
 
@@ -223,10 +224,10 @@ mod tests {
             ways: vec!["mezura.content".to_string(), "tokei.default".to_string()],
             lines: vec![Line {
                 pieces: vec![
-                    Piece { ink: Ink::Plain, text: "a = ".to_string() },
-                    Piece { ink: Ink::String, text: "\"one\"".to_string() },
-                    Piece { ink: Ink::Plain, text: "; ".to_string() },
-                    Piece { ink: Ink::Comment, text: "// two".to_string() },
+                    Piece { covering: Covering::Residue, text: "a = ".to_string() },
+                    Piece { covering: Covering::String, text: "\"one\"".to_string() },
+                    Piece { covering: Covering::Residue, text: "; ".to_string() },
+                    Piece { covering: Covering::Comment, text: "// two".to_string() },
                 ],
                 counted: vec![
                     Counted {

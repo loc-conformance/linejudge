@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
 
 use linejudge::answer;
+use linejudge::truth::Covering;
 use serde::{Deserialize, Serialize};
-
-use crate::marks::Ink;
 
 // One measurement of the whole roster, in the shape it is published. The pages are rendered from
 // this and `data.json` is this, so a field here is a promise to whoever reads that file. Nothing
@@ -107,7 +106,7 @@ pub struct Line {
 // marker looks like.
 #[derive(Debug, PartialEq)]
 pub struct Piece {
-    pub ink: Ink,
+    pub covering: Covering,
     pub text: String,
 }
 

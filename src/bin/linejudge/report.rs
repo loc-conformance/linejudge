@@ -1,12 +1,14 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use linejudge::adapter::{Adapter, Dialect};
+use linejudge::adapter::{Adapter, Invocation};
 use linejudge::answer::{Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RecordedAnswers;
-use linejudge::verdict::{Conformance, Drift, Judged, Measured, Outcome};
+use linejudge::verdict::{
+    Conformance, Drift, Judged, Measured, Outcome, find_what_breaks_the_run,
+};
 
 use crate::style;
 
@@ -18,7 +20,7 @@ const REGION_ROW_WIDTH: usize = "recorded regions".len() + 1;
 // and whether a record of this build exists to hold the run against.
 pub struct OneRun<'a> {
     pub adapter: &'a Adapter,
-    pub dialect: &'a Dialect,
+    pub dialect: &'a Invocation,
     pub binary: &'a Path,
     pub version: &'a str,
     pub drift_is_judged: bool,
@@ -87,7 +89,7 @@ pub fn report_the_verdicts_of_one_dialect(
                 _ => {}
             }
         }
-        return Ok(judged.iter().any(|one| one.breaks_the_run()));
+        return Ok(!find_what_breaks_the_run(judged, &dialect.name, None).is_empty());
     };
 
     let mut unnamed = 0;
@@ -133,7 +135,7 @@ pub fn report_entries_that_name_nothing(
 ) -> io::Result<()> {
     for (dialect, case_name) in known_failures.entries() {
         let dialect_is_real =
-            dialect.is_none_or(|d| adapter.dialects.iter().any(|one| one.name == d));
+            dialect.is_none_or(|d| adapter.invocations.iter().any(|one| one.name == d));
         let case_is_real = corpus.cases.iter().any(|case| case.name == case_name);
         if !dialect_is_real || !case_is_real {
             let entry = match dialect {
@@ -268,7 +270,7 @@ fn format_summary(judged: &[Judged], drift_is_judged: bool) -> String {
     let broke = judged.iter().filter(|one| matches!(one.outcome, Outcome::Broke(_))).count();
     let agree = measured(&|m| m.conformance == Conformance::Agrees);
     let fails = measured(&|m| m.conformance == Conformance::Fails);
-    let known = measured(&|m| m.is_a_known_failure());
+    let known = measured(&|m| m.fails_exactly_as_recorded());
     let unclaimed = measured(&|m| m.conformance == Conformance::Unclaimed && m.drift != Some(Drift::NoLongerClaimed));
     // A count of none is left to fade, so what is there stands out from what is not.
     let painted = |count: usize, what: &str, ink: style::Style| {

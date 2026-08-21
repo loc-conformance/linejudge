@@ -1,10 +1,16 @@
 //! The rules that say where each line of a file goes, one set per way of counting.
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+
+use crate::faults::Faults;
+
+/// The directory the dialects are read from, one folder per counter inside it.
+pub const DIALECTS_DIR: &str = "dialects";
 
 const DIALECT_EXTENSION: &str = "toml";
 pub(crate) const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
@@ -20,6 +26,7 @@ pub(crate) const PREDICATES: [(&str, Predicate); 7] = [
 
 /// Every way of counting this run knows: one dialect per file in the directory it was read from.
 /// Case files, adapter files and what a counter prints are all checked against these.
+#[derive(Debug)]
 pub struct Dialects {
     dialects: Vec<Dialect>,
 }
@@ -27,7 +34,7 @@ pub struct Dialects {
 impl Dialects {
     /// Layered per counter, and the whole folder is the unit: a later directory naming a counter
     /// replaces all of that counter's dialects, never half of them.
-    pub fn read(dirs: &[PathBuf]) -> Result<Dialects, Vec<String>> {
+    pub fn read(dirs: &[PathBuf]) -> Result<Dialects, Faults> {
         let mut dialects: Vec<Dialect> = Vec::new();
         let mut faults = Vec::new();
         for dir in dirs {
@@ -47,7 +54,7 @@ impl Dialects {
             let named: Vec<String> = dirs.iter().map(|dir| dir.display().to_string()).collect();
             faults.push(format!("{} holds no dialect file", named.join(" or ")));
         }
-        if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults) }
+        if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults.into()) }
     }
 
     // One folder per counter, one file per way it counts: `<counter>/<dialect>.toml`.
@@ -91,7 +98,7 @@ impl Dialects {
             for path in paths {
                 match Dialect::read(&path) {
                     Ok(dialect) => dialects.push(dialect),
-                    Err(mut found) => faults.append(&mut found),
+                    Err(found) => faults.extend(found.iter().cloned()),
                 }
             }
         }
@@ -99,8 +106,10 @@ impl Dialects {
     }
 
     /// One counter's one way of counting, and `None` where no directory declared it.
-    pub fn find(&self, counter: &str, dialect: &str) -> Option<&Dialect> {
-        self.dialects.iter().find(|d| d.counter == counter && d.name == dialect)
+    pub fn find(&self, name_of_counter: &str, name_of_dialect: &str) -> Option<&Dialect> {
+        self.dialects
+            .iter()
+            .find(|d| d.counter == name_of_counter && d.name == name_of_dialect)
     }
 
     /// Every dialect, by counter and then by name.
@@ -111,6 +120,7 @@ impl Dialects {
 
 /// One way of counting, as its file declares it: the names it gives its buckets, the rules that
 /// put each line in one of them, and its answer to each reading a case can mark as optional.
+#[derive(Debug)]
 pub struct Dialect {
     pub counter: String,
     /// `default` for a counter that counts only the one way.
@@ -128,11 +138,11 @@ pub struct Dialect {
 
 impl Dialect {
     /// Reads one dialect file. A file that breaks more than one rule is told so once for each.
-    pub fn read(path: &Path) -> Result<Dialect, Vec<String>> {
+    pub fn read(path: &Path) -> Result<Dialect, Faults> {
         let text = fs::read_to_string(path)
-            .map_err(|e| vec![format!("{} could not be read: {e}", path.display())])?;
+            .map_err(|e| format!("{} could not be read: {e}", path.display()))?;
         let raw: RawDialect = toml::from_str(&text)
-            .map_err(|e| vec![format!("{} does not parse: {e}", path.display())])?;
+            .map_err(|e| format!("{} does not parse: {e}", path.display()))?;
         let where_it_is = path.display();
         let mut faults = Vec::new();
 
@@ -195,7 +205,7 @@ impl Dialect {
         }
 
         if !faults.is_empty() {
-            return Err(faults);
+            return Err(faults.into());
         }
         Ok(Dialect {
             counter: raw.counter,
@@ -211,6 +221,7 @@ impl Dialect {
 /// A rule takes a line when all of its conditions hold, and puts it in its bucket. Rules are not
 /// tried in order, so two of them taking the same line is allowed only where they name the same
 /// bucket.
+#[derive(Debug)]
 pub struct Rule {
     /// What the file calls it, which is how a report names the rule that took a line.
     pub name: String,
@@ -219,11 +230,22 @@ pub struct Rule {
 }
 
 /// A question a rule asks, and whether it needs the answer to be yes or no.
+#[derive(Clone, Copy, Debug)]
 pub enum Condition {
     /// The rule needs this to be true of the line.
     Holds(Predicate),
     /// The rule needs this to be false of the line.
     Fails(Predicate),
+}
+
+/// Prints the condition the way a dialect file writes it, `in-comment` or `!in-string`.
+impl fmt::Display for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Condition::Holds(predicate) => write!(f, "{predicate}"),
+            Condition::Fails(predicate) => write!(f, "!{predicate}"),
+        }
+    }
 }
 
 /// What a rule can ask about a line. The *residue* of a line is what is left once its strings and
@@ -245,6 +267,21 @@ pub enum Predicate {
     WordInComment,
     /// The residue holds a word, so a line of nothing but punctuation answers no.
     WordInResidue,
+}
+
+/// Prints the name a dialect file writes the predicate under, which is never its Rust spelling.
+impl fmt::Display for Predicate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Predicate::Blank => "blank",
+            Predicate::HasResidue => "has-residue",
+            Predicate::InComment => "in-comment",
+            Predicate::InDocString => "in-doc-string",
+            Predicate::InString => "in-string",
+            Predicate::WordInComment => "word-in-comment",
+            Predicate::WordInResidue => "word-in-residue",
+        })
+    }
 }
 
 pub(crate) fn check_buckets(found: &BTreeMap<String, u32>, wanted: &[String]) -> Result<(), String> {
@@ -452,7 +489,18 @@ mod tests {
         assert!(missing.unwrap_err().contains("no blanks bucket"));
     }
 
-    fn read_a_broken_dialect(name: &str, text: &str) -> Vec<String> {
+    // The names are written twice, in the table that parses them and in Display, and a condition
+    // printed under a name no file can be written with would be worse than not printing it.
+    #[test]
+    fn a_condition_prints_the_name_a_dialect_file_writes_it_under() {
+        for (name, predicate) in PREDICATES {
+            assert_eq!(predicate.to_string(), name);
+            assert_eq!(Condition::Holds(predicate).to_string(), name);
+            assert_eq!(Condition::Fails(predicate).to_string(), format!("!{name}"));
+        }
+    }
+
+    fn read_a_broken_dialect(name: &str, text: &str) -> Faults {
         let dir = env::temp_dir().join(format!("linejudge-{name}"));
         let _ = fs::remove_dir_all(&dir);
         let path = dir.join("tokei").join("default.toml");

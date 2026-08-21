@@ -5,11 +5,13 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
-use crate::adapter::{Adapter, Dialect};
+use crate::adapter::{Adapter, Invocation};
 use crate::answer::Answer;
 use crate::corpus::{Case, Corpus};
 use crate::deriver::derive_answer;
-use crate::dialects;
+use crate::dialects::Dialects;
+use crate::faults::Faults;
+use crate::known_failures::KnownFailures;
 use crate::recorded::{Exception, RecordedAnswer, RecordedAnswers, is_same_build};
 
 const AT_ONCE: usize = 8;
@@ -41,23 +43,26 @@ pub enum Drift {
 }
 
 /// One counter's answer to one case.
+#[derive(Debug)]
 pub struct Judged<'a> {
     pub case: &'a Case,
     pub outcome: Outcome<'a>,
 }
 
 impl Judged<'_> {
-    /// Whether this alone should fail the build of whoever ran it.
-    pub fn breaks_the_run(&self) -> bool {
+    fn breaks_a_run_with_no_list(&self) -> bool {
         match &self.outcome {
             Outcome::Broke(_) => true,
-            Outcome::Measured(measured) => measured.breaks_the_run(),
+            Outcome::Measured(measured) => {
+                measured.is_a_failure() && !measured.fails_exactly_as_recorded()
+            }
         }
     }
 }
 
 /// What came of asking one counter about one case. Breaking is an outcome like any other, and the
 /// rest of the corpus is measured anyway.
+#[derive(Debug)]
 pub enum Outcome<'a> {
     /// A non-zero exit, a panic, or output that could not be read, with what is known about why.
     Broke(String),
@@ -66,6 +71,7 @@ pub enum Outcome<'a> {
 }
 
 /// One judged answer.
+#[derive(Debug)]
 pub struct Measured<'a> {
     /// What it ought to answer by its own rules, or by its exception where one is declared.
     pub real: Answer,
@@ -82,9 +88,10 @@ pub struct Measured<'a> {
 }
 
 impl Measured<'_> {
-    /// A failure that fails exactly as the record says, which is the one failure that does not
-    /// break the run.
-    pub fn is_a_known_failure(&self) -> bool {
+    /// Whether it fails in exactly the way the record holds. This asks the record and never a
+    /// known-failures list, which is a different question and belongs to whoever wrote the list:
+    /// see [`find_what_breaks_the_run`].
+    pub fn fails_exactly_as_recorded(&self) -> bool {
         self.conformance == Conformance::Fails && self.drift == Some(Drift::Same)
     }
 
@@ -95,15 +102,35 @@ impl Measured<'_> {
             || matches!(self.drift, Some(Drift::NoLongerClaimed | Drift::NowClaimed))
     }
 
-    /// A failure that is not a known one.
-    pub fn breaks_the_run(&self) -> bool {
-        self.is_a_failure() && !self.is_a_known_failure()
-    }
-
     /// Whether it agrees only because an exception was declared for this case.
     pub fn agrees_through_its_exception(&self) -> bool {
         self.exception.is_some() && self.conformance == Conformance::Agrees
     }
+}
+
+/// The cases that should fail the build of whoever ran this, which is nothing where they all pass.
+///
+/// `allowed` is the counter's own list, the file in its own repository saying which cases it is
+/// content to fail. With one, a case counts here when it failed or broke and the list does not
+/// name it. Without one, the record stands in: a case counts when it fails in a way the record
+/// does not already hold.
+pub fn find_what_breaks_the_run<'a, 'c>(
+    judged: &'a [Judged<'c>],
+    name_of_dialect: &str,
+    allowed: Option<&KnownFailures>,
+) -> Vec<&'a Judged<'c>> {
+    judged
+        .iter()
+        .filter(|one| match allowed {
+            None => one.breaks_a_run_with_no_list(),
+            Some(list) => match &one.outcome {
+                Outcome::Broke(_) => !list.names(name_of_dialect, &one.case.name),
+                Outcome::Measured(measured) => {
+                    measured.is_a_failure() && !list.names(name_of_dialect, &one.case.name)
+                }
+            },
+        })
+        .collect()
 }
 
 /// Runs the counter once per case and judges each answer. `Err` is never the counter's doing: it
@@ -111,32 +138,35 @@ impl Measured<'_> {
 /// numbers contradict.
 pub fn measure_and_judge_every_case<'a>(
     adapter: &Adapter,
-    dialect: &Dialect,
-    rules: &dialects::Dialect,
+    invocation: &Invocation,
+    dialects: &Dialects,
     binary: &Path,
     corpus: &'a Corpus,
     record: Option<&'a RecordedAnswers>,
     version_of_this_run: &str,
-) -> Result<Vec<Judged<'a>>, Vec<String>> {
+) -> Result<Vec<Judged<'a>>, Faults> {
+    let key = format!("{}.{}", adapter.name_of_counter, invocation.name);
+    let Some(rules) = dialects.find(&adapter.name_of_counter, &invocation.name) else {
+        return Err(format!("{key} is a way of counting no dialect file describes").into());
+    };
     let drift_is_judged =
         record.is_some_and(|record| is_same_build(&record.version, version_of_this_run));
-    let key = format!("{}.{}", adapter.name_of_counter, dialect.name);
 
     let mut prepared = Vec::with_capacity(corpus.cases.len());
     let mut faults = Vec::new();
     for case in &corpus.cases {
-        let exception = record.and_then(|r| r.find_exception(&case.name, &dialect.name));
+        let exception = record.and_then(|r| r.find_exception(&case.name, &invocation.name));
         let real = match exception {
             Some(exception) => exception.expected.clone(),
             None => match derive_answer(&case.truth, rules, &corpus.readings) {
                 Ok(derivation) => derivation.real,
                 Err(messages) => {
-                    faults.extend(messages.into_iter().map(|m| format!("{}: {m}", case.name)));
+                    faults.extend(messages.iter().map(|m| format!("{}: {m}", case.name)));
                     continue;
                 }
             },
         };
-        let entry = record.and_then(|r| r.find(&case.name, &dialect.name));
+        let entry = record.and_then(|r| r.find(&case.name, &invocation.name));
         if let Some(entry) = entry
             && let Some(counted) = &entry.counted
             && entry.is_known_failure == (*counted == real)
@@ -157,11 +187,11 @@ pub fn measure_and_judge_every_case<'a>(
         prepared.push((case, real, entry, exception));
     }
     if !faults.is_empty() {
-        return Err(faults);
+        return Err(faults.into());
     }
 
     let files: Vec<&Path> = prepared.iter().map(|(case, ..)| case.input_file.as_path()).collect();
-    let answers = measure_every_file(adapter, dialect, binary, &files);
+    let answers = measure_every_file(adapter, invocation, binary, &files);
 
     let mut judged = Vec::with_capacity(prepared.len());
     for ((case, real, entry, exception), answer) in prepared.into_iter().zip(answers) {
@@ -196,7 +226,7 @@ pub fn measure_and_judge_every_case<'a>(
 // somebody else's program to start and finish, so more run at once than the machine has cores.
 fn measure_every_file(
     adapter: &Adapter,
-    dialect: &Dialect,
+    invocation: &Invocation,
     binary: &Path,
     files: &[&Path],
 ) -> Vec<Result<Option<Answer>, String>> {
@@ -209,7 +239,7 @@ fn measure_every_file(
                 loop {
                     let at = next.fetch_add(1, Ordering::Relaxed);
                     let Some(file) = files.get(at) else { return };
-                    let answered = adapter.measure(dialect, binary, file);
+                    let answered = adapter.measure(invocation, binary, file);
                     answers.lock().unwrap_or_else(|held| held.into_inner()).push((at, answered));
                 }
             });
@@ -222,6 +252,10 @@ fn measure_every_file(
 
 /// Holds one answer against what the rules ask for. `live` is `None` for a counter that says there
 /// is no such file.
+///
+/// The whole of both answers is compared, the stretches of other languages included, so a counter
+/// that leaves [`Answer::regions`] empty fails every case holding another language even where all
+/// its counts are right.
 pub fn judge_conformance(real: &Answer, live: Option<&Answer>) -> Conformance {
     match live {
         None => Conformance::Unclaimed,
@@ -252,6 +286,7 @@ mod tests {
     use crate::dialects::{Dialects, read_the_shipped_dialects};
     use crate::measurement::OutputFormat;
     use crate::recorded::RecordedAnswers;
+    use crate::truth::Truth;
 
     #[test]
     fn a_counter_that_answers_what_its_rules_ask_agrees_and_one_that_does_not_fails() {
@@ -272,36 +307,55 @@ mod tests {
     }
 
     #[test]
-    fn the_known_failure_is_the_one_failure_that_breaks_nothing() {
+    fn with_no_list_the_failure_that_fails_exactly_as_recorded_breaks_nothing() {
         let known = measured(Conformance::Fails, Some(Drift::Same));
-        assert!(known.is_a_known_failure());
+        assert!(known.fails_exactly_as_recorded());
         assert!(known.is_a_failure());
-        assert!(!known.breaks_the_run());
+        assert!(!breaks_the_run(known, None));
 
         let new = measured(Conformance::Fails, Some(Drift::Changed));
-        assert!(!new.is_a_known_failure());
-        assert!(new.breaks_the_run());
+        assert!(!new.fails_exactly_as_recorded());
+        assert!(breaks_the_run(new, None));
 
-        let unrecorded = measured(Conformance::Fails, None);
-        assert!(unrecorded.breaks_the_run());
+        assert!(breaks_the_run(measured(Conformance::Fails, None), None));
 
         let fixed = measured(Conformance::Agrees, Some(Drift::Changed));
         assert!(!fixed.is_a_failure());
-        assert!(!fixed.breaks_the_run());
+        assert!(!breaks_the_run(fixed, None));
     }
 
     #[test]
     fn a_change_in_what_the_counter_claims_breaks_the_run() {
         let gone = measured(Conformance::Unclaimed, Some(Drift::NoLongerClaimed));
         assert!(gone.is_a_failure());
-        assert!(gone.breaks_the_run());
+        assert!(breaks_the_run(gone, None));
 
         let appeared = measured(Conformance::Agrees, Some(Drift::NowClaimed));
         assert!(appeared.is_a_failure());
-        assert!(appeared.breaks_the_run());
+        assert!(breaks_the_run(appeared, None));
 
         let quiet = measured(Conformance::Unclaimed, None);
         assert!(!quiet.is_a_failure());
+    }
+
+    // With a list, the record is not asked at all: a failure the list names passes whether it is
+    // the recorded one or a brand new one, and a failure it does not name breaks the run even
+    // where the record holds exactly that failure.
+    #[test]
+    fn a_list_answers_for_every_failure_and_the_record_is_not_asked() {
+        let named = KnownFailures::of("default:0400-a_case_built_by_a_test\n");
+        let other = KnownFailures::of("9999-a_case_nobody_wrote\n");
+        for drift in [Some(Drift::Same), Some(Drift::Changed), None] {
+            let one = measured(Conformance::Fails, drift);
+            assert!(!breaks_the_run(one, Some(&named)), "{drift:?} is named by the list");
+            let same = measured(Conformance::Fails, drift);
+            assert!(breaks_the_run(same, Some(&other)), "{drift:?} is not named by the list");
+        }
+        let broke = Judged {
+            case: &a_case(),
+            outcome: Outcome::Broke("it fell over".to_string()),
+        };
+        assert!(find_what_breaks_the_run(&[broke], "default", Some(&other)).len() == 1);
     }
 
     // Nothing is run, so a path to a binary that does not exist stands in for the counter.
@@ -338,7 +392,7 @@ mod tests {
         root: &std::path::Path,
         record_text: &str,
         dialects: &Dialects,
-    ) -> Result<Vec<Judged<'static>>, Vec<String>> {
+    ) -> Result<Vec<Judged<'static>>, Faults> {
         let cases = root.join("cases");
         let dir = cases.join("0000-a_group_built_by_a_test").join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(root);
@@ -360,11 +414,10 @@ mod tests {
                 .unwrap_or_else(|| panic!("no record was read")),
         ));
         let adapter = a_tokei_adapter();
-        let rules = dialects.find("tokei", "default").unwrap_or_else(|| panic!("no tokei rules"));
         let judged = measure_and_judge_every_case(
             &adapter,
-            &adapter.dialects[0],
-            rules,
+            &adapter.invocations[0],
+            dialects,
             Path::new("a-binary-that-is-never-run"),
             corpus,
             Some(record),
@@ -384,12 +437,27 @@ mod tests {
             explain_keep_from: None,
             version_flag: None,
             acquisition: None,
-            dialects: vec![Dialect {
+            invocations: vec![Invocation {
                 name: "default".to_string(),
                 args: Vec::new(),
                 buckets: vec!["code".to_string(), "comments".to_string(), "blanks".to_string()],
                 reader: Reader::Written(OutputFormat::TokeiJson),
             }],
+        }
+    }
+
+    fn breaks_the_run(one: Measured<'_>, allowed: Option<&KnownFailures>) -> bool {
+        let case = a_case();
+        let judged = [Judged { case: &case, outcome: Outcome::Measured(one) }];
+        !find_what_breaks_the_run(&judged, "default", allowed).is_empty()
+    }
+
+    fn a_case() -> Case {
+        Case {
+            name: "0400-a_case_built_by_a_test".to_string(),
+            input_file: std::path::PathBuf::from("input.rs"),
+            trap: String::new(),
+            truth: Truth { lines: Vec::new() },
         }
     }
 

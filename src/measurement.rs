@@ -101,18 +101,18 @@ fn read_tokei(buckets: &[String], text: &str) -> Result<Option<Answer>, String> 
 fn read_buckets(
     printed: &BTreeMap<&str, u64>,
     wanted: &[String],
-    counter: &str,
+    name_of_counter: &str,
 ) -> Result<BTreeMap<String, u32>, String> {
     let mut counts = BTreeMap::new();
     for bucket in wanted {
         let Some(number) = printed.get(bucket.as_str()) else {
             let named: Vec<&str> = printed.keys().copied().collect();
             return Err(format!(
-                "{counter} printed no {bucket} for this file, it printed {}",
+                "{name_of_counter} printed no {bucket} for this file, it printed {}",
                 named.join(", ")
             ));
         };
-        let whose = format!("{counter}'s {bucket}");
+        let whose = format!("{name_of_counter}'s {bucket}");
         counts.insert(bucket.clone(), count_lines(*number, &whose)?);
     }
     Ok(counts)
