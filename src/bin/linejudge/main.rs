@@ -35,109 +35,88 @@ use crate::report::{
     report_the_verdicts_of_one_dialect,
 };
 
+const COMMAND_OPENS: &str = "linejudge ";
 const SITE_DIR: &str = "site";
 const USAGE: &str = "\
 linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <file>]
                 [--corpus <dir>] [--adapters <dir>] [--dialects <dir>] [--recorded <dir>]
                 [--disabled <case>]
 
-    Runs every counter it has a binary for over every case, and answers two questions apart. The
-    first is conformance: does the counter answer what its own declared rules ask for, judged for
-    any counter at all. The second is drift: does it still answer what it did when its answers
-    were recorded, judged only where recorded/<counter>.toml holds a photograph and the binary is
-    the version written at the top of it; a different build is said once and what changed since
-    is reported, never judged. A case a counter breaks on, by exiting non-zero or printing
-    something unreadable, is an outcome of its own beside the failures, and every other case is
-    measured anyway.
+    Runs each counter over every case and asks two things of every answer: does it match what that
+    counter's own rules say, and does it match what the counter answered when it was last recorded.
+    A counter that crashes on a case is reported apart from one that answers wrongly, and the
+    remaining cases still run.
 
-    The cases, the adapters, the dialects and the recorded answers are carried inside this binary
-    and need nothing else on disk. --corpus replaces the corpus; --adapters, --dialects and
-    --recorded are layered over what is carried, per counter, so a directory naming one counter
-    declares that one and leaves every other as it is.
+    Name a case to run only that one. Any part of the name is enough if it fits exactly one case.
 
-    Binaries are named in .linejudge/counters.toml, or with --bin, which needs --counter to say
-    whose binary it is, and whatever a fetch has downloaded is found without anybody naming a
-    path. The .linejudge folder is looked for upward from the working directory,
-    the way cargo finds its own, and its settings.toml can name the corpus, adapters, dialects,
-    recorded and known-failures paths, each meaning what the flag of the same name means. A flag
-    wins over the folder.
+    --counter <name>         run this counter and no other
+    --bin <path>             the binary to run it with; needs --counter
+    --known-failures <file>  fail only on cases this file does not list; needs --counter
+    --disabled <case>        leave one more case out of this run
+    --corpus <dir>           use these cases instead of the built-in ones
+    --adapters <dir>         replace the built-in adapters for the counters named inside
+    --dialects <dir>         replace the built-in dialects for the counters named inside
+    --recorded <dir>         replace the built-in records for the counters named inside
 
-    Naming a case judges that one and nothing else, and the exit code is then its own. It is named
-    the way this report names it, or by any part of the name that fits exactly one case, so
-    'check 2150' is enough and the run says which case that was.
+    Binaries are found in .linejudge/counters.toml, or given with --bin, or downloaded by fetch.
+    linejudge looks for .linejudge here and in every directory above, the way cargo does. Its
+    settings.toml can hold the four directory paths and the known-failures path, and a flag on the
+    command line beats it.
 
-    A case whose directory name starts with 'disabled-' is set aside and named, never judged,
-    since the prefix says this suite's own resolution of it is not to be trusted. --disabled sets
-    one more aside for a single run.
-
-    With --known-failures, the run breaks on a failing case the file does not name, and on nothing
-    else. One case per line, named the way this report names it, '#' starts a comment, and
-    'region:8010-punctuation_only_line' names one way of counting where naming the case alone
-    names them all. It needs --counter.
+    A known-failures file holds one case per line and '#' starts a comment. '8010-blank_line'
+    allows that case for every way the counter counts; 'region:8010-blank_line' allows it for the
+    'region' way only.
 
 linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--adapters <dir>]
                 [--dialects <dir>]
 
-    Prints, for one case, how each way of counting reads every line of it: the marked spans, the
-    rule that took the line and the predicates that hold on it, and under those whatever per-line
-    analysis the counter itself can print, run through the explain-args of its adapter. A case is
-    named the way check names it, or by any part of the name that fits exactly one case, and no
-    binary is needed for anything but the counter's own analysis.
+    Prints one case line by line: the strings and comments marked in it, the rule that decided each
+    line, and what the counter itself says about the same line. Any part of the case name is enough
+    if it fits exactly one case.
 
-    A counter whose analysis is the linejudge-per-line format is read rather than shown, and every
-    line it reads differently from these rules is named where that line is.
+    --counter <name>         explain this counter and no other
+    --bin <path>             the binary to run it with; needed only for what the counter says
+
+    --corpus, --adapters and --dialects mean what they mean in check.
 
 linejudge fetch [<counter>] [--adapters <dir>] [--dialects <dir>]
 
-    Downloads the counters of the roster, each at exactly the version its adapter declares, and
-    puts them where every other command looks for them without anybody naming a path. Naming one
-    counter fetches that one, by any part of the name that fits exactly one, and naming none
-    fetches every counter that says where it comes from.
+    Downloads the counters this suite knows about and puts each one where the other commands find
+    it, so no path has to be given afterwards. Name a counter to fetch only that one.
 
-    Where it comes from is the [acquisition] block of its adapter. A github-release-asset channel
-    picks the file for this system out of the release tagged with that version, checks it against
-    the checksums the release publishes beside it, and unpacks it. A crates-io channel holds source
-    and never a built program, so it compiles the crate and needs cargo on the machine. The
-    downloading itself is whatever curl or wget this machine already has.
-
-    What arrives is asked for its version before it is kept, so a channel that hands over something
-    other than what was asked for is refused rather than quietly measured. A counter already here
-    at that version is left alone, and one that fails does not stop the others: each is named with
-    what went wrong and the exit code says whether everything arrived.
-
-    A path in counters.toml still wins over a download, since it is somebody saying which binary
-    they mean, and where one shadows what was just fetched this says so.
+    Each is downloaded at the exact version its adapter file declares. What arrives is asked its
+    version and thrown away when the answer is not that version, so a download that quietly hands
+    over something else is never measured. A counter that fails does not stop the others, and a
+    path in counters.toml still wins over anything fetch downloaded.
 
 linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <dir>]
                 [--recorded <dir>]
 
-    Measures every counter it has a binary for over every case, the way check does, and writes the
-    published pages instead of a report: index.html, the scoreboard of every counter over every
-    case with the failures explained on hover, a page under cases/ for each of them holding the
-    file with its marked spans and every answer to it, and data.json, the whole measurement as one
-    record for anybody building their own view of the same numbers. They land in --out, or in
-    ./site. A counter with no binary is named on stderr and left out rather than failing the run.
+    Measures the way check does and writes web pages instead of a report: the scoreboard, a page
+    per case, and data.json holding the whole measurement.
 
-    The scoreboard is opened afterwards with whatever this machine opens an HTML file with, unless
-    the output is not a terminal, so a run on a build machine writes the pages and opens nothing.
+    --out <dir>              where to write them; ./site by default
 
-The commands print colour when they print to a terminal. NO_COLOR turns it off wherever it is set,
-and CLICOLOR_FORCE keeps it through a pipe.
+    --corpus, --adapters, --dialects and --recorded mean what they mean in check.
+
+    The scoreboard opens in a browser when the output is a terminal, so a build machine writes the
+    pages and opens nothing. A counter with no binary is left out and named on stderr.
+
+Output to a terminal has colour and output to a file or a pipe does not. Set NO_COLOR to turn it
+off, or CLICOLOR_FORCE to keep it through a pipe.
 ";
 #[cfg(feature = "maintenance")]
 const RECORD_USAGE: &str = "
 linejudge record --counter <name> [--bin <path>] [--corpus <dir>] [--adapters <dir>]
                 [--dialects <dir>] [--recorded <dir>]
 
-    Writes recorded/<name>.toml from scratch: runs that counter over every case, reads the version
-    out of its binary, and records what it answered. It is how this suite keeps its own photographs
-    current and it is not something a consumer of the corpus needs, so it is built only with
-    --features maintenance.
+    Writes recorded/<name>.toml from scratch: runs that counter over every case and records what
+    it answered, at the version its binary printed. It maintains this suite's own record and no
+    consumer of the corpus needs it, so it is built only with --features maintenance.
 
-    A note is kept exactly as long as the answer it was written about and dropped the moment that
-    answer moves, and every note dropped is named, since the sentence is owed by a person. An
-    exception is carried over as it stands. A counter that breaks on any case is refused rather
-    than written down with a hole in it.
+    A note is kept exactly as long as the answer it was written about, and every note dropped is
+    named, since the sentence is owed by a person. A counter that breaks on any case is refused
+    rather than written down with a hole in it.
 ";
 
 fn main() -> ExitCode {
@@ -153,8 +132,15 @@ fn main() -> ExitCode {
             eprintln!("{}", style::DIFFERS.paint(&trouble.to_string()));
             ExitCode::FAILURE
         }
+        // What went wrong is painted; anything under a blank line is the usage or a list of
+        // faults printed as it stands, since painting it red reads as more of the complaint.
         Err(Trouble::Said(message)) => {
-            eprintln!("{}", style::DIFFERS.paint(&message));
+            match message.split_once("\n\n") {
+                Some((said, under)) => {
+                    eprintln!("{}\n\n{}", style::DIFFERS.paint(said), paint_the_usage(under));
+                }
+                None => eprintln!("{}", style::DIFFERS.paint(&message)),
+            }
             ExitCode::FAILURE
         }
     }
@@ -166,6 +152,119 @@ fn get_the_usage() -> String {
     return USAGE.to_string();
     #[cfg(feature = "maintenance")]
     format!("{USAGE}{RECORD_USAGE}")
+}
+
+// A flag that does not exist is a mistake inside one command, so that command's own block answers
+// it and the other three are not printed. Blocks are told apart by where they start: a command
+// opens at the first column and everything belonging to it is indented or blank.
+fn find_the_usage_of(named: &str) -> String {
+    let whole = get_the_usage();
+    let opening = format!("{COMMAND_OPENS}{named} ");
+    let mut block: Vec<&str> = Vec::new();
+    for line in whole.lines().skip_while(|line| !line.starts_with(&opening)) {
+        if !block.is_empty() && !line.is_empty() && !line.starts_with(' ') {
+            break;
+        }
+        block.push(line);
+    }
+    match block.is_empty() {
+        true => whole,
+        false => format!("{}\n", block.join("\n").trim_end()),
+    }
+}
+
+// Painted here and never where the help is built, so what the parser hands back stays plain text.
+fn paint_the_usage(text: &str) -> String {
+    let mut painted: Vec<String> = Vec::new();
+    let mut inside = false;
+    for line in text.lines() {
+        if line.starts_with(COMMAND_OPENS) {
+            inside = true;
+            painted.push(paint_a_command_line(line));
+            continue;
+        }
+        if line.trim().is_empty() {
+            inside = false;
+        }
+        painted.push(match (inside, line.is_empty()) {
+            (true, _) => paint_the_arguments(line, style::PLAIN),
+            // Painting an empty line writes escape codes around nothing.
+            (false, true) => line.to_string(),
+            (false, false) => paint_the_arguments(line, style::FADED),
+        });
+    }
+    painted.join("\n")
+}
+
+fn paint_a_command_line(line: &str) -> String {
+    let mut words = line.splitn(3, ' ');
+    let (Some(program), Some(named)) = (words.next(), words.next()) else {
+        return line.to_string();
+    };
+    let painted = format!("{program} {}", style::COMMAND.paint(named));
+    match words.next() {
+        Some(rest) => format!("{painted} {}", paint_the_arguments(rest, style::PLAIN)),
+        None => painted,
+    }
+}
+
+// A flag is painted wherever it appears, on a command line and in the table under it alike. `rest`
+// is what everything around the flags is painted with, which is the only thing that differs.
+fn paint_the_arguments(text: &str, rest: style::Style) -> String {
+    cut_the_arguments(text)
+        .iter()
+        .map(|(ink, piece)| match *ink == style::FLAG {
+            true => ink.paint(piece).to_string(),
+            false => rest.paint(piece).to_string(),
+        })
+        .collect()
+}
+
+// Walked by character because a flag is glued to the bracket in front of it, so splitting on
+// spaces would hand back `[--counter`.
+fn cut_the_arguments(text: &str) -> Vec<(style::Style, String)> {
+    let mut cut: Vec<(style::Style, String)> = Vec::new();
+    let mut plain = String::new();
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch != '-' || chars.peek() != Some(&'-') {
+            plain.push(ch);
+            continue;
+        }
+        let mut held = String::from(ch);
+        while chars.peek().is_some_and(|ch| !" ]".contains(*ch)) {
+            held.extend(chars.next());
+        }
+        if !plain.is_empty() {
+            cut.push((style::PLAIN, std::mem::take(&mut plain)));
+        }
+        cut.push((style::FLAG, held));
+    }
+    if !plain.is_empty() {
+        cut.push((style::PLAIN, plain));
+    }
+    cut
+}
+
+// Nothing says which command a misspelled one was meant to be, so the answer is the list of them.
+fn name_every_command() -> String {
+    let whole = get_the_usage();
+    let mut named: Vec<&str> = Vec::new();
+    let mut inside = false;
+    for line in whole.lines() {
+        if line.starts_with(COMMAND_OPENS) {
+            if !named.is_empty() {
+                named.push("");
+            }
+            inside = true;
+        } else if line.trim().is_empty() {
+            inside = false;
+        }
+        if inside {
+            named.push(line);
+        }
+    }
+    named.join("\n")
 }
 
 enum Trouble {
@@ -188,8 +287,8 @@ impl From<io::Error> for Trouble {
 fn run(args: Vec<String>) -> Result<bool, Trouble> {
     let mut settings = Settings::of(args)?;
     let mut out = io::stdout().lock();
-    if settings.wants_help {
-        writeln!(out, "{}", get_the_usage())?;
+    if let Some(help) = &settings.help {
+        writeln!(out, "{}", paint_the_usage(help))?;
         return Ok(false);
     }
     let folder = match env::current_dir() {
@@ -396,7 +495,9 @@ struct Settings {
     known_failures: Option<PathBuf>,
     disabled: Vec<String>,
     out: Option<PathBuf>,
-    wants_help: bool,
+    // The help to print instead of running, and `None` for a run. `linejudge --help` asks for the
+    // whole of it; a `--help` after a command asks about that command and gets that block.
+    help: Option<String>,
 }
 
 #[derive(Debug)]
@@ -424,13 +525,13 @@ impl Settings {
             known_failures: None,
             disabled: Vec::new(),
             out: None,
-            wants_help: false,
+            help: None,
         };
         let mut args = args.into_iter();
         let Some(command) = args.next() else { return Err(get_the_usage()) };
         match command.as_str() {
             "--help" | "-h" => {
-                settings.wants_help = true;
+                settings.help = Some(get_the_usage());
                 return Ok(settings);
             }
             "check" => {}
@@ -440,15 +541,15 @@ impl Settings {
             #[cfg(feature = "maintenance")]
             "record" => settings.command = Command::Record,
             _ => {
-                let usage = get_the_usage();
-                return Err(format!("{command} is not a command of this program\n\n{usage}"));
+                let named = name_every_command();
+                return Err(format!("{command} is not a command of this program\n\n{named}\n"));
             }
         }
         // The flag is recognised before its value is taken, so a misspelled last flag is told it
         // is misspelled instead of being told it was given nothing.
         while let Some(flag) = args.next() {
             match flag.as_str() {
-                "--help" | "-h" => settings.wants_help = true,
+                "--help" | "-h" => settings.help = Some(find_the_usage_of(&command)),
                 "--corpus" => settings.corpus = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--adapters" => settings.adapters = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--dialects" => settings.dialects = Some(PathBuf::from(value_of(&flag, &mut args)?)),
@@ -469,13 +570,13 @@ impl Settings {
                         *case = flag;
                     }
                     _ => {
-                        let usage = get_the_usage();
+                        let usage = find_the_usage_of(&command);
                         return Err(format!("{flag} is not a flag of this command\n\n{usage}"));
                     }
                 },
             }
         }
-        if settings.wants_help {
+        if settings.help.is_some() {
             return Ok(settings);
         }
         if let Command::Explain { case } = &settings.command {
@@ -766,8 +867,40 @@ mod tests {
     #[test]
     fn help_is_asked_for_in_every_position_and_is_not_an_error() {
         for args in [vec!["--help"], vec!["check", "--help"], vec!["check", "-h"]] {
-            assert!(settings_of(&args).unwrap().wants_help);
+            assert!(settings_of(&args).unwrap().help.is_some(), "{args:?}");
         }
+    }
+
+    #[test]
+    fn a_usage_line_is_cut_into_its_flags_and_what_lies_between_them() {
+        let cut = cut_the_arguments("[<case>] [--counter <name>] [--bin <path>]");
+        assert_eq!(cut[0], (style::PLAIN, "[<case>] [".to_string()));
+        assert_eq!(cut[1], (style::FLAG, "--counter".to_string()));
+        assert_eq!(cut[2], (style::PLAIN, " <name>] [".to_string()));
+        assert_eq!(cut[3], (style::FLAG, "--bin".to_string()));
+
+        // Nothing may be added or lost, however odd the line.
+        for line in ["", "[]", "--", "-h", "a -- b", "[--last]"] {
+            let kept: String =
+                cut_the_arguments(line).iter().map(|(_, piece)| piece.as_str()).collect();
+            assert_eq!(kept, line, "{line}");
+        }
+    }
+
+    // Asking a command for its help is asking about that command, so it answers with itself. The
+    // whole of it, the note about colour included, is what a bare --help is for.
+    #[test]
+    fn help_after_a_command_is_that_commands_own_and_a_bare_one_is_the_whole_of_it() {
+        let one = settings_of(&["fetch", "--help"]).unwrap().help.unwrap();
+        assert!(one.contains("linejudge fetch "), "{one}");
+        assert!(!one.contains("linejudge check "), "{one}");
+        assert!(!one.contains("CLICOLOR_FORCE"), "{one}");
+
+        let whole = settings_of(&["--help"]).unwrap().help.unwrap();
+        for named in ["check", "explain", "fetch", "render"] {
+            assert!(whole.contains(&format!("linejudge {named} ")), "{named} is missing");
+        }
+        assert!(whole.contains("CLICOLOR_FORCE"), "the note about colour is missing");
     }
 
     #[test]
