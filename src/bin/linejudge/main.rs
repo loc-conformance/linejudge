@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "maintenance")]
+mod bump;
 mod counters;
 mod explain;
 mod fetch;
@@ -118,6 +120,24 @@ linejudge record --counter <name> [--bin <path>] [--corpus <dir>] [--adapters <d
     named, since the sentence is owed by a person. A counter that breaks on any case is refused
     rather than written down with a hole in it.
 ";
+#[cfg(feature = "maintenance")]
+const BUMP_USAGE: &str = "
+linejudge bump-versions [<counter>] [--json] [--adapters <dir>]
+
+    Asks every channel what it publishes newest and, where that differs from the version an
+    adapter declares, writes the new one into it and changes nothing else in the file. Named a
+    counter, it does that for that one. It maintains this suite's own declarations and no consumer
+    of the corpus needs it, so it is built only with --features maintenance.
+
+    The comparison is equality alone: a channel answering something unexpected reads as a
+    difference rather than passing quietly, and no order between two version numbers is invented.
+
+    A raised version is half a change. The recorded answers of that counter were measured against
+    the old build, and moving them is the other half.
+
+    --json prints the counters that moved as one document and nothing else, with anything gone
+    wrong on the error output, which is what a scheduled job builds its work list from.
+";
 
 fn main() -> ExitCode {
     match run(env::args().skip(1).collect()) {
@@ -151,7 +171,7 @@ fn get_the_usage() -> String {
     #[cfg(not(feature = "maintenance"))]
     return USAGE.to_string();
     #[cfg(feature = "maintenance")]
-    format!("{USAGE}{RECORD_USAGE}")
+    format!("{USAGE}{RECORD_USAGE}{BUMP_USAGE}")
 }
 
 // A flag that does not exist is a mistake inside one command, so that command's own block answers
@@ -313,6 +333,20 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         let chosen = choose_the_counters_named(&mut out, &adapters, counter)?;
         let named = read_the_counters_of(folder.as_ref())?;
         return Ok(fetch::fetch_every_counter(&mut out, &chosen, &named)?);
+    }
+    // Asking a channel what it publishes touches neither the corpus nor anybody's answers either.
+    #[cfg(feature = "maintenance")]
+    if let Command::BumpVersions { counter } = &settings.command {
+        let adapters = Adapter::read_all(&dirs.adapters, &dialects)?;
+        let chosen = choose_the_counters_named(&mut out, &adapters, counter)?;
+        let into = dirs.adapters.last().filter(|dir| !dir.starts_with(&shipped));
+        let Some(into) = into else {
+            return Err(Trouble::Said(
+                "bump-versions writes into an adapters directory of your own, and none was named"
+                    .to_string(),
+            ));
+        };
+        return Ok(bump::bump_every_version(&mut out, &chosen, into, settings.as_json)?);
     }
     let mut corpus = read_the_corpus(&dirs.corpus)?;
     set_aside_what_was_disabled(&mut corpus, &settings.disabled)?;
@@ -495,6 +529,8 @@ struct Settings {
     known_failures: Option<PathBuf>,
     disabled: Vec<String>,
     out: Option<PathBuf>,
+    #[cfg(feature = "maintenance")]
+    as_json: bool,
     // The help to print instead of running, and `None` for a run. `linejudge --help` asks for the
     // whole of it; a `--help` after a command asks about that command and gets that block.
     help: Option<String>,
@@ -510,6 +546,9 @@ enum Command {
     Render,
     #[cfg(feature = "maintenance")]
     Record,
+    // An empty name asks every channel and writes nothing.
+    #[cfg(feature = "maintenance")]
+    BumpVersions { counter: String },
 }
 
 impl Settings {
@@ -525,6 +564,8 @@ impl Settings {
             known_failures: None,
             disabled: Vec::new(),
             out: None,
+            #[cfg(feature = "maintenance")]
+            as_json: false,
             help: None,
         };
         let mut args = args.into_iter();
@@ -540,6 +581,10 @@ impl Settings {
             "render" => settings.command = Command::Render,
             #[cfg(feature = "maintenance")]
             "record" => settings.command = Command::Record,
+            #[cfg(feature = "maintenance")]
+            "bump-versions" => {
+                settings.command = Command::BumpVersions { counter: String::new() }
+            }
             _ => {
                 let named = name_every_command();
                 return Err(format!("{command} is not a command of this program\n\n{named}\n"));
@@ -561,6 +606,8 @@ impl Settings {
                 }
                 "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
                 "--out" => settings.out = Some(PathBuf::from(value_of(&flag, &mut args)?)),
+                #[cfg(feature = "maintenance")]
+                "--json" => settings.as_json = true,
                 _ => match &mut settings.command {
                     Command::Check { case }
                     | Command::Explain { case }
@@ -568,6 +615,12 @@ impl Settings {
                         if case.is_empty() && !flag.starts_with('-') =>
                     {
                         *case = flag;
+                    }
+                    #[cfg(feature = "maintenance")]
+                    Command::BumpVersions { counter }
+                        if counter.is_empty() && !flag.starts_with('-') =>
+                    {
+                        *counter = flag;
                     }
                     _ => {
                         let usage = find_the_usage_of(&command);
@@ -598,6 +651,10 @@ impl Settings {
         }
         if matches!(settings.command, Command::Check { .. }) && settings.out.is_some() {
             return Err("--out belongs to render".to_string());
+        }
+        #[cfg(feature = "maintenance")]
+        if settings.as_json && !matches!(settings.command, Command::BumpVersions { .. }) {
+            return Err("--json belongs to bump-versions".to_string());
         }
         if let Command::Fetch { .. } = &settings.command {
             if settings.name_of_counter.is_some() {

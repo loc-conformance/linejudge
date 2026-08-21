@@ -1,0 +1,141 @@
+name: Version check
+
+# Once a week it reads the adapters, asks each channel what it publishes newest, and opens a pull
+# request for each counter whose declared version has moved. It measures nothing and publishes
+# nothing: its output is a pull request and never a page, so a version we measure changes only by
+# somebody merging one of these.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  find-what-moved:
+    runs-on: ubuntu-latest
+    outputs:
+      moved: ${{ steps.ask.outputs.moved }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache the cargo registry and the build dir
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --features maintenance
+
+      # A channel that could not be answered is a warning and not the end of the run: the counters
+      # that did answer still get their pull request, and the one that did not is asked again next
+      # week. The document is the whole of stdout, so nothing has to be parsed out of a report.
+      - name: Ask every channel what it publishes newest
+        id: ask
+        run: |
+          set +e
+          moved=$(./target/release/linejudge bump-versions --json --adapters adapters)
+          asked=$?
+          set -e
+          # A run that failed before it could report prints nothing at all, and an empty value here
+          # is not the empty list: it would pass the gate below and reach fromJSON as a parse error.
+          if [ -z "$moved" ]; then moved='[]'; fi
+          echo "moved=$moved" >> "$GITHUB_OUTPUT"
+          echo "$moved"
+          if [ "$asked" -ne 0 ]; then
+            echo "::warning::a channel could not be asked, and the counters it covers were skipped"
+          fi
+
+  raise:
+    needs: find-what-moved
+    if: needs.find-what-moved.outputs.moved != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    # One job and one pull request per counter, because each raise brings its own recorded answers
+    # and its own reading. One failing leaves the others to finish.
+    strategy:
+      fail-fast: false
+      matrix:
+        bump: ${{ fromJSON(needs.find-what-moved.outputs.moved) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The branch carries the version, so it is written once and never again. A second run over
+      # the same raise finds it there and stops, which is what makes it safe to work on this branch
+      # by hand: nothing here will ever force push over what somebody added to it.
+      - name: Has this raise been opened already
+        id: branch
+        run: |
+          branch="bump-${{ matrix.bump.counter }}-${{ matrix.bump.to }}"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "already=yes" >> "$GITHUB_OUTPUT"
+            echo "::notice::$branch is already there, so this raise has been opened"
+          else
+            echo "already=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install the Rust toolchain
+        if: steps.branch.outputs.already == 'no'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache the cargo registry and the build dir
+        if: steps.branch.outputs.already == 'no'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        if: steps.branch.outputs.already == 'no'
+        run: cargo build --release --features maintenance
+
+      - name: Raise the version this counter declares
+        if: steps.branch.outputs.already == 'no'
+        run: |
+          ./target/release/linejudge bump-versions "${{ matrix.bump.counter }}" \
+            --adapters adapters
+          git diff --stat
+
+      # A pull request opened with the run's own token does not start CI, which github suppresses
+      # so that a workflow cannot set itself off. It matters here, because a raise on its own fails
+      # the test that holds an adapter's version to the one its answers were recorded from, and
+      # that failure is the instruction. Whoever reads the pull request starts CI from its own
+      # Run workflow button.
+      - name: Open the pull request
+        if: steps.branch.outputs.already == 'no'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          COUNTER: ${{ matrix.bump.counter }}
+          FROM: ${{ matrix.bump.from }}
+          TO: ${{ matrix.bump.to }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git commit -qam "declare $COUNTER $TO"
+          git push -q origin "$BRANCH"
+          gh pr create --head "$BRANCH" --title "declare $COUNTER $TO" --body "$(cat <<BODY
+          \`$COUNTER\` declared **$FROM**, and its channel now publishes **$TO**.
+
+          This is half a change and cannot be merged as it stands. The recorded answers under
+          \`recorded/$COUNTER.toml\` were measured against the $FROM build, and a test refuses to
+          let the two drift, so it fails until they move together.
+
+          What is left, on this branch:
+
+          - fetch the new build: \`linejudge fetch $COUNTER\`
+          - run \`linejudge check\` and read what changed. A case this build now passes comes out
+            as having started agreeing; a case it has started failing is a finding of its own.
+          - re-record it: \`linejudge record --counter $COUNTER\`, which also moves the version
+            written at the top of that file.
+
+          Nothing here will ever be force pushed over: this branch carries the version in its
+          name, so the weekly run sees it and leaves it alone.
+          BODY
+          )"

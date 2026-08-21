@@ -12,10 +12,15 @@ use crate::counters::Counters;
 use crate::fetched::{create_a_partial_dir_for, find_the_binary_of, finish_the_partial_dir};
 use crate::style;
 
+pub(crate) const CRATES_IO: &str = "crates-io";
+pub(crate) const GITHUB_API: &str = "https://api.github.com/repos";
+pub(crate) const GITHUB_RELEASE_ASSET: &str = "github-release-asset";
+
 const CHECKSUM_WORDS: [&str; 2] = ["checksum", "sha256"];
-const CRATES_IO: &str = "crates-io";
-const GITHUB_API: &str = "https://api.github.com/repos";
-const GITHUB_RELEASE_ASSET: &str = "github-release-asset";
+// crates.io answers 403 to a request that arrives as plain curl, which reads exactly like a crate
+// that is not there, so every request says who it is and where to complain about it.
+const USER_AGENT: &str =
+    concat!("linejudge/", env!("CARGO_PKG_VERSION"), " (+", env!("CARGO_PKG_REPOSITORY"), ")");
 
 // Downloads every counter that says where it comes from, at exactly the version it declares. One
 // counter failing never stops the others, so whether anything went wrong is answered at the end.
@@ -297,7 +302,7 @@ fn find_the_file_named(named: &str, under: &Path) -> Option<PathBuf> {
         .find_map(|dir| find_the_file_named(named, &dir))
 }
 
-fn read_a_url(url: &str) -> Result<String, String> {
+pub(crate) fn read_a_url(url: &str) -> Result<String, String> {
     download_with_curl_or_wget(&["-sSfL", url], &["-qO-", url])
 }
 
@@ -314,6 +319,11 @@ fn save_a_url(url: &str, into: &Path) -> Result<(), String> {
 // Only a curl that is not on the machine moves on to wget. A curl that ran and was refused is the
 // answer: falling through would report a missing wget for what is really a plain 404.
 fn download_with_curl_or_wget(curl: &[&str], wget: &[&str]) -> Result<String, String> {
+    let mut for_curl = vec!["-A", USER_AGENT];
+    for_curl.extend_from_slice(curl);
+    let mut for_wget = vec!["-U", USER_AGENT];
+    for_wget.extend_from_slice(wget);
+    let (curl, wget) = (for_curl.as_slice(), for_wget.as_slice());
     let missing = match run_the_program("curl", curl) {
         Ok(printed) => return Ok(printed),
         Err(Refusal::Refused(message)) => return Err(message),
