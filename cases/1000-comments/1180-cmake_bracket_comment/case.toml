@@ -1,2 +1,3 @@
 trap = """
-a counted bracket comment is closed only by an end carrying the same count"""
+CMake opens a bracket comment with any number of equals signs between its brackets, and only a
+closer carrying the same number ends it. A shorter one further down is text"""

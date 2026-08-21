@@ -1,3 +1,3 @@
 trap = """
-an apostrophe inside a heredoc body. A heredoc names its own closer at runtime, which no
-declaration of comment and string symbols can express"""
+an apostrophe inside the body of a shell heredoc. The word that ends a heredoc is chosen where it
+is written, so no fixed list of comment and string symbols can say what closes this one"""

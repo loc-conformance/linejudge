@@ -1,2 +1,3 @@
 trap = """
-a primed name beside an apostrophe inside a string, where neither tick may pair"""
+F# lets a name end in an apostrophe, so s' is one name. The apostrophe in the word it's, inside the
+string on the same line, is the other one. Neither may pair with the other"""

@@ -1,2 +1,4 @@
 trap = """
-a primed name beside a real character literal, in a language whose comments are a nesting pair"""
+OCaml lets a name end in an apostrophe, so x' is one name and the apostrophe opens nothing. The
+line under it holds a real character literal, and the comment under that is written with (* *),
+which nests"""

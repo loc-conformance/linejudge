@@ -1,4 +1,4 @@
 trap = """
-a closing tag written with a space before its bracket, which is legal and rare. It is not the
-closer any language file declares, and all four totals are the same whether the block is found or
-not, which is what hides it"""
+a closing script tag written with a space before its bracket, which is legal HTML and rare. A
+counter looking for the tag without the space never finds the end of the block. Every count comes
+out the same whether it found it or not, which is what keeps this one hidden"""

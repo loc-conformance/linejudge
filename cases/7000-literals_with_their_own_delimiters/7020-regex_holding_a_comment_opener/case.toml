@@ -1,3 +1,4 @@
 trap = """
-a comment opener inside a regex literal. Telling a regex from a division needs the token before
-the slash, which is a lexer's job, and every counter measured here answers the same way"""
+a block comment opener inside a JavaScript regular expression. Knowing that the slash begins a
+pattern rather than a division takes reading what came before it, which is more than any counter
+here attempts, and all of them answer the same way"""

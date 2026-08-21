@@ -1,2 +1,4 @@
 trap = """
-a bare ]] must not hide the ]=] that begins one byte inside it"""
+a Lua comment opened with one equals sign, ended by a line reading ]]=]. The bare ]] at the front
+of that line matches nothing, and the real closer ]=] begins one character inside it, so a counter
+searching left to right finds the wrong one first"""

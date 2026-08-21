@@ -1,4 +1,4 @@
 trap = """
-the same empty doc comment line as case 8040, this time with no further documentation under it.
-What makes it its own case is that the answer stops being about comments and becomes about
-lines"""
+the same empty /// line as case 8040, this time the last one, with code and no more documentation
+under it. A counter that decides an empty marker by what surrounds it has nothing to look at here,
+and the answer has to come out the same, since the line itself has not changed"""

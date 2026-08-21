@@ -1,2 +1,3 @@
 trap = """
-a raw string keeps the quotes inside it to itself"""
+a Rust raw string, opened with r#" and closed with "#, so the plain quotes written inside it are
+text and close nothing"""

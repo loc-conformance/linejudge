@@ -1,2 +1,3 @@
 trap = """
-a raw string ends at its own closer even when the last byte is a backslash"""
+a Rust raw string, r#" to "#, whose last character is a backslash. Nothing escapes inside a raw
+string, so the closer closes it and the line ends where it looks like it ends"""

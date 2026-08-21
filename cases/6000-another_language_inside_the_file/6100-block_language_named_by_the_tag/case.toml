@@ -1,4 +1,4 @@
 trap = """
-the opener names the block's language, so this file is Vue, TypeScript and SCSS and not Vue,
-JavaScript and CSS. The three totals are the same either way, which is why a case about labelling
-has to declare its regions and not only its counts"""
+the opening tag names the language of its block, so this file is Vue, TypeScript and SCSS and not
+Vue, JavaScript and CSS. Every count comes out the same either way, so nothing but the names
+themselves can tell a counter that read the tags from one that guessed"""

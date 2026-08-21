@@ -1,2 +1,3 @@
 trap = """
-each pair ends only at its own closer, the other pair's token inside it is text"""
+D writes block comments two ways, /* */ and /+ +/. Each ends only at its own closer, so the other
+pair's symbol sitting inside one is text"""

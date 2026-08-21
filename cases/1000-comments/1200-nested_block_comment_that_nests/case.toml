@@ -1,2 +1,3 @@
 trap = """
-an inner block does not end the outer one in a language whose pairs nest"""
+Haskell block comments nest, so an inner one opening and closing inside the outer leaves the outer
+still open, and the text after it is still comment"""

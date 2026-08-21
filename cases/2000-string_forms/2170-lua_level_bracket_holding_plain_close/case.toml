@@ -1,2 +1,3 @@
 trap = """
-a counted bracket is closed only by an end carrying the same count"""
+Lua opens a long comment with any number of equals signs between its brackets, and only a closer
+carrying the same number ends it. A bare ]] further down is text"""

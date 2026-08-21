@@ -1,2 +1,3 @@
 trap = """
-two lone ticks on one line, a lifetime and the apostrophe of a word inside a string"""
+two lone apostrophes on one Rust line: the one that marks a lifetime, and the one in the word
+don't inside a string. Neither opens anything, and a counter pairing them would swallow the line"""

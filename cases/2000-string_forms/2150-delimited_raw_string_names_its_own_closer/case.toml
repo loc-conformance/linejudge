@@ -1,2 +1,4 @@
 trap = """
-a delimited raw string names its own terminator, so no declared symbol can close it"""
+a C++ raw string that puts a word of its own between the R" and the bracket, and then ends only at
+that same word. The closer is chosen where the string is written, so no fixed list of symbols can
+say what ends this one"""

@@ -1,6 +1,6 @@
 trap = """
 four pairs of lines, each holding the same two things in opposite order: code and a comment, a
-string and a comment, a brace and a comment, a semicolon and a wordless comment. The swap keeps
-every span the same kind, so within each pair the two lines must classify identically, whatever
-order a counter's own classifier reads them in. The string pair is the witness that words inside
-a comment do not outweigh a string on the same line in either direction"""
+string and a comment, a brace and a comment, a semicolon and a wordless comment. Swapping the two
+changes neither of them, so the two lines of a pair have to be counted the same way whichever one
+a counter meets first. The string pair is the one that shows words inside a comment do not
+outweigh a string on the same line, in either direction"""

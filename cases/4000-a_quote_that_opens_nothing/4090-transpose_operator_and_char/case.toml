@@ -1,2 +1,4 @@
 trap = """
-the transpose operator is a lone tick and must not pair with the literal below it"""
+Julia transposes a matrix by writing an apostrophe after it, so a' is an operation and the
+apostrophe stands alone. A real character literal sits on the line below, and a counter that pairs
+the two swallows everything between them"""

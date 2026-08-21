@@ -1,4 +1,4 @@
 trap = """
-a doc comment line holding nothing but its marker, which is how a blank line is put between two
-paragraphs of documentation. A bare marker says nothing, so it is extra to a counter that asks
-what a line says"""
+a documentation line holding nothing but the /// that marks it, which is how a blank line is put
+between two paragraphs of documentation. It is a comment to a counter that asks what the line is
+inside, and neither code nor comment to one that asks what the line says, since it says nothing"""

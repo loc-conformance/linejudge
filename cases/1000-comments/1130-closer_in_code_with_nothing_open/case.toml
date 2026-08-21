@@ -1,2 +1,3 @@
 trap = """
-a raw string closer sitting in code with nothing open is an ordinary string holding a hash"""
+Rust ends a raw string with a quote and a hash, and those two characters appear here in ordinary
+code with no raw string open. They are a plain string holding a hash and nothing more"""

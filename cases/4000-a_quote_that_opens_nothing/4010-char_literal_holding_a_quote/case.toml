@@ -1,2 +1,3 @@
 trap = """
-the quote inside a character literal opens no string"""
+a Rust character literal holding a double quote. The quote is the value of the character and opens
+no string, so the comment lines under it are comments"""

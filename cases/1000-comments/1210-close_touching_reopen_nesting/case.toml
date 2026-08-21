@@ -1,2 +1,3 @@
 trap = """
-the same close and reopen with a pair that nests, where the reopener must not be counted twice"""
+a Haskell block comment closes and the next one opens with nothing between the two symbols. The
+pair nests, so a counter tracking how deep it is must not read the reopener as two levels"""

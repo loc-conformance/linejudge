@@ -1,2 +1,4 @@
 trap = """
-a primed name beside a real character literal"""
+Haskell lets a name end in an apostrophe, so x' is one name and the apostrophe opens nothing. The
+line under it holds a real character literal, where a pair of apostrophes does mean what it looks
+like"""

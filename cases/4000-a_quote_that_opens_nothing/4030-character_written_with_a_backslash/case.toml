@@ -1,2 +1,4 @@
 trap = """
-a quote written as a character with a backslash opens no string"""
+Clojure writes a character as a backslash and the character itself, so a double quote is written
+\\". It reads like an escaped quote and is not one: there is no string here for it to be inside,
+and it opens none"""

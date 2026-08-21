@@ -1,3 +1,7 @@
 trap = """
-the opening line closes its quotes, so only the raw pair itself keeps the block opener under it
-from starting a comment that never ends. A lone ) inside does not end the string"""
+a C++ raw string, R"( to )", holding a block comment opener on a line of its own. Only the raw
+pair keeps that opener from starting a comment that never closes, and a lone ) inside does not end
+the string. The body of the opening line holds one further quote on purpose, so that counting the
+quotes on that line gives an even number: a counter that only tracks quotes then reaches the
+comment opener with nothing open, and cannot swallow it by accident and pass without reading the
+raw string at all"""

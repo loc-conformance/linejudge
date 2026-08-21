@@ -1,2 +1,3 @@
 trap = """
-HTML declares no string symbols, so an apostrophe in the text costs nothing"""
+HTML has no strings of its own, so the apostrophe in the word it's is text like everything around
+it and opens nothing"""
