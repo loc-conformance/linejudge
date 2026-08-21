@@ -29,6 +29,20 @@ header h1 {
   font-size: .9375rem;
 }
 
+a.why {
+  color: #0969da;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.why::after {
+  content: " \2192";
+}
+
+a.why:hover {
+  text-decoration: underline;
+}
+
 .meta {
   margin: 0 0 1rem;
   color: #6e7781;

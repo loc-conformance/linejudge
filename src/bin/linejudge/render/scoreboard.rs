@@ -80,7 +80,11 @@ fn render_the_header(sweep: &Sweep, counted: usize) -> Markup {
             p .intro {
                 "Every tool below is judged against its own declared rules, so a failure means \
                  the tool disagrees with itself. Hover elements like the test name or the status \
-                 result for more information or the reasons."
+                 result for more information or the reasons. "
+                a .why href=(find_the_url_of_the_organisation())
+                        target="_blank" rel="noreferrer" {
+                    "Why this exists"
+                }
             }
             p .meta {
                 "measured " (sweep.measured_on)
@@ -313,6 +317,16 @@ fn format_the_version_of(counter: &Counter) -> &str {
         .map(str::trim_start)
         .filter(|rest| !rest.is_empty())
         .unwrap_or(&counter.version)
+}
+
+// The organisation profile is the repository's parent path, taken from it rather than written out
+// again, so the two cannot come to name different organisations.
+fn find_the_url_of_the_organisation() -> &'static str {
+    let repository = env!("CARGO_PKG_REPOSITORY");
+    match repository.rsplit_once('/') {
+        Some((organisation, _)) => organisation,
+        None => repository,
+    }
 }
 
 #[cfg(test)]
