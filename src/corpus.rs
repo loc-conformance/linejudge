@@ -474,6 +474,54 @@ mod tests {
         assert!(unmarked[0].contains("marks no such reading"), "{unmarked:?}");
     }
 
+    // A trap saying "case 1070 is the same line with a space" is the only place one case points at
+    // another, and renumbering 1070 would leave the sentence pointing nowhere with nothing to say
+    // so. It stays a test rather than a fault of the read: the reference is text for a person, no
+    // count depends on it, and refusing to judge somebody's counter over their own wording would
+    // be the wrong trade.
+    #[test]
+    fn every_case_a_trap_points_at_is_in_the_corpus() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
+        let corpus = Corpus::read(&dir).unwrap_or_else(|faults| panic!("{faults:?}"));
+        let mut checked = 0;
+        let mut written = 0;
+        for case in &corpus.cases {
+            for number in find_the_case_numbers_in(&case.trap) {
+                let exists =
+                    corpus.cases.iter().any(|one| find_the_number_in(&one.name) == Some(number));
+                assert!(exists, "{}: its trap points at case {number}, which is gone", case.name);
+                checked += 1;
+            }
+            // Counted again the plain way, so a walk that quietly finds fewer than are there
+            // cannot leave this test passing while it guards a part of them.
+            let lowered = case.trap.to_lowercase();
+            for (at, _) in lowered.match_indices("case ") {
+                let after = &lowered[at + "case ".len()..];
+                written += usize::from(after.starts_with(|one: char| one.is_ascii_digit()));
+            }
+        }
+        assert!(written > 0, "no trap points at another case, so this test proved nothing");
+        assert_eq!(checked, written, "the walk over the traps missed a reference");
+    }
+
+    fn find_the_case_numbers_in(trap: &str) -> Vec<u32> {
+        const NAMES_ONE: &str = "case ";
+
+        let lowered = trap.to_lowercase();
+        let mut rest = lowered.as_str();
+        let mut found = Vec::new();
+        while let Some(at) = rest.find(NAMES_ONE) {
+            rest = &rest[at + NAMES_ONE.len()..];
+            let digits: String = rest.chars().take_while(|one| one.is_ascii_digit()).collect();
+            rest = &rest[digits.len()..];
+            let ends_the_word = rest.chars().next().is_none_or(|one| !one.is_alphanumeric());
+            if ends_the_word && let Ok(number) = digits.parse() {
+                found.push(number);
+            }
+        }
+        found
+    }
+
     fn build_and_read_the_case(
         name: &str,
         declaration: &str,
