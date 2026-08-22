@@ -29,42 +29,27 @@ pub fn derive_answer(
     dialect: &Dialect,
     readings: &Readings,
 ) -> Result<Derivation, Faults> {
-    let key = format!("{}.{}", dialect.counter, dialect.name);
-    let mut faults = check_readings_are_answered(truth, dialect, readings);
-    if !faults.is_empty() {
-        return Err(faults.into());
-    }
-    let counted = collect_counted_readings(dialect);
-
     let rules = &dialect.rules;
     let mut counts = create_empty_counts(rules);
-    let mut regions: BTreeMap<&str, Counts> = BTreeMap::new();
+    let mut regions: BTreeMap<String, Counts> = BTreeMap::new();
     let mut rules_that_fired = vec![false; rules.len()];
-    for (line, in_doc_string) in truth.lines.iter().zip(find_lines_in_a_doc_string(truth)) {
-        let facts = Facts::of(line, in_doc_string);
-        let bucket = match judge_line(&facts, rules, &mut rules_that_fired) {
-            Ok(bucket) => bucket,
-            Err(message) => {
-                faults.push(format!("{key}: {message} [{}]", line.source));
-                continue;
-            }
-        };
+    walk_every_line(truth, dialect, readings, |_, bucket, fired, region| {
+        for (ever, here) in rules_that_fired.iter_mut().zip(fired) {
+            *ever |= *here;
+        }
         add_one_line(&mut counts, bucket);
-        if let Some(claim) = line.find_region(&counted) {
+        if let Some(language) = region {
             let region = regions
-                .entry(claim.language.as_str())
+                .entry(language.to_string())
                 .or_insert_with(|| create_empty_counts(rules));
             add_one_line(region, bucket);
         }
-    }
-    if !faults.is_empty() {
-        return Err(faults.into());
-    }
+    })?;
 
     let regions = regions
         .into_iter()
         .map(|(language, counts)| RegionCounts {
-            language: language.to_string(),
+            language,
             lines: counts.lines,
             buckets: counts.buckets,
         })
@@ -85,7 +70,8 @@ pub struct ExplainedLine {
 }
 
 /// The same work as [`derive_answer`], kept line by line instead of summed, for a person asking
-/// why the counts came out the way they did. Both go through one function, so the two cannot part.
+/// why the counts came out the way they did. Both walk the file through one function, so a change
+/// to how a line is placed reaches the counts and this list together.
 ///
 /// One entry per line of the input, in the file's own order, so it lines up with
 /// [`Truth::lines`](crate::truth::Truth::lines). A line no rule can place is an `Err` and never a
@@ -95,39 +81,53 @@ pub fn explain_every_line(
     dialect: &Dialect,
     readings: &Readings,
 ) -> Result<Vec<ExplainedLine>, Faults> {
-    let key = format!("{}.{}", dialect.counter, dialect.name);
-    let faults = check_readings_are_answered(truth, dialect, readings);
-    if !faults.is_empty() {
-        return Err(faults.into());
-    }
-    let counted = collect_counted_readings(dialect);
-
     let rules = &dialect.rules;
     let mut lines = Vec::with_capacity(truth.lines.len());
-    let mut faults = Vec::new();
-    for (line, in_doc_string) in truth.lines.iter().zip(find_lines_in_a_doc_string(truth)) {
-        let facts = Facts::of(line, in_doc_string);
-        let mut fired = vec![false; rules.len()];
-        let bucket = match judge_line(&facts, rules, &mut fired) {
-            Ok(bucket) => bucket.to_string(),
-            Err(message) => {
-                faults.push(format!("{key}: {message} [{}]", line.source));
-                continue;
-            }
-        };
+    walk_every_line(truth, dialect, readings, |facts, bucket, fired, region| {
         lines.push(ExplainedLine {
-            bucket,
+            bucket: bucket.to_string(),
             rules: rules
                 .iter()
-                .zip(&fired)
+                .zip(fired)
                 .filter(|(_, fired)| **fired)
                 .map(|(rule, _)| rule.name.clone())
                 .collect(),
             holds: facts.find_predicates_that_hold(),
-            region: line.find_region(&counted).map(|claim| claim.language.clone()),
+            region: region.map(str::to_string),
         });
+    })?;
+    Ok(lines)
+}
+
+// The one walk over a case that both public functions above are built from, so a change to how a
+// line is placed cannot reach one of them and miss the other. The rules that fired are handed over
+// per line; whoever wants them for the whole file adds them up.
+fn walk_every_line(
+    truth: &Truth,
+    dialect: &Dialect,
+    readings: &Readings,
+    mut take: impl FnMut(&Facts, &str, &[bool], Option<&str>),
+) -> Result<(), Faults> {
+    let key = format!("{}.{}", dialect.counter, dialect.name);
+    let unanswered = check_readings_are_answered(truth, dialect, readings);
+    if !unanswered.is_empty() {
+        return Err(unanswered.into());
     }
-    if faults.is_empty() { Ok(lines) } else { Err(faults.into()) }
+    let counted = collect_counted_readings(dialect);
+    let rules = &dialect.rules;
+    let mut faults = Vec::new();
+    for (line, in_doc_string) in truth.lines.iter().zip(find_lines_in_a_doc_string(truth)) {
+        let facts = Facts::of(line, in_doc_string);
+        let mut fired = vec![false; rules.len()];
+        match judge_line(&facts, rules, &mut fired) {
+            Ok(bucket) => {
+                let region = line.find_region(&counted).map(|claim| claim.language.as_str());
+                take(&facts, bucket, &fired, region);
+            }
+            Err(message) => faults.push(format!("{key}: {message} [{}]", line.source)),
+        }
+    }
+    if faults.is_empty() { Ok(()) } else { Err(faults.into()) }
 }
 
 // One field per `Predicate`, answered for a single line.
@@ -310,7 +310,6 @@ mod tests {
 
     use super::*;
 
-    // A rule that no case reaches has never been checked against what the counter really does.
     #[test]
     fn every_rule_of_every_dialect_decides_a_line_of_the_corpus() {
         let dialects = read_the_shipped_dialects();
@@ -358,8 +357,6 @@ mod tests {
         assert!(refused.contains("code (residue) against comments (not-blank)"), "{refused}");
     }
 
-    // No file in the corpus holds a character above ASCII, so this is the only place that tests
-    // what happens to one.
     #[test]
     fn a_word_is_a_letter_a_digit_or_anything_above_ascii_and_a_column_is_a_character() {
         let facts = |source: &str, marker: &str| Facts::of(&create_a_line(source, marker), false);
@@ -369,8 +366,6 @@ mod tests {
         assert!(facts("{ x ;", ". . .").word_in_residue);
     }
 
-    // The reading a dialect has never answered is the one a new kind of case brings, and the
-    // answer cannot be guessed: reading it as a no would blame the counter for our omission.
     #[test]
     fn a_reading_no_dialect_has_answered_is_refused_and_says_what_to_do_about_it() {
         let input = "/** doc */\nlet x = 1\n";

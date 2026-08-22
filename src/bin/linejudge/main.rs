@@ -166,7 +166,6 @@ fn main() -> ExitCode {
     }
 }
 
-// The help of a plain build names only what a plain build can run.
 fn get_the_usage() -> String {
     #[cfg(not(feature = "maintenance"))]
     return USAGE.to_string();
@@ -327,14 +326,14 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
     let shipped = create_the_shipped_dir()?;
     let dirs = resolve_dirs(&settings, folder.as_ref(), &shipped)?;
     let dialects = Dialects::read(&dirs.dialects).map_err(|faults| faults.join("\n"))?;
-    // Downloading asks nothing of the corpus or of anybody's answers to it, so neither is read.
+    // Neither downloading nor asking a channel what it publishes touches the corpus or anybody's
+    // answers to it, so the two commands below read neither.
     if let Command::Fetch { counter } = &settings.command {
         let adapters = Adapter::read_all(&dirs.adapters, &dialects)?;
         let chosen = choose_the_counters_named(&mut out, &adapters, counter)?;
         let named = read_the_counters_of(folder.as_ref())?;
         return Ok(fetch::fetch_every_counter(&mut out, &chosen, &named)?);
     }
-    // Asking a channel what it publishes touches neither the corpus nor anybody's answers either.
     #[cfg(feature = "maintenance")]
     if let Command::BumpVersions { counter } = &settings.command {
         let adapters = Adapter::read_all(&dirs.adapters, &dialects)?;
@@ -922,13 +921,6 @@ mod tests {
     }
 
     #[test]
-    fn help_is_asked_for_in_every_position_and_is_not_an_error() {
-        for args in [vec!["--help"], vec!["check", "--help"], vec!["check", "-h"]] {
-            assert!(settings_of(&args).unwrap().help.is_some(), "{args:?}");
-        }
-    }
-
-    #[test]
     fn a_usage_line_is_cut_into_its_flags_and_what_lies_between_them() {
         let cut = cut_the_arguments("[<case>] [--counter <name>] [--bin <path>]");
         assert_eq!(cut[0], (style::PLAIN, "[<case>] [".to_string()));
@@ -936,7 +928,6 @@ mod tests {
         assert_eq!(cut[2], (style::PLAIN, " <name>] [".to_string()));
         assert_eq!(cut[3], (style::FLAG, "--bin".to_string()));
 
-        // Nothing may be added or lost, however odd the line.
         for line in ["", "[]", "--", "-h", "a -- b", "[--last]"] {
             let kept: String =
                 cut_the_arguments(line).iter().map(|(_, piece)| piece.as_str()).collect();
@@ -944,10 +935,9 @@ mod tests {
         }
     }
 
-    // Asking a command for its help is asking about that command, so it answers with itself. The
-    // whole of it, the note about colour included, is what a bare --help is for.
     #[test]
     fn help_after_a_command_is_that_commands_own_and_a_bare_one_is_the_whole_of_it() {
+        assert!(settings_of(&["check", "-h"]).unwrap().help.is_some());
         let one = settings_of(&["fetch", "--help"]).unwrap().help.unwrap();
         assert!(one.contains("linejudge fetch "), "{one}");
         assert!(!one.contains("linejudge check "), "{one}");
@@ -1046,9 +1036,25 @@ mod tests {
     }
 
     #[test]
-    fn a_disabled_flag_names_a_case_or_is_refused() {
+    fn a_disabled_flag_is_taken_more_than_once() {
         let parsed = settings_of(&["check", "--disabled", "0400-a", "--disabled", "0500-b"]).unwrap();
         assert_eq!(parsed.disabled, ["0400-a", "0500-b"]);
+    }
+
+    #[test]
+    fn a_disabled_case_leaves_the_run_and_a_name_that_is_no_case_is_refused() {
+        let shipped = create_the_shipped_dir().unwrap();
+        let mut corpus = read_the_corpus(&shipped.join(CASES_DIR)).unwrap();
+        let name = corpus.cases[0].name.clone();
+        set_aside_what_was_disabled(&mut corpus, std::slice::from_ref(&name)).unwrap();
+        assert!(corpus.disabled.contains(&name));
+        assert!(!corpus.cases.iter().any(|case| case.name == name), "it is still being judged");
+
+        let twice = set_aside_what_was_disabled(&mut corpus, &[name]);
+        assert!(twice.is_ok(), "naming it again is not a mistake");
+        let refused = set_aside_what_was_disabled(&mut corpus, &["1234-no_such_case".to_string()])
+            .unwrap_err();
+        assert!(refused.contains("no case of that name"), "{refused}");
     }
 
     fn settings_of(args: &[&str]) -> Result<Settings, String> {

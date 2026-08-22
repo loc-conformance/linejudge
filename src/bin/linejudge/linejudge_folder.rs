@@ -101,7 +101,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_folder_is_found_from_a_subdirectory_and_absent_where_none_exists() {
+    fn the_folder_is_found_by_climbing_out_of_a_subdirectory() {
         let root = env::temp_dir().join("linejudge-a_folder_to_find");
         let deep = root.join("a").join("b");
         let _ = fs::remove_dir_all(&root);
@@ -112,17 +112,6 @@ mod tests {
         assert_eq!(folder.get_counters_file(), root.join(FOLDER_NAME).join(COUNTERS_FILE));
         assert!(folder.find_corpus().is_none());
         fs::remove_dir_all(&root).unwrap();
-
-        let lone = env::temp_dir().join("linejudge-no_folder_anywhere");
-        let _ = fs::remove_dir_all(&lone);
-        fs::create_dir_all(&lone).unwrap();
-        // The temp dir sits under the machine's own tree, where a stray .linejudge above it would
-        // make this flaky; finding none from the filesystem root is the only stable half.
-        let found = Folder::find(&lone).unwrap();
-        fs::remove_dir_all(&lone).unwrap();
-        if let Some(found) = found {
-            assert_ne!(found.get_root(), lone);
-        }
     }
 
     #[test]

@@ -102,15 +102,12 @@ pub struct Line {
     pub counted: Vec<Counted>,
 }
 
-// A stretch of one line and what covers it, so a page can paint the file without knowing what a
-// marker looks like.
 #[derive(Debug, PartialEq)]
 pub struct Piece {
     pub covering: Covering,
     pub text: String,
 }
 
-// Where one way of counting puts one line, and which of its rules put it there.
 #[derive(Debug, PartialEq)]
 pub struct Counted {
     pub bucket: String,
@@ -118,13 +115,10 @@ pub struct Counted {
     pub region: Option<String>,
 }
 
-// One counter as its own page shows it: the half of the measurement that has nothing to do with
-// any case.
 #[derive(Debug, PartialEq)]
 pub struct ToolDetail {
     pub name: String,
     pub version: String,
-    // `None` where the adapter does not say.
     pub repository: Option<String>,
     // `None` for a counter that cannot be fetched.
     pub channel: Option<String>,
@@ -140,8 +134,6 @@ pub struct DialectDetail {
     pub rules: Vec<RuleDetail>,
 }
 
-// One rule of a dialect, its conditions already written out in words for somebody who will never
-// open the file they came from.
 #[derive(Debug, PartialEq)]
 pub struct RuleDetail {
     pub name: String,

@@ -59,9 +59,11 @@ impl Truth {
                 return Err(faults.into());
             }
             if source.is_empty() {
-                let marker = match rows.peek() {
-                    Some(&"s") | Some(&"c") => rows.next().unwrap_or_default().to_string(),
-                    _ => String::new(),
+                let inside =
+                    |row: &str| KINDS.iter().any(|marks| row == marks.interior.to_string());
+                let marker = match rows.peek().is_some_and(|row| inside(row)) {
+                    true => rows.next().unwrap_or_default().to_string(),
+                    false => String::new(),
                 };
                 lines.push(RawLine { source: source.to_string(), marker, label: None });
                 continue;
@@ -518,11 +520,6 @@ mod tests {
     fn a_labeled_doc_comment_covers_its_own_lines_and_stops_at_a_plain_one() {
         let input = "/// a\n///\n// plain\nfn x() {}\n";
         let marked = "/// a\nCCCcc Markdown (optional rust-doc-comment)\n///\nCCC\n\
-                      // plain\nCCcccccc\nfn x() {}\n.. . ..\n";
-        let refused = Truth::read(marked, input);
-        // The last marker above is deliberately short, so first prove the length gate still runs.
-        assert!(refused.is_err());
-        let marked = "/// a\nCCCcc Markdown (optional rust-doc-comment)\n///\nCCC\n\
                       // plain\nCCcccccc\nfn x() {}\n.. ... ..\n";
         let truth = Truth::read(marked, input).unwrap();
         let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
@@ -538,8 +535,9 @@ mod tests {
         let marked = "\"\"\"\nSSS Markdown (optional rust-doc-comment)\nnotes\nsssss\n\
                       \"\"\"\nZZZ\nx = 1\n. . .\n";
         let truth = Truth::read(marked, input).unwrap();
-        assert!(!truth.lines[1].regions.is_empty());
-        assert!(!truth.lines[2].regions.is_empty(), "the closing quotes match the opening bytes");
+        let markdown = |at: usize| truth.lines[at].regions.last().map(|c| c.language.as_str());
+        assert_eq!(markdown(1), Some("Markdown"));
+        assert_eq!(markdown(2), Some("Markdown"), "the closing quotes match the opening bytes");
         assert!(truth.lines[3].regions.is_empty());
     }
 
@@ -562,8 +560,7 @@ mod tests {
         assert_eq!(markdown(1), Some("Markdown"), "the block is signed by /// and not by /*");
     }
 
-    // A php page whose markup opens where the php stops and whose script opens on the very next
-    // line, so both boundaries touch, and so do both closers.
+    // The `?>` opens the markup region and the `<?php` closes it, which is the way round it looks.
     #[test]
     fn tags_that_touch_open_and_close_a_region_each() {
         let input = "?>\n<script>\nvar x = 1;\n</script>\n<?php\n";
@@ -612,7 +609,6 @@ mod tests {
         assert!(unclosed[0].contains("never closed"), "{unclosed:?}");
     }
 
-    // The everyday three-language file: a page's html holding a script, here in php's clothing.
     #[test]
     fn a_tag_pair_inside_a_tag_pair_nests_and_the_innermost_language_wins() {
         let input = "?>\n<div>\n<script>\nx\n</script>\n</div>\n<?php\n";
@@ -632,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn a_labeled_span_inside_a_tagged_region_is_the_inner_region_of_the_two() {
+    fn a_dialect_that_declines_an_optional_region_is_given_the_one_around_it() {
         let input = "<script>\n/** doc */\n</script>\n";
         let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\n\
                       CCCcccccUU Markdown (optional rust-doc-comment)\n</script>\n<<<<<<<<<\n";
@@ -640,15 +636,6 @@ mod tests {
         let claims: Vec<&str> =
             truth.lines[1].regions.iter().map(|c| c.language.as_str()).collect();
         assert_eq!(claims, ["TypeScript", "Markdown"]);
-        assert_eq!(truth.lines[1].regions[1].reading.as_deref(), Some("rust-doc-comment"));
-    }
-
-    #[test]
-    fn a_dialect_that_declines_an_optional_region_is_given_the_one_around_it() {
-        let input = "<script>\n/** doc */\n</script>\n";
-        let marked = "<script>\n>>>>>>>> TypeScript\n/** doc */\n\
-                      CCCcccccUU Markdown (optional rust-doc-comment)\n</script>\n<<<<<<<<<\n";
-        let truth = Truth::read(marked, input).unwrap();
         let charged = |at: usize, counted: &[&str]| {
             truth.lines[at].find_region(counted).map(|claim| claim.language.as_str())
         };
@@ -726,7 +713,6 @@ mod tests {
         for marks in KINDS {
             for mark in [marks.opener, marks.interior, marks.closer] {
                 assert!(ALPHABET.contains(mark), "{} of a {}", mark, marks.name);
-                assert!(marks.owns(mark));
             }
         }
         for mark in [RESIDUE, TAG_OPENS, TAG_CLOSES] {

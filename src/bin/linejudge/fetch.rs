@@ -71,7 +71,6 @@ fn report_the_path_that_shadows(
             instead.display())))
 }
 
-// The download is assembled to one side, asked its version, and only then put in place.
 fn fetch_one_counter(
     out: &mut dyn Write,
     adapter: &Adapter,
@@ -312,12 +311,9 @@ fn save_a_url(url: &str, into: &Path) -> Result<(), String> {
     Ok(())
 }
 
-// The one place with a network, and it asks the machine rather than carrying a client of its own.
 // curl ships with Windows and macOS and is on every ordinary Linux; wget is what the smallest
-// container images have instead.
-//
-// Only a curl that is not on the machine moves on to wget. A curl that ran and was refused is the
-// answer: falling through would report a missing wget for what is really a plain 404.
+// container images have instead. Only a curl that is not on the machine moves on to wget: falling
+// through from a curl that ran and was refused would report a missing wget for a plain 404.
 fn download_with_curl_or_wget(curl: &[&str], wget: &[&str]) -> Result<String, String> {
     let mut for_curl = vec!["-A", USER_AGENT];
     for_curl.extend_from_slice(curl);
@@ -392,8 +388,6 @@ struct Asset {
 mod tests {
     use super::*;
 
-    // Every machine is checked from every machine: the trap is a word read inside another word,
-    // "darwin" ending in "win", and that belongs to the names rather than to whoever runs this.
     #[test]
     fn the_file_for_a_machine_is_picked_out_of_what_a_release_carries() {
         let assets = a_release();
@@ -411,7 +405,6 @@ mod tests {
         assert!(find_the_asset_for_this_machine(&assets).is_ok(), "and the machine running this");
     }
 
-    // The 32 bit file is named i386 and the 64 bit one x86_64, so neither is ever the other.
     #[test]
     fn a_release_carrying_nothing_for_this_machine_says_what_it_does_carry() {
         let assets = vec![
@@ -423,7 +416,6 @@ mod tests {
         assert!(refused.contains(OS), "{refused}");
     }
 
-    // The name is written into a path, and it came off the network.
     #[test]
     fn a_file_name_a_release_hands_over_may_not_carry_a_path_inside_it() {
         let plain = an_asset("scc_Linux_x86_64.tar.gz");
@@ -483,7 +475,6 @@ AB12CD34  scc_Windows_x86_64.zip
         assert!(missing.is_none());
     }
 
-    // Told apart so that a curl 404 is reported as the 404, and not as a missing wget.
     #[test]
     fn a_program_this_machine_does_not_have_is_told_apart_from_one_that_ran_and_said_no() {
         match run_the_program("a-program-no-machine-has", &[]) {

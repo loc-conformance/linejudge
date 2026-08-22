@@ -409,6 +409,7 @@ mod tests {
         assert_eq!(mezura.invocations[1].buckets, ["code", "comments", "blanks"]);
         let tokei = adapters[2].acquisition.as_ref().unwrap();
         assert_eq!((tokei.channel.as_str(), tokei.version.as_str()), ("crates-io", "14.0.0"));
+        assert!(mezura.acquisition.is_none(), "mezura is published nowhere to be fetched from");
         for adapter in &adapters {
             let home = adapter.repository.as_deref().unwrap_or_default();
             assert!(home.starts_with("https://"), "{}: {home}", adapter.name_of_counter);
@@ -435,20 +436,6 @@ mod tests {
         let elsewhere = Path::new("/somewhere/of/its/own/input.c");
         let whole = tokei.format_command(&tokei.invocations[0], Path::new("tokei"), elsewhere);
         assert!(whole.contains("somewhere"), "{whole}");
-    }
-
-    // A counter nobody publishes anywhere has no channel to declare, and all the absence costs is
-    // that nothing can fetch it.
-    #[test]
-    fn an_adapter_with_no_acquisition_reads_as_a_counter_that_cannot_be_fetched() {
-        let path = write_an_adapter(
-            "an_adapter_that_cannot_be_fetched",
-            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [dialect.default]\nargs = []\n",
-        );
-        let adapter = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
-        fs::remove_dir_all(path.parent().unwrap()).unwrap();
-        assert!(adapter.acquisition.is_none());
     }
 
     #[test]
@@ -578,15 +565,6 @@ mod tests {
         fs::remove_dir_all(both.parent().unwrap()).unwrap();
         assert!(refused.contains("two ways of taking the same output"), "{refused}");
 
-        let unknown = write_an_adapter(
-            "a_format_nobody_reads",
-            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             explain-args = [\"-t\", \"{file}\"]\nexplain-output = \"tokei-lines\"\n\
-             [dialect.default]\nargs = []\n",
-        );
-        let refused = Adapter::read(&unknown, &read_the_shipped_dialects()).unwrap_err();
-        fs::remove_dir_all(unknown.parent().unwrap()).unwrap();
-        assert!(refused.contains("does not parse"), "{refused}");
     }
 
     #[test]

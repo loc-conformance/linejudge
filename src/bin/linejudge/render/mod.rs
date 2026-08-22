@@ -6,7 +6,7 @@ use linejudge::corpus::Corpus;
 use linejudge::dialects::Dialects;
 use maud::{DOCTYPE, Markup, html};
 
-use crate::render::data::{CaseDetail, Sweep, ToolDetail};
+use crate::render::data::{Answer, CaseDetail, Sweep, ToolDetail, Verdict};
 
 mod badge;
 mod case;
@@ -25,8 +25,6 @@ const STYLE_FILE: &str = "page.css";
 const STYLE: &str = include_str!("page.css");
 const SCRIPT: &str = include_str!("page.js");
 
-// Measures the whole roster and writes what a static host serves: the scoreboard, a page per case
-// under it, and the measurement behind them as JSON.
 pub fn write_the_site(
     adapters: &[Adapter],
     corpus: &Corpus,
@@ -106,6 +104,29 @@ pub fn name_the_badge_of(name_of_counter: &str, name_of_dialect: &str) -> String
     format!("{name_of_counter}.{name_of_dialect}")
 }
 
+// The five states an answer can be in. The badge and the scoreboard both show them and both read
+// them from here, in this order, so neither can come to mean something else by "open".
+pub struct Tally {
+    pub agrees: usize,
+    pub open: usize,
+    pub fails: usize,
+    pub unclaimed: usize,
+    pub broke: usize,
+}
+
+impl Tally {
+    pub fn of(answers: &[Answer]) -> Tally {
+        let of = |wanted: &dyn Fn(&Answer) -> bool| answers.iter().filter(|a| wanted(a)).count();
+        Tally {
+            agrees: of(&|a| a.verdict == Verdict::Agrees),
+            open: of(&|a| a.verdict == Verdict::Fails && a.note.is_none()),
+            fails: of(&|a| a.verdict == Verdict::Fails && a.note.is_some()),
+            unclaimed: of(&|a| a.verdict == Verdict::Unclaimed),
+            broke: of(&|a| a.verdict == Verdict::Broke),
+        }
+    }
+}
+
 // Every page is this, so the stylesheet and the script are written once and linked rather than
 // carried inside each one. `up` is what a page climbs to reach the root of the site: nothing for
 // the scoreboard, one step for a case.
@@ -171,9 +192,8 @@ mod tests {
 
     use super::*;
 
-    // Each page is rendered by a function that knows nothing of where the others were written, so
-    // a name built in one place and a directory made in another are held together by nothing but
-    // this.
+    // A name built by one function and a directory made by another are held together by nothing
+    // else.
     #[test]
     fn every_page_points_only_at_files_the_site_actually_holds() {
         let out = env::temp_dir().join("linejudge-every_page_points_at_what_is_there");
@@ -269,7 +289,6 @@ mod tests {
                             trap: "a trap".to_string(),
                             disabled: false,
                         },
-                        // Set aside, so the scoreboard names it and links it nowhere.
                         Case {
                             name: "disabled-1020-set_aside".to_string(),
                             trap: String::new(),

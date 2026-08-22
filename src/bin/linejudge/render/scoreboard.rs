@@ -1,5 +1,6 @@
 use maud::{Markup, html};
 
+use crate::render::Tally;
 use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Verdict};
 use crate::render::{
     CASES_DIR, DATA_FILE, TOOLS_DIR, format_as_one_line, format_the_group_title,
@@ -126,18 +127,13 @@ fn render_one_column_head(counter: &Counter) -> Markup {
 }
 
 fn render_one_tally(answers: &[Answer]) -> Markup {
-    let of = |wanted: &dyn Fn(&Answer) -> bool| answers.iter().filter(|a| wanted(a)).count();
-    let agrees = of(&|a| a.verdict == Verdict::Agrees);
-    let fails = of(&|a| a.verdict == Verdict::Fails && a.note.is_some());
-    let open = of(&|a| a.verdict == Verdict::Fails && a.note.is_none());
-    let unclaimed = of(&|a| a.verdict == Verdict::Unclaimed);
-    let broke = of(&|a| a.verdict == Verdict::Broke);
+    let tally = Tally::of(answers);
     html! {
-        b .ok { (agrees) "✓" }
-        @if fails > 0 { " " b .bad { (fails) "✗" } }
-        @if open > 0 { " " b .open { (open) " open" } }
-        @if unclaimed > 0 { " " b .na { (unclaimed) "⊘" } }
-        @if broke > 0 { " " b .bad { (broke) " broke" } }
+        b .ok { (tally.agrees) "✓" }
+        @if tally.open > 0 { " " b .open { (tally.open) " open" } }
+        @if tally.fails > 0 { " " b .bad { (tally.fails) "✗" } }
+        @if tally.unclaimed > 0 { " " b .na { (tally.unclaimed) "⊘" } }
+        @if tally.broke > 0 { " " b .bad { (tally.broke) " broke" } }
     }
 }
 
@@ -217,7 +213,6 @@ fn render_one_failure(answer: &Answer) -> Markup {
     }
 }
 
-// The lines and every bucket whose two sides disagree, so a cell shows only what moved.
 fn find_the_differing_counts(wants: &Counts, answered: &Counts) -> Vec<(String, u32, u32)> {
     let mut differing = Vec::new();
     if wants.lines != answered.lines {

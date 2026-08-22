@@ -365,8 +365,6 @@ mod tests {
         assert!(dialects.find("cloc", "default").is_none());
     }
 
-    // Every dialect answers every reading, whatever the answer is, because a question left out is
-    // a case this suite cannot work out an answer for.
     #[test]
     fn every_shipped_dialect_answers_every_reading_and_tokei_is_the_one_that_counts_them() {
         let dialects = read_the_shipped_dialects();

@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -41,13 +40,8 @@ impl RecordedAnswers {
         else {
             return Ok(None);
         };
-        let text = match fs::read_to_string(&path) {
-            Ok(text) => text,
-            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(error) => {
-                return Err(format!("{} could not be read: {error}", path.display()).into());
-            }
-        };
+        let text = fs::read_to_string(&path)
+            .map_err(|e| Faults::from(format!("{} could not be read: {e}", path.display())))?;
         let raw: RawRecorded = toml::from_str(&text)
             .map_err(|e| format!("{} does not parse: {e}", path.display()))?;
         let where_it_is = path.display();

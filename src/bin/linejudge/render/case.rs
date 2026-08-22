@@ -2,7 +2,7 @@ use maud::{Markup, html};
 
 use linejudge::truth::Covering;
 
-use crate::render::data::{Answer, CaseDetail, Counts, Region, Sweep, Verdict};
+use crate::render::data::{Answer, CaseDetail, Counted, Counts, Region, Sweep, Verdict};
 use crate::render::{INDEX_FILE, format_as_one_line, format_the_group_title, wrap_the_page};
 
 // A case's page sits one directory under the root of the site.
@@ -134,7 +134,6 @@ fn render_the_verdict_of(answer: &Answer) -> Markup {
     }
 }
 
-// Where another answer is given to hold these against, the numbers that differ are painted.
 fn format_the_counts(counts: &Counts, against: Option<&Counts>) -> Markup {
     let differs = |name: &str, value: u32| {
         against.is_some_and(|other| other.buckets.get(name) != Some(&value))
@@ -172,7 +171,7 @@ fn find_the_answers_to<'a>(detail: &CaseDetail, sweep: &'a Sweep) -> Vec<(String
     found
 }
 
-fn name_the_rules_of(counted: &crate::render::data::Counted) -> String {
+fn name_the_rules_of(counted: &Counted) -> String {
     match counted.rules.is_empty() {
         true => "no rule took this line".to_string(),
         false => format!("by {}", counted.rules.join(" and by ")),

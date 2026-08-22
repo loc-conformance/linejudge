@@ -145,23 +145,15 @@ mod tests {
         let detail = a_tool();
         let shown = render_the_worklist_of(&detail, &a_sweep()).into_string();
         assert!(shown.contains("1 of 3"), "one of three is not agreed\n{shown}");
-        // A tool's page is one directory down, so a case is reached by climbing out of it first.
         assert!(shown.contains("href=\"../cases/0500-a_failure.html\""), "{shown}");
         assert!(!shown.contains("0400-a_pass"), "an agreeing case earns no line\n{shown}");
         assert!(shown.contains("the /* opens a comment"), "{shown}");
     }
 
     #[test]
-    fn a_dialect_shows_its_rules_in_words_and_nothing_else() {
-        let shown = render_one_dialect(&a_tool().dialects[0]).into_string();
-        assert!(shown.contains("part of the line is inside a comment"), "{shown}");
-        assert!(shown.contains("comments"), "the bucket a rule counts into\n{shown}");
-        assert!(!shown.contains("in-comment&"), "not the token from the file\n{shown}");
-    }
-
-    #[test]
-    fn a_way_of_counting_is_named_beside_the_command_line_that_asks_for_it() {
+    fn a_way_of_counting_is_named_beside_its_rules_in_words_and_the_flags_that_ask_for_it() {
         let named = render_one_dialect(&a_tool().dialects[0]).into_string();
+        assert!(named.contains("part of the line is inside a comment"), "{named}");
         assert!(named.contains(">default<"), "{named}");
         assert!(named.contains("run with <code>--mode default</code>"), "{named}");
 

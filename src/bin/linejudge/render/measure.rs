@@ -132,8 +132,6 @@ pub fn read_every_case(
     Ok(detailed)
 }
 
-// What a counter's own page shows: where it comes from, and the rules each of its ways of counting
-// is judged by, written out in words.
 pub fn read_every_tool(
     sweep: &data::Sweep,
     adapters: &[Adapter],
@@ -177,8 +175,8 @@ pub fn read_every_tool(
     Ok(detailed)
 }
 
-// What one condition asks, in words. The dialect files write these as `in-comment` and
-// `!in-string`, which say enough to whoever writes one and nothing to whoever opens the page.
+// The dialect files write these as `in-comment` and `!in-string`, which say enough to whoever
+// writes one and nothing to whoever opens the page.
 fn say_what_a_condition_asks(condition: &Condition) -> String {
     let (predicate, holds) = match condition {
         Condition::Holds(predicate) => (predicate, true),

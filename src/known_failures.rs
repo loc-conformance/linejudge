@@ -80,6 +80,7 @@ region:8020-blank_line_inside_block_comment      # only one of the two models fa
         assert!(known.names("content", "8010-punctuation_only_line"));
         assert!(known.names("region", "8010-punctuation_only_line"));
         assert!(known.names("default", "8040-doc_comment_with_no_text"));
+        assert!(!known.names("content", "8010"));
     }
 
     #[test]
@@ -90,15 +91,8 @@ region:8020-blank_line_inside_block_comment      # only one of the two models fa
     }
 
     #[test]
-    fn the_number_alone_names_no_case() {
-        let known = KnownFailures::of(A_LIST);
-        assert!(!known.names("content", "8010"));
-    }
-
-    #[test]
     fn comments_and_empty_lines_name_nothing() {
         let known = KnownFailures::of(A_LIST);
-        assert!(!known.names("content", "the"));
         assert_eq!(known.entries().count(), 3);
     }
 }

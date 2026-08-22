@@ -171,7 +171,10 @@ fn parse_row(row: &str) -> Result<Item, String> {
             if from != to {
                 return Err(format!("[{row}] gives a tag a range, and a tag row is one line"));
             }
-            let kind = kind.chars().next().unwrap_or('>');
+            let kind = match kind {
+                "<" => '<',
+                _ => '>',
+            };
             return Ok(Item::Tag { line: from, kind, label, text: text.to_string(), occurrence });
         }
         _ => return Err(format!("[{kind}] is not S, C, > or <")),
@@ -473,6 +476,19 @@ mod tests {
     }
 
     #[test]
+    fn the_cases_readme_quotes_this_help_word_for_word() {
+        let readme =
+            fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("cases/README.md"))
+                .unwrap_or_else(|e| panic!("cases/README.md: {e}"))
+                .replace("\r\n", "\n");
+        assert!(
+            readme.contains(USAGE),
+            "cases/README.md no longer quotes the propose-markers help exactly; paste the current \
+             help into its fenced block"
+        );
+    }
+
+    #[test]
     fn two_spans_on_one_line_are_painted_in_the_order_they_sit_on_it() {
         let truth = propose(&["/* block */ // trailing"], &["1 C /*| block |*/", "1 C //| trailing"]);
         assert_eq!(truth, "/* block */ // trailing\nCCcccccccUU CCccccccccc\n");
@@ -541,7 +557,7 @@ mod tests {
     }
 
     // 6400's second line, where the closer is there twice: once ending the comment above and once
-    // inside the '*/*' whose second half reopens it. The tool cannot know which, and says so.
+    // inside the '*/*' whose second half reopens it.
     #[test]
     fn a_text_that_is_there_twice_is_refused_until_an_occurrence_is_named() {
         let source = ["int w = 8; /* tail", "*/ int z = 9; */* int y = 10;"];

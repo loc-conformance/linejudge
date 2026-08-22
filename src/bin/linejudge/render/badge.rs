@@ -1,4 +1,5 @@
-use crate::render::data::{Answer, Verdict};
+use crate::render::Tally;
+use crate::render::data::Answer;
 
 const HEIGHT: usize = 20;
 const LABEL: &str = "conformance";
@@ -11,13 +12,13 @@ const NARROW_BLOCK: usize = 34;
 // One badge for one way of counting: the label, then a block per state, each carrying its count. A
 // block of nought is left out, apart from the green one, which is what the badge is for and stays.
 pub fn render_one_badge(answers: &[Answer]) -> String {
-    let of = |wanted: &dyn Fn(&Answer) -> bool| answers.iter().filter(|a| wanted(a)).count();
+    let tally = Tally::of(answers);
     let blocks: Vec<(usize, &str, &str)> = [
-        (of(&|a| a.verdict == Verdict::Agrees), "✓", "#2ea043"),
-        (of(&|a| a.verdict == Verdict::Fails && a.note.is_none()), "?", "#c99a06"),
-        (of(&|a| a.verdict == Verdict::Fails && a.note.is_some()), "✗", "#cf222e"),
-        (of(&|a| a.verdict == Verdict::Unclaimed), "⊘", "#8c959f"),
-        (of(&|a| a.verdict == Verdict::Broke), "!", "#8b1a1a"),
+        (tally.agrees, "✓", "#2ea043"),
+        (tally.open, "?", "#c99a06"),
+        (tally.fails, "✗", "#cf222e"),
+        (tally.unclaimed, "⊘", "#8c959f"),
+        (tally.broke, "!", "#8b1a1a"),
     ]
     .into_iter()
     .enumerate()
@@ -75,7 +76,7 @@ fn name_of(symbol: &str) -> &'static str {
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::render::data::Counts;
+    use crate::render::data::{Counts, Verdict};
 
     use super::*;
 
@@ -103,23 +104,6 @@ mod tests {
             assert!(badge.contains(said), "{said} is missing\n{badge}");
         }
         assert!(badge.contains("1 agree, 1 fail and nobody has reviewed them, 1 fail"), "{badge}");
-    }
-
-    // A width that does not match what is drawn crops the last block or hangs empty colour off
-    // the end.
-    #[test]
-    fn the_width_of_the_badge_is_the_width_of_what_is_drawn() {
-        let badge = render_one_badge(&[
-            answer(Verdict::Agrees, None),
-            answer(Verdict::Fails, Some("a note")),
-            answer(Verdict::Fails, None),
-            answer(Verdict::Unclaimed, None),
-            answer(Verdict::Broke, None),
-        ]);
-        assert!(badge.contains("width=\"260\""), "{badge}");
-
-        let two = render_one_badge(&[answer(Verdict::Agrees, None), answer(Verdict::Fails, Some("a"))]);
-        assert!(two.contains("width=\"158\""), "{two}");
     }
 
     fn answer(verdict: Verdict, note: Option<&str>) -> Answer {

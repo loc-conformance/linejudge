@@ -338,8 +338,6 @@ mod tests {
         assert_eq!(corpus.find_case("1150").unwrap_or_else(|_| panic!("1150")).name, whole);
         assert!(corpus.find_case("no_case_is_called_this").unwrap_err().is_empty());
 
-        // A whole name that is also part of a longer one is still the exact match, never the
-        // ambiguity: the two doc-comment cases below share the shorter name as a prefix.
         let many = corpus.find_case("doc_comment").unwrap_err();
         assert!(many.len() > 1, "{:?}", many.iter().map(|c| &c.name).collect::<Vec<_>>());
     }
@@ -475,10 +473,7 @@ mod tests {
     }
 
     // A trap saying "case 1070 is the same line with a space" is the only place one case points at
-    // another, and renumbering 1070 would leave the sentence pointing nowhere with nothing to say
-    // so. It stays a test rather than a fault of the read: the reference is text for a person, no
-    // count depends on it, and refusing to judge somebody's counter over their own wording would
-    // be the wrong trade.
+    // another, and renumbering 1070 would leave that sentence pointing nowhere.
     #[test]
     fn every_case_a_trap_points_at_is_in_the_corpus() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");

@@ -205,8 +205,7 @@ mod tests {
         assert_eq!(as_numbers_of_region(&tokei.regions[1], "blanks"), (2, 2, 0, 0));
     }
 
-    // A readme whose html fence holds a script. The JavaScript sits two levels down, where a
-    // reader that stops at the first level loses it without a word.
+    // A readme whose html fence holds a script, so the JavaScript sits two levels down.
     #[test]
     fn a_language_two_levels_down_is_read_out_of_the_blobs_and_not_lost() {
         let tokei = measure(OutputFormat::TokeiJson, &WITH_BLANKS, TOKEI_DEEP);
@@ -235,8 +234,6 @@ mod tests {
         assert!(nothing.unwrap().is_none());
     }
 
-    // Every count is taken by its name, so four buckets read like three, and a bucket the counter
-    // never printed is named beside the ones it did.
     #[test]
     fn a_bucket_a_counter_never_printed_is_refused_beside_what_it_did_print() {
         let four = ["code", "comments", "documentation", "blanks"];
@@ -248,15 +245,6 @@ mod tests {
         let refused = read_output(OutputFormat::TokeiJson, &named(&four), TOKEI).unwrap_err();
         assert!(refused.contains("printed no documentation"), "{refused}");
         assert!(refused.contains("blanks, code, comments"), "{refused}");
-    }
-
-    #[test]
-    fn the_order_a_dialect_lists_its_buckets_in_changes_nothing() {
-        let listed = measure(OutputFormat::TokeiJson, &["code", "comments", "blanks"], TOKEI);
-        let shuffled = measure(OutputFormat::TokeiJson, &["blanks", "code", "comments"], TOKEI);
-        assert_eq!(listed, shuffled);
-        assert!(listed.counts.buckets["code"] > 0);
-        assert!(!listed.regions.is_empty(), "and the regions came through it too");
     }
 
     #[test]

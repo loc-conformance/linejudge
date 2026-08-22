@@ -16,10 +16,6 @@ use crate::style;
 
 const EXTENSION: &str = "toml";
 
-// Runs the counter over every case and writes its file under `recorded/` from scratch, so a new
-// release of a tool does not mean editing eighty entries by hand. A note is kept exactly as long
-// as the answer it was written about, and every note dropped is named, since somebody still owes
-// the replacement sentence.
 pub fn record_one_counter(
     out: &mut dyn Write,
     adapter: &Adapter,
@@ -91,7 +87,6 @@ pub fn record_one_counter(
     Ok(())
 }
 
-// One block of the file being written.
 struct Recorded {
     counted: Option<Answer>,
     is_known_failure: bool,

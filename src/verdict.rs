@@ -338,9 +338,6 @@ mod tests {
         assert!(!quiet.is_a_failure());
     }
 
-    // With a list, the record is not asked at all: a failure the list names passes whether it is
-    // the recorded one or a brand new one, and a failure it does not name breaks the run even
-    // where the record holds exactly that failure.
     #[test]
     fn a_list_answers_for_every_failure_and_the_record_is_not_asked() {
         let named = KnownFailures::of("default:0400-a_case_built_by_a_test\n");
@@ -358,7 +355,6 @@ mod tests {
         assert!(find_what_breaks_the_run(&[broke], "default", Some(&other)).len() == 1);
     }
 
-    // Nothing is run, so a path to a binary that does not exist stands in for the counter.
     #[test]
     fn a_stale_failure_flag_is_refused_before_anything_is_run() {
         let dialects = read_the_shipped_dialects();
@@ -392,7 +388,7 @@ mod tests {
         root: &std::path::Path,
         record_text: &str,
         dialects: &Dialects,
-    ) -> Result<Vec<Judged<'static>>, Faults> {
+    ) -> Result<(), Faults> {
         let cases = root.join("cases");
         let dir = cases.join("0000-a_group_built_by_a_test").join("0400-a_case_built_by_a_test");
         let _ = fs::remove_dir_all(root);
@@ -405,26 +401,22 @@ mod tests {
         fs::create_dir_all(&recorded_dir).unwrap();
         fs::write(recorded_dir.join("tokei.toml"), record_text).unwrap();
 
-        let corpus = Box::leak(Box::new(
-            Corpus::read(&cases).unwrap_or_else(|faults| panic!("{faults:?}")),
-        ));
-        let record = Box::leak(Box::new(
-            RecordedAnswers::read(std::slice::from_ref(&recorded_dir), "tokei", dialects)
-                .unwrap_or_else(|faults| panic!("{faults:?}"))
-                .unwrap_or_else(|| panic!("no record was read")),
-        ));
+        let corpus = Corpus::read(&cases).unwrap_or_else(|faults| panic!("{faults:?}"));
+        let record = RecordedAnswers::read(std::slice::from_ref(&recorded_dir), "tokei", dialects)
+            .unwrap_or_else(|faults| panic!("{faults:?}"))
+            .unwrap_or_else(|| panic!("no record was read"));
         let adapter = a_tokei_adapter();
         let judged = measure_and_judge_every_case(
             &adapter,
             &adapter.invocations[0],
             dialects,
             Path::new("a-binary-that-is-never-run"),
-            corpus,
-            Some(record),
+            &corpus,
+            Some(&record),
             "tokei 14.0.0",
         );
         let _ = fs::remove_dir_all(root);
-        judged
+        judged.map(|_| ())
     }
 
     fn a_tokei_adapter() -> Adapter {

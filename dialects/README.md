@@ -71,7 +71,7 @@ be inside a string or comment that is open across it.
   of its own line, whitespace before it allowed. Only scc asks this.
 
 The vocabulary is implemented once, in the harness, and shared by every dialect; a dialect file
-holds no code. A new predicate lands only with a case that witnesses it.
+holds no code. A new predicate lands only together with a case that uses it.
 
 ## What a dialect answers in `[counts-as-its-own-language]`
 
@@ -89,7 +89,7 @@ behavior is documented or consistent everywhere; a difference that looks like a 
 recorded failure on the cases it touches, because a rule written for every difference turns each
 bug into a definition and the report can never find one again.
 
-One mechanism is reserved and not yet built: a deliberate, consistent behavior that no rule over
-spans can express will be declarable as an exception for that one case, expected counts outright
-with a mandatory note, counted apart in every report as the dialect's health. No case has needed
-it yet, and it gets its shape the day one does.
+A deliberate, consistent behavior that no rule over spans can express can be declared as an
+exception for that one case: expected counts outright, with a mandatory note, in that counter's
+file under `recorded/`. The case then passes and is counted apart in every report. No counter
+declares one today; the [README](../README.md) has a full example.

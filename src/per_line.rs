@@ -94,8 +94,8 @@ pub fn read_per_line(
     })
 }
 
-// No `deny_unknown_fields`, deliberately: whatever a counter says beyond what the format promises
-// is its own business and rides along unread.
+// No `deny_unknown_fields`, deliberately: a counter is free to print detail of its own beside each
+// line, and a field this reader does not know is passed over rather than making the document wrong.
 #[derive(Deserialize)]
 struct RawDocument {
     format: u32,
@@ -123,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn the_fields_a_reader_does_not_know_are_carried_past_it() {
+    fn a_field_the_reader_does_not_know_is_passed_over_instead_of_refused() {
         let with_extras = a_document().replace(
             "{ \"line\": 2, \"bucket\": \"comments\" }",
             "{ \"line\": 2, \"bucket\": \"comments\", \"class\": \"words_in_comment\", \

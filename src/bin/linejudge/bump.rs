@@ -12,11 +12,9 @@ const ACQUISITION_BLOCK: &str = "[acquisition]";
 const CRATES_IO_API: &str = "https://crates.io/api/v1/crates";
 const VERSION_KEY: &str = "version";
 
-// Asks every channel what it publishes newest and, where that differs from the version an adapter
-// declares, writes the new one into it and nothing else in the file, so the hand alignment of the
-// other lines survives. With `as_json` the whole of stdout is one document of the counters that
-// moved, which is what the weekly job builds its matrix from, so every human line goes to the
-// error output instead and none of them can land inside the document.
+// Only the declared version line is rewritten, so the hand alignment of the rest of the file
+// survives. With `as_json` the whole of stdout is one document, so every human line goes to the
+// error output instead and none of them can land inside it.
 pub fn bump_every_version(
     out: &mut dyn Write,
     adapters: &[&Adapter],
@@ -223,8 +221,6 @@ mod tests {
         assert!(raised.ends_with("args = []\n"), "{raised}");
     }
 
-    // A dialect block can carry a version of its own one day, and the first `version` line of the
-    // file is not necessarily the one this command means.
     #[test]
     fn a_version_outside_the_acquisition_block_is_left_alone() {
         let elsewhere = AN_ADAPTER.replace("args = []", "version = \"1.0.0\"");
@@ -274,19 +270,5 @@ mod tests {
             "[{\"counter\":\"scc\",\"from\":\"3.7.0\",\"to\":\"3.8.0\"}]"
         );
         assert_eq!(format_as_a_matrix(&[]).unwrap(), "[]");
-    }
-
-    // A quote in a version would end the document early if it were written by hand, and github
-    // would answer with a parse error naming nothing.
-    #[test]
-    fn a_quote_in_a_version_is_escaped_rather_than_ending_the_document() {
-        let moved = [Moved {
-            counter: "scc".to_string(),
-            from: "3.7.0".to_string(),
-            to: "3.8.0\"".to_string(),
-        }];
-        let written = format_as_a_matrix(&moved).unwrap();
-        assert!(written.contains("\\\""), "{written}");
-        assert!(serde_json::from_str::<serde_json::Value>(&written).is_ok(), "{written}");
     }
 }

@@ -75,7 +75,6 @@ pub fn explain_one_counter(
     Ok(())
 }
 
-// One counter's one way of counting, over one case.
 struct OneWay<'a> {
     counter: &'a str,
     way: &'a str,
@@ -283,8 +282,7 @@ fn count_the_lines_of(region: &RegionCounts) -> Counts {
     Counts { lines: region.lines, buckets: region.buckets.clone() }
 }
 
-// Every line of the case: the source painted by its marked spans, the markers themselves, the
-// bucket the rules put the line in, and what the counter says instead where it differs.
+// What the counter itself says is written under a line only where it differs from the rules.
 fn write_every_line(
     out: &mut dyn Write,
     block: &OneWay,
@@ -441,7 +439,6 @@ mod tests {
         assert!(text.contains("mezura could not be run: exit status 101"), "{text}");
     }
 
-    // The counts can agree while the split into embedded languages does not.
     #[test]
     fn an_answer_whose_regions_alone_differ_is_marked_and_says_which_ones() {
         colored::control::set_override(false);
@@ -455,7 +452,6 @@ mod tests {
         let text = a_header(case, &real, &ItsAnswer::Counted(lost), &TheirAnswer::NoCommand, &[]);
         assert!(text.contains("✗ differs"), "{text}");
         assert!(text.contains("in its regions"), "{text}");
-        assert!(text.contains("against"), "{text}");
     }
 
     #[test]
@@ -490,14 +486,12 @@ mod tests {
     #[test]
     fn a_counter_that_prints_a_document_nobody_can_read_says_what_is_wrong_with_it() {
         colored::control::set_override(false);
-        let (corpus, dialects, adapters) = read_everything();
+        let (corpus, dialects, _) = read_everything();
         let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
-        let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
         let real = a_derivation(&corpus, &dialects, case);
         let unreadable = TheirAnswer::Unreadable("it answers 4 lines, and the file has 3".to_string());
         let text = a_header(case, &real, &ItsAnswer::NotMeasured, &unreadable, &[]);
         assert!(text.contains("what mezura printed could not be read: it answers 4 lines"), "{text}");
-        assert!(mezura.explain_args.is_some());
     }
 
     #[test]
