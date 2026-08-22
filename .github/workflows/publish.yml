@@ -22,7 +22,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -34,7 +34,7 @@ jobs:
       # of several minutes. The key is the adapters, because that is where the wanted versions are
       # written: raising one is exactly the change that has to fetch again.
       - name: Cache the counters that were downloaded
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.local/share/linejudge/bin
           key: counters-${{ hashFiles('adapters/**') }}

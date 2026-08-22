@@ -19,7 +19,7 @@ jobs:
       moved: ${{ steps.ask.outputs.moved }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -65,7 +65,7 @@ jobs:
         bump: ${{ fromJSON(needs.find-what-moved.outputs.moved) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The branch carries the version, so it is written once and never again. A second run over
       # the same raise finds it there and stops, which is what makes it safe to work on this branch
