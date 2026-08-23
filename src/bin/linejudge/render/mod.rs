@@ -12,7 +12,7 @@ mod badge;
 mod case;
 mod data;
 mod measure;
-mod scoreboard;
+mod overview;
 mod tool;
 
 pub const DATA_FILE: &str = "data.json";
@@ -55,7 +55,7 @@ fn write_every_file(
     };
     write(STYLE_FILE, STYLE.to_string())?;
     write(SCRIPT_FILE, SCRIPT.to_string())?;
-    write(INDEX_FILE, scoreboard::render_the_scoreboard(sweep))?;
+    write(INDEX_FILE, overview::render_the_overview(sweep))?;
     write_a_page_each(&out.join(CASES_DIR), cases, |detail| {
         (format!("{}.html", detail.name), case::render_one_case(detail, sweep))
     })?;
@@ -104,7 +104,7 @@ pub fn name_the_badge_of(name_of_counter: &str, name_of_dialect: &str) -> String
     format!("{name_of_counter}.{name_of_dialect}")
 }
 
-// How many answers are in each of the five states. The badge and the scoreboard both show these
+// How many answers are in each of the five states. The badge and the overview both show these
 // and both read them from here, in this order, so neither can come to mean something else by
 // "open".
 pub struct StateCounts {
@@ -130,7 +130,7 @@ impl StateCounts {
 
 // Every page is this, so the stylesheet and the script are written once and linked rather than
 // carried inside each one. `up` is what a page climbs to reach the root of the site: nothing for
-// the scoreboard, one step for a case.
+// the overview, one step for a case.
 fn wrap_the_page(title: &str, body: Markup, up: &str) -> String {
     let page = html! {
         (DOCTYPE)

@@ -380,6 +380,30 @@ the line comment is swallowed by the block above it"""
         assert!(wrong.is_empty(), "{}", wrong.join("\n"));
     }
 
+    // The other direction of the test above. A case that was deleted or renamed leaves its answers
+    // behind in three files, and nothing else in the suite reads them again to notice. A disabled
+    // case is still a case and keeps its answers.
+    #[test]
+    fn a_recorded_answer_names_a_case_that_is_still_there() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let corpus =
+            Corpus::read(&root.join("cases")).unwrap_or_else(|faults| panic!("{faults:?}"));
+        let mut wrong = Vec::new();
+        for counter in ["mezura", "scc", "tokei"] {
+            let text = fs::read_to_string(root.join(RECORDED_DIR).join(format!("{counter}.toml")))
+                .unwrap();
+            let raw: RawRecorded = toml::from_str(&text).unwrap();
+            for name in raw.answer.keys().chain(raw.exception.keys()) {
+                let still_there = corpus.cases.iter().any(|case| case.name == *name)
+                    || corpus.disabled.contains(name);
+                if !still_there {
+                    wrong.push(format!("{counter}: {name} is recorded and is no longer a case"));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+    }
+
     // Raising the version a fetch downloads without re-measuring would publish numbers taken from
     // a build nobody ever recorded.
     #[test]

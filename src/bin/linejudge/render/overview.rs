@@ -14,18 +14,23 @@ const UNCLAIMED_TIP: &str = "the tool does not support this file's language, so 
 const CASES_COLUMN_REM: usize = 25;
 const TOOL_COLUMN_REM: usize = 16;
 
-pub fn render_the_scoreboard(sweep: &Sweep) -> String {
+pub fn render_the_overview(sweep: &Sweep) -> String {
     let counted: usize = sweep
         .groups
         .iter()
         .map(|group| group.cases.iter().filter(|case| !case.disabled).count())
         .sum();
-    // The width of the cases column is written here and in `page.css`, and the two have to agree:
-    // the stylesheet sizes the column, this is the table's own narrowest width.
-    let width = CASES_COLUMN_REM + TOOL_COLUMN_REM * sweep.counters.len();
+    // A tool's column never narrows to fit; the table grows and the page scrolls sideways under
+    // the sticky first column instead. `--shown` is what the picker below changes, so hiding a
+    // tool takes its width with it. The cases column is sized in `page.css` and the two agree.
+    let sizes = format!(
+        "--cases-col: {CASES_COLUMN_REM}rem; --tool-col: {TOOL_COLUMN_REM}rem; --shown: {}",
+        sweep.counters.len()
+    );
     let body = html! {
         (render_the_header(sweep, counted))
-        table style=(format!("min-width: {width}rem")) {
+        (render_the_picker(sweep))
+        table style=(sizes) {
             colgroup {
                 col .cases;
                 @for _ in &sweep.counters { col; }
@@ -43,7 +48,9 @@ pub fn render_the_scoreboard(sweep: &Sweep) -> String {
                         @if case.disabled {
                             tr .disabled {
                                 td .case { span .tag { "disabled" } (case.name) }
-                                @for _ in &sweep.counters { td {} }
+                                @for counter in &sweep.counters {
+                                    td data-counter=(counter.name) {}
+                                }
                             }
                         } @else {
                             tr {
@@ -105,10 +112,27 @@ fn render_the_header(sweep: &Sweep, counted: usize) -> Markup {
     }
 }
 
+// One checkbox per tool, so a reader with twenty of them can put the ones they care about beside
+// each other instead of scrolling between them. Every tool starts shown, and the order stays
+// alphabetical whatever is ticked, since which tool comes first is not ours to say.
+fn render_the_picker(sweep: &Sweep) -> Markup {
+    html! {
+        div .picks {
+            span .pickslabel { "show" }
+            @for counter in &sweep.counters {
+                label {
+                    input type="checkbox" checked data-counter=(counter.name);
+                    span { (counter.name) }
+                }
+            }
+        }
+    }
+}
+
 fn render_one_column_head(counter: &Counter) -> Markup {
     let multi = counter.dialects.len() > 1;
     html! {
-        th {
+        th data-counter=(counter.name) {
             div .tname {
                 a href=(format!("{TOOLS_DIR}/{}.html", counter.name)) { (counter.name) }
             }
@@ -140,7 +164,7 @@ fn render_the_state_counts(answers: &[Answer]) -> Markup {
 fn render_one_cell(counter: &Counter, name_of_case: &str) -> Markup {
     let multi = counter.dialects.len() > 1;
     html! {
-        td {
+        td data-counter=(counter.name) {
             @for (at, dialect) in counter.dialects.iter().enumerate() {
                 @let answer = dialect.answers.iter().find(|one| one.case == name_of_case);
                 @if multi {

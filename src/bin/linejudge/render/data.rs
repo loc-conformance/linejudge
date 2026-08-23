@@ -91,7 +91,7 @@ pub struct CaseDetail {
     pub trap: String,
     pub file: String,
     // Every way of counting the page speaks about, as `counter.dialect`, in the order the
-    // scoreboard shows them, which is the order every line's readings are in.
+    // overview shows them, which is the order every line's readings are in.
     pub ways: Vec<String>,
     pub lines: Vec<Line>,
 }

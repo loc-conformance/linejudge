@@ -94,14 +94,14 @@ linejudge fetch [<counter>] [--adapters <dir>] [--dialects <dir>]
 linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <dir>]
                 [--recorded <dir>]
 
-    Measures the way check does and writes web pages instead of a report: the scoreboard, a page
+    Measures the way check does and writes web pages instead of a report: the overview, a page
     per case, and data.json holding the whole measurement.
 
     --out <dir>              where to write them; ./site by default
 
     --corpus, --adapters, --dialects and --recorded mean what they mean in check.
 
-    The scoreboard opens in a browser when the output is a terminal, so a build machine writes the
+    The overview opens in a browser when the output is a terminal, so a build machine writes the
     pages and opens nothing. A counter with no binary is left out and named on stderr.
 
 Output to a terminal has colour and output to a file or a pipe does not. Set NO_COLOR to turn it
