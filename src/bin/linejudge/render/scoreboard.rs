@@ -1,6 +1,6 @@
 use maud::{Markup, html};
 
-use crate::render::Tally;
+use crate::render::StateCounts;
 use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Verdict};
 use crate::render::{
     CASES_DIR, DATA_FILE, TOOLS_DIR, format_as_one_line, format_the_group_title,
@@ -118,7 +118,7 @@ fn render_one_column_head(counter: &Counter) -> Markup {
                     span .chip .pick[multi] .active[multi && at == 0]
                             data-group=[multi.then_some(&counter.name)]
                             data-value=[multi.then_some(&dialect.name)] {
-                        (dialect.name) " · " (render_one_tally(&dialect.answers))
+                        (dialect.name) " · " (render_the_state_counts(&dialect.answers))
                     }
                 }
             }
@@ -126,14 +126,14 @@ fn render_one_column_head(counter: &Counter) -> Markup {
     }
 }
 
-fn render_one_tally(answers: &[Answer]) -> Markup {
-    let tally = Tally::of(answers);
+fn render_the_state_counts(answers: &[Answer]) -> Markup {
+    let counted = StateCounts::of(answers);
     html! {
-        b .ok { (tally.agrees) "✓" }
-        @if tally.open > 0 { " " b .open { (tally.open) " open" } }
-        @if tally.fails > 0 { " " b .bad { (tally.fails) "✗" } }
-        @if tally.unclaimed > 0 { " " b .na { (tally.unclaimed) "⊘" } }
-        @if tally.broke > 0 { " " b .bad { (tally.broke) " broke" } }
+        b .ok { (counted.agrees) "✓" }
+        @if counted.open > 0 { " " b .open { (counted.open) " open" } }
+        @if counted.fails > 0 { " " b .bad { (counted.fails) "✗" } }
+        @if counted.unclaimed > 0 { " " b .na { (counted.unclaimed) "⊘" } }
+        @if counted.broke > 0 { " " b .bad { (counted.broke) " broke" } }
     }
 }
 

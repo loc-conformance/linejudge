@@ -104,9 +104,10 @@ pub fn name_the_badge_of(name_of_counter: &str, name_of_dialect: &str) -> String
     format!("{name_of_counter}.{name_of_dialect}")
 }
 
-// The five states an answer can be in. The badge and the scoreboard both show them and both read
-// them from here, in this order, so neither can come to mean something else by "open".
-pub struct Tally {
+// How many answers are in each of the five states. The badge and the scoreboard both show these
+// and both read them from here, in this order, so neither can come to mean something else by
+// "open".
+pub struct StateCounts {
     pub agrees: usize,
     pub open: usize,
     pub fails: usize,
@@ -114,10 +115,10 @@ pub struct Tally {
     pub broke: usize,
 }
 
-impl Tally {
-    pub fn of(answers: &[Answer]) -> Tally {
+impl StateCounts {
+    pub fn of(answers: &[Answer]) -> StateCounts {
         let of = |wanted: &dyn Fn(&Answer) -> bool| answers.iter().filter(|a| wanted(a)).count();
-        Tally {
+        StateCounts {
             agrees: of(&|a| a.verdict == Verdict::Agrees),
             open: of(&|a| a.verdict == Verdict::Fails && a.note.is_none()),
             fails: of(&|a| a.verdict == Verdict::Fails && a.note.is_some()),

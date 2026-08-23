@@ -16,8 +16,8 @@ pub struct Derivation {
     /// The answer the counter should give.
     pub real: Answer,
     /// One entry per rule of the dialect, saying whether it took a line of this file. Whether a
-    /// rule is ever used at all is a question about the whole corpus, so the tally is handed back
-    /// to be summed.
+    /// rule is ever used at all is a question about the whole corpus, so this is handed back to be
+    /// added up over every case.
     pub rules_that_fired: Vec<bool>,
 }
 

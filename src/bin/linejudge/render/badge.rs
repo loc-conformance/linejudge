@@ -1,4 +1,4 @@
-use crate::render::Tally;
+use crate::render::StateCounts;
 use crate::render::data::Answer;
 
 const HEIGHT: usize = 20;
@@ -12,13 +12,13 @@ const NARROW_BLOCK: usize = 34;
 // One badge for one way of counting: the label, then a block per state, each carrying its count. A
 // block of nought is left out, apart from the green one, which is what the badge is for and stays.
 pub fn render_one_badge(answers: &[Answer]) -> String {
-    let tally = Tally::of(answers);
+    let counted = StateCounts::of(answers);
     let blocks: Vec<(usize, &str, &str)> = [
-        (tally.agrees, "✓", "#2ea043"),
-        (tally.open, "?", "#c99a06"),
-        (tally.fails, "✗", "#cf222e"),
-        (tally.unclaimed, "⊘", "#8c959f"),
-        (tally.broke, "!", "#8b1a1a"),
+        (counted.agrees, "✓", "#2ea043"),
+        (counted.open, "?", "#c99a06"),
+        (counted.fails, "✗", "#cf222e"),
+        (counted.unclaimed, "⊘", "#8c959f"),
+        (counted.broke, "!", "#8b1a1a"),
     ]
     .into_iter()
     .enumerate()
