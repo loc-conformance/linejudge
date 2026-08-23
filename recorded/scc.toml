@@ -149,6 +149,10 @@ counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 [answer.2180-lua_short_closer_hiding_the_real_one.default]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
+[answer.2190-triple_quote_read_as_three_short_ones.default]
+is-known-failure = true
+counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 

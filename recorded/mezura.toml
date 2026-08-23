@@ -255,6 +255,12 @@ counted = { lines = 3, code = 1, comments = 1, extra = 1 }
 [answer.2180-lua_short_closer_hiding_the_real_one.region]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
+[answer.2190-triple_quote_read_as_three_short_ones.content]
+counted = { lines = 5, code = 5, comments = 0, extra = 0 }
+
+[answer.2190-triple_quote_read_as_three_short_ones.region]
+counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
+
 [answer.3010-escaped_quote_before_comment.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
 

@@ -1,0 +1,7 @@
+trap = """
+Groovy opens a string that runs over several lines with three apostrophes. A counter that reads
+the first apostrophe as the start of an ordinary one line string ends that string where the line
+ends, and is then outside a string when it meets the two comment openers below, so it reads them
+as comments instead of as the text they are. The second one opens a block that nothing closes,
+which takes the rest of the file with it. Case 2090 is the same shape in Python, written with
+double quotes"""

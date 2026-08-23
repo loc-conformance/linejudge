@@ -1,0 +1,10 @@
+def a = '''
+... . . SSS
+// this is text inside the string
+sssssssssssssssssssssssssssssssss
+/* and so is this
+sssssssssssssssss
+'''
+ZZZ
+def b = 1
+... . . .

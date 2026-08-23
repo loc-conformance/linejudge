@@ -98,7 +98,7 @@ mod tests {
         let cases = FILES.iter().filter(|(name, _)| name.ends_with("case.toml")).count();
         fs::remove_dir_all(&root).unwrap();
         assert!(wrong.is_empty(), "{wrong:?}");
-        assert_eq!(cases, 83, "the corpus that was carried holds {cases} cases");
+        assert_eq!(cases, 84, "the corpus that was carried holds {cases} cases");
     }
 
     // The four names live twice: once in build.rs, which cannot import them because it runs before
