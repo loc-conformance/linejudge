@@ -152,6 +152,9 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 [answer.2190-triple_quote_read_as_three_short_ones.default]
 is-known-failure = true
 counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+note = """
+the three apostrophes are read as short strings and not as one that runs on, so the // below
+counts as a comment and the /* under it opens a block that nothing closes"""
 
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
