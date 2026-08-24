@@ -1,5 +1,5 @@
 counter = "scc"
-version = "scc version 3.7.0"
+version = "scc version 4.0.0"
 
 [answer.1010-code_then_comment_on_one_line.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
@@ -126,10 +126,7 @@ the apostrophe opens a string and every comment under it is counted as code"""
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.2140-raw_string_holding_its_own_closing_bracket.default]
-is-known-failure = true
-counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
-note = """
-the raw string is not seen, so the block opener inside it starts a comment that never ends"""
+counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 
 [answer.2150-delimited_raw_string_names_its_own_closer.default]
 is-known-failure = true
@@ -138,10 +135,7 @@ note = """
 the delimited form is not recognised, so the block opener inside the string opens a comment"""
 
 [answer.2160-long_bracket_string_holding_a_comment_symbol.default]
-is-known-failure = true
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-note = """
-the string form of the long bracket is not recognised, so the -- inside it opens a comment"""
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
 
 [answer.2170-lua_level_bracket_holding_plain_close.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
@@ -163,17 +157,10 @@ counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 
 [answer.3030-raw_string_ending_in_backslash.default]
-is-known-failure = true
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
-note = """
-the backslash is read as escaping the closing quote, so the string is left open and the comment
-under it counts as code"""
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.3040-bare_raw_string_ending_in_backslash.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the string never closes, so both comments under it are counted as code"""
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
