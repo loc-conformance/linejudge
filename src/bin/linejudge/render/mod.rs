@@ -272,14 +272,14 @@ mod tests {
     #[test]
     fn the_committed_mark_is_the_icon_the_site_is_given() {
         let kept = fs::read_to_string(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("brand").join("linejudge.svg"),
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/logo").join("linejudge.svg"),
         )
-        .unwrap_or_else(|error| panic!("brand/linejudge.svg: {error}"))
+        .unwrap_or_else(|error| panic!("assets/logo/linejudge.svg: {error}"))
         .replace("\r\n", "\n");
         assert_eq!(
             kept.trim_end(),
             build_the_icon().trim_end(),
-            "regenerate brand/linejudge.svg from the icon the render writes",
+            "regenerate assets/logo/linejudge.svg from the icon the render writes",
         );
     }
 
