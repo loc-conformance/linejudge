@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: #eef6ff;
@@ -18,8 +22,24 @@ body {
 }
 
 header h1 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
   font-size: 1.6rem;
   margin: 0 0 .25rem;
+}
+
+header h1 .mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  color: #303a4a;
+}
+
+.wrap > h1 {
+  font-size: 1.6rem;
+  margin: 0 0 .5rem;
+  overflow-wrap: anywhere;
 }
 
 .intro {
@@ -47,6 +67,7 @@ a.why:hover {
   margin: 0 0 1rem;
   color: #6e7781;
   font-size: .85rem;
+  font-style: italic;
 }
 
 .meta a {
@@ -96,19 +117,56 @@ a.why:hover {
   display: none;
 }
 
-table {
-  width: 100%;
-  min-width: calc(var(--cases-col) + var(--tool-col) * var(--shown));
+.boardscroll {
+  overflow: auto;
+  scrollbar-gutter: stable;
+  max-height: 85vh;
   background: #ffffff;
   border: 0.0625rem solid #d0d7de;
   border-radius: .5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #c4cdd8 transparent;
+}
+
+.boardscroll::-webkit-scrollbar {
+  width: .55rem;
+  height: .55rem;
+}
+
+.boardscroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.boardscroll::-webkit-scrollbar-thumb {
+  background: #c4cdd8;
+  border: 0.125rem solid #ffffff;
+  border-radius: .5rem;
+}
+
+.boardscroll::-webkit-scrollbar-thumb:hover {
+  background: #8c959f;
+}
+
+.boardscroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* A tool's column never narrows to fit the screen. The table keeps its full width and scrolls
+   sideways under the pinned first column, so twenty tools are twenty readable columns rather than
+   twenty slivers. `--shown` is set on the element and drops as the picker hides tools. */
+table {
+  --cases-col: 25rem;
+  --tool-col: 16rem;
+  width: 100%;
+  min-width: calc(var(--cases-col) + var(--tool-col) * var(--shown));
+  background: #ffffff;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
 }
 
 col.cases {
-  width: 25rem;
+  width: var(--cases-col);
 }
 
 th,
@@ -156,11 +214,58 @@ td:first-child:hover {
 
 thead th:first-child {
   z-index: 4;
-  border-top-left-radius: .5rem;
+  vertical-align: middle;
 }
 
-thead th:last-child {
-  border-top-right-radius: .5rem;
+.find {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .4rem .65rem;
+  background: #f6f8fa;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .4rem;
+  color: #8c959f;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.find:focus-within {
+  background: #ffffff;
+  border-color: #0969da;
+  box-shadow: 0 0 0 .1875rem rgba(9, 105, 218, .15);
+  color: #0969da;
+}
+
+.find svg {
+  flex: none;
+}
+
+.find input {
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: #1f2328;
+  font-family: inherit;
+  font-size: .875rem;
+  font-weight: 400;
+}
+
+.find input::placeholder {
+  color: #8c959f;
+  font-style: italic;
+}
+
+.find input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.found {
+  margin-bottom: .4rem;
+  color: #8c959f;
+  font-size: .78rem;
+  font-weight: 400;
 }
 
 .tname {
@@ -259,10 +364,12 @@ tr.group td span {
   display: inline-block;
 }
 
+/* `break-word` only breaks after the number's hyphen, so the underscored tail runs past the cell. */
 td.case {
   font-family: ui-monospace, Consolas, monospace;
   font-size: .85rem;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 td.case a {
@@ -362,7 +469,9 @@ tr.disabled td {
   cursor: help;
 }
 
-.tip:hover::after {
+/* `.open` is what a tap sets, since a touch screen never hovers. */
+.tip:hover::after,
+.tip.open::after {
   content: attr(data-tip);
   position: absolute;
   left: 0;
@@ -385,7 +494,9 @@ tr.disabled td {
 
 /* The last column's tooltip would otherwise hang past the right edge of the page. */
 td:last-child .tip:hover::after,
-th:last-child .tip:hover::after {
+td:last-child .tip.open::after,
+th:last-child .tip:hover::after,
+th:last-child .tip.open::after {
   left: auto;
   right: 0;
 }
@@ -423,10 +534,16 @@ footer {
   font-size: .8rem;
 }
 
+/* The table is as wide as the widest line of the case, which is wider than a phone. It scrolls
+   inside this rather than pushing the whole page sideways. */
+.filescroll {
+  overflow-x: auto;
+  margin-bottom: .6rem;
+}
+
 table.file {
   width: auto;
   min-width: 0;
-  margin-bottom: .6rem;
 }
 
 table.file td {
@@ -471,16 +588,16 @@ td.src {
   padding-left: 1rem;
 }
 
-.ink-string {
+.covers-string {
   color: #0a7b53;
 }
 
-.ink-comment {
+.covers-comment {
   color: #8c959f;
   font-style: italic;
 }
 
-.ink-tag {
+.covers-tag {
   color: #0550ae;
 }
 
@@ -706,4 +823,17 @@ a.home {
 a.home:hover {
   color: #0969da;
   text-decoration: underline;
+}
+
+/* On a phone the pinned first column is wider than the whole screen, so nothing of any tool is
+   ever beside it however far you scroll. Narrowing it is the only thing that changes here: a
+   tool's column keeps its width, and the table still scrolls sideways. */
+@media (max-width: 40rem) {
+  .wrap {
+    padding: 1.25rem .75rem 3rem;
+  }
+
+  table {
+    --cases-col: 11rem;
+  }
 }

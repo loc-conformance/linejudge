@@ -39,7 +39,7 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
                 span .chip .pick .active[at == 0] data-group="way" data-value=(way) { (way) }
             }
         }
-        table .file {
+        div .filescroll { table .file {
             tr .filename { td colspan="3" {
                 div .bar {
                     span { (detail.file) }
@@ -59,7 +59,9 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
                         @for (which, counted) in line.counted.iter().enumerate() {
                             span .dv data-group="way" data-value=(detail.ways[which])
                                     hidden[which > 0] {
-                                span .bucket title=(name_the_rules_of(counted)) { (counted.bucket) }
+                                span .bucket.tip data-tip=(name_the_rules_of(counted)) {
+                                    (counted.bucket)
+                                }
                                 @if let Some(region) = &counted.region {
                                     " " span .rgn { (region) }
                                 }
@@ -73,11 +75,11 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
                     }
                 }
             }
-        }
+        } }
         p .file-legend {
-            span { span .ink-string { "string" } }
-            span { span .ink-comment { "comment" } }
-            span { span .ink-tag { "the tag around another language" } }
+            span { span .covers-string { "string" } }
+            span { span .covers-comment { "comment" } }
+            span { span .covers-tag { "the tag around another language" } }
         }
     }
 }
@@ -180,10 +182,10 @@ fn name_the_rules_of(counted: &Counted) -> String {
 
 fn name_the_ink(covering: Covering) -> &'static str {
     match covering {
-        Covering::Comment => "ink-comment",
-        Covering::String => "ink-string",
-        Covering::Tag => "ink-tag",
-        Covering::Residue => "ink-plain",
+        Covering::Comment => "covers-comment",
+        Covering::String => "covers-string",
+        Covering::Tag => "covers-tag",
+        Covering::Residue => "covers-residue",
     }
 }
 
@@ -199,9 +201,9 @@ mod tests {
     fn the_file_is_painted_by_what_covers_it_and_keeps_every_character() {
         let detail = a_case();
         let shown = render_the_file(&detail).into_string();
-        assert!(shown.contains("<span class=\"ink-string\">&quot;one&quot;</span>"), "{shown}");
-        assert!(shown.contains("<span class=\"ink-comment\">// two</span>"), "{shown}");
-        assert!(shown.contains("title=\"by a-rule and by another-rule\""), "{shown}");
+        assert!(shown.contains("<span class=\"covers-string\">&quot;one&quot;</span>"), "{shown}");
+        assert!(shown.contains("<span class=\"covers-comment\">// two</span>"), "{shown}");
+        assert!(shown.contains("data-tip=\"by a-rule and by another-rule\""), "{shown}");
         assert!(shown.contains("Markdown"), "the region of a line is named\n{shown}");
     }
 

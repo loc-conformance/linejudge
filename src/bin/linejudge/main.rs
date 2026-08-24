@@ -232,8 +232,8 @@ fn paint_a_command_line(line: &str) -> String {
 fn paint_the_arguments(text: &str, rest: style::Style) -> String {
     cut_the_arguments(text)
         .iter()
-        .map(|(ink, piece)| match *ink == style::FLAG {
-            true => ink.paint(piece).to_string(),
+        .map(|(colour, piece)| match *colour == style::FLAG {
+            true => colour.paint(piece).to_string(),
             false => rest.paint(piece).to_string(),
         })
         .collect()

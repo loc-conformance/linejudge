@@ -20,10 +20,15 @@ pub const INDEX_FILE: &str = "index.html";
 pub const BADGES_DIR: &str = "badges";
 pub const CASES_DIR: &str = "cases";
 pub const TOOLS_DIR: &str = "tools";
+const ICON_FILE: &str = "favicon.svg";
 const SCRIPT_FILE: &str = "page.js";
 const STYLE_FILE: &str = "page.css";
 const STYLE: &str = include_str!("page.css");
 const SCRIPT: &str = include_str!("page.js");
+const MARK_WEDGE: &str = "M32 41 L46 55 L18 55 Z";
+const MARK_LINES: &str = "#0969da";
+const MARK_FRAME_ON_PAPER: &str = "#303a4a";
+const MARK_FRAME_ON_INK: &str = "#c3ccd8";
 
 pub fn write_the_site(
     adapters: &[Adapter],
@@ -55,6 +60,7 @@ fn write_every_file(
     };
     write(STYLE_FILE, STYLE.to_string())?;
     write(SCRIPT_FILE, SCRIPT.to_string())?;
+    write(ICON_FILE, build_the_icon())?;
     write(INDEX_FILE, overview::render_the_overview(sweep))?;
     write_a_page_each(&out.join(CASES_DIR), cases, |detail| {
         (format!("{}.html", detail.name), case::render_one_case(detail, sweep))
@@ -139,6 +145,7 @@ fn wrap_the_page(title: &str, body: Markup, up: &str) -> String {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 title { (title) }
+                link rel="icon" type="image/svg+xml" href=(format!("{up}{ICON_FILE}"));
                 link rel="stylesheet" href=(format!("{up}{STYLE_FILE}"));
             }
             body {
@@ -148,6 +155,25 @@ fn wrap_the_page(title: &str, body: Markup, up: &str) -> String {
         }
     };
     page.into_string()
+}
+
+// The scales, drawn once and used twice: inline in the header, where the frame takes the colour of
+// the text around it, and inside the icon file, where a rule of its own supplies that colour.
+pub fn render_the_mark_of_linejudge() -> Markup {
+    html! {
+        g fill="currentColor" {
+            rect x="3" y="11" width="58" height="7" rx="3.5" {}
+            rect x="29" y="8" width="6" height="35" rx="3" {}
+            rect x="10.5" y="18" width="4" height="7" {}
+            rect x="48.5" y="18" width="4" height="7" {}
+            path d=(MARK_WEDGE) stroke="currentColor" stroke-width="4" stroke-linejoin="round" {}
+        }
+        g fill=(MARK_LINES) {
+            rect x="1" y="25" width="23" height="8" rx="4" {}
+            rect x="4" y="37" width="17" height="8" rx="4" {}
+            rect x="39" y="25" width="23" height="8" rx="4" {}
+        }
+    }
 }
 
 // GitHub's own mark, drawn rather than fetched, since the pages ask nothing of any other host.
@@ -165,6 +191,18 @@ pub fn render_the_mark_of_github() -> Markup {
             path d=(GITHUB_MARK) fill="currentColor" {}
         }
     }
+}
+
+// An icon file stands on its own with no page around it to take a colour from, and a tab bar can be
+// either light or dark, so the rule it carries is the only thing keeping the frame visible in both.
+fn build_the_icon() -> String {
+    format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\">\
+         <style>svg{{color:{MARK_FRAME_ON_PAPER}}}\
+         @media(prefers-color-scheme:dark){{svg{{color:{MARK_FRAME_ON_INK}}}}}</style>\
+         {}</svg>\n",
+        render_the_mark_of_linejudge().into_string()
+    )
 }
 
 // A trap and a note are written across several lines in their files and read as one sentence here.
@@ -227,6 +265,22 @@ mod tests {
         assert_eq!(written, 2);
         assert_eq!(read_back, sweep, "what data.json holds is the measurement itself");
         assert!(badge, "one badge per counter and way of counting");
+    }
+
+    // The site's icon is generated and the file GitHub and the README are pointed at is committed,
+    // so the two are one drawing kept in two places and nothing else holds them together.
+    #[test]
+    fn the_committed_mark_is_the_icon_the_site_is_given() {
+        let kept = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("brand").join("linejudge.svg"),
+        )
+        .unwrap_or_else(|error| panic!("brand/linejudge.svg: {error}"))
+        .replace("\r\n", "\n");
+        assert_eq!(
+            kept.trim_end(),
+            build_the_icon().trim_end(),
+            "regenerate brand/linejudge.svg from the icon the render writes",
+        );
     }
 
     fn find_every_page_under(dir: &Path) -> Vec<PathBuf> {

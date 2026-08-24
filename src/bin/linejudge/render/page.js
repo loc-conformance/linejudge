@@ -46,6 +46,62 @@ if (picks.length) {
   }
 }
 
+// Finding a case by name, since eighty of them are read by looking for one. A group whose cases
+// have all gone hides with them, so the board never shows a heading standing over nothing.
+const find = document.querySelector('.find input');
+if (find) {
+  const found = document.querySelector('.found');
+  const rows = [...document.querySelectorAll('tbody tr')];
+  const show = () => {
+    const wanted = find.value.trim().toLowerCase();
+    let group = null;
+    let anyInGroup = false;
+    let showing = 0;
+    for (const row of rows) {
+      if (row.classList.contains('group')) {
+        if (group) {
+          group.hidden = !anyInGroup;
+        }
+        group = row;
+        anyInGroup = false;
+        continue;
+      }
+      const name = row.querySelector('.case');
+      const here = !wanted || (name && name.textContent.toLowerCase().includes(wanted));
+      row.hidden = !here;
+      if (here) {
+        anyInGroup = true;
+        showing++;
+      }
+    }
+    if (group) {
+      group.hidden = !anyInGroup;
+    }
+    found.textContent = wanted ? `${showing} of ${found.dataset.all}` : found.dataset.all;
+  };
+  find.addEventListener('input', show);
+  find.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      find.value = '';
+      show();
+    }
+  });
+}
+
+// A touch screen never hovers, so without this every tooltip is unreachable from a phone. A tip
+// that is also a link is left alone: tapping it goes where it points.
+document.addEventListener('click', event => {
+  const tip = event.target.closest('.tip:not(a)');
+  document.querySelectorAll('.tip.open').forEach(open => {
+    if (open !== tip) {
+      open.classList.remove('open');
+    }
+  });
+  if (tip) {
+    tip.classList.toggle('open');
+  }
+});
+
 // The file is read back out of the table it is painted in, so the line numbers and the buckets
 // beside it are left behind and what lands on the clipboard is the file.
 document.querySelectorAll('button.copy').forEach(button => {
