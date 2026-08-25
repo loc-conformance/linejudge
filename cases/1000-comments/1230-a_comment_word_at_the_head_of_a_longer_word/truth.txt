@@ -1,0 +1,6 @@
+REM a comment
+CCCcccccccccc
+REMOVE /Q file.txt
+...... .. ........
+echo done
+.... ....

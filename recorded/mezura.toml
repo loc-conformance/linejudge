@@ -133,6 +133,14 @@ counted = { lines = 6, code = 2, comments = 3, extra = 1 }
 [answer.1220-nested_block_comment_in_odin.region]
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 
+[answer.1230-a_comment_word_at_the_head_of_a_longer_word.content]
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, extra = 0 }
+
+[answer.1230-a_comment_word_at_the_head_of_a_longer_word.region]
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
 [answer.2010-comment_symbol_inside_string.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
 

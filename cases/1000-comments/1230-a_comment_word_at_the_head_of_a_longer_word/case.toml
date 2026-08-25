@@ -1,0 +1,3 @@
+trap = """
+Batch opens a comment with the word REM, and REMOVE is a different word. A counter that looks for
+those three letters as a substring reads a command as a comment"""
