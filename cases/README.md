@@ -47,14 +47,14 @@ wrong bytes.
 ## Writing it with propose-markers, the recommended way
 
 You can write a `truth.txt` by hand, but lining up the marker columns by hand is easy to get
-wrong, and that is what this tool takes off you. Describe where the spans and the tags are in a
+wrong, and that is what `propose-markers` takes off you. Describe where the spans and the tags are in a
 short spec file, then run, from the root of the repository:
 
 ```
 cargo run --features maintenance --bin propose-markers -- <spec>
 ```
 
-The spec notation is documented in the tool's own help, reproduced here word for word (a test
+The spec notation is documented in its own help, reproduced here word for word (a test
 keeps this page and the help identical):
 
 ```
@@ -132,7 +132,7 @@ propose-markers <spec>
 
 ## Check it yourself, always
 
-The tool does not verify the spec: if the spec marks the wrong bytes, the truth comes out wrong,
+`propose-markers` does not verify the spec: if the spec marks the wrong bytes, the truth comes out wrong,
 and `cargo test` cannot tell, because it checks the file against the input, not against the
 language. So read the markers yourself before committing. If the language has a lexer that can
 print its tokens (`python -m tokenize`, say), run it over the input and compare: the token
