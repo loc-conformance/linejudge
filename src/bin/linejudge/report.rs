@@ -167,7 +167,7 @@ pub fn report_recorded_answers_that_name_nothing(
 }
 
 // Where another answer is given to hold these against, every number that differs is painted, so
-// two rows of the same shape can be read by their colours alone.
+// two rows of the same shape can be read by their colors alone.
 pub fn paint_counts(counts: &Counts, against: Option<&Counts>) -> String {
     let mut named = vec![paint_one_count(counts.lines, "lines",
             against.is_some_and(|other| other.lines != counts.lines))];
@@ -181,23 +181,23 @@ pub fn paint_counts(counts: &Counts, against: Option<&Counts>) -> String {
 
 fn write_the_name_of(
     out: &mut dyn Write,
-    colour: &style::Style,
+    color: &style::Style,
     what: &str,
     name: &str,
 ) -> io::Result<()> {
-    writeln!(out, "  {}   {name}", colour.paint(what))
+    writeln!(out, "  {}   {name}", color.paint(what))
 }
 
 // A finding with rows under it opens with a blank line so it does not run into the one above. A
 // finding that is only its name does not, so a run of them reads as the list it is.
 fn write_the_name_above_the_rows(
     out: &mut dyn Write,
-    colour: &style::Style,
+    color: &style::Style,
     what: &str,
     name: &str,
 ) -> io::Result<()> {
     writeln!(out)?;
-    write_the_name_of(out, colour, what, name)
+    write_the_name_of(out, color, what, name)
 }
 
 fn write_row(out: &mut dyn Write, width: usize, name: &str, text: &str) -> io::Result<()> {
@@ -273,12 +273,12 @@ fn format_summary(judged: &[Judged], drift_is_judged: bool) -> String {
     let known = measured(&|m| m.fails_exactly_as_recorded());
     let unclaimed = measured(&|m| m.conformance == Conformance::Unclaimed && m.drift != Some(Drift::NoLongerClaimed));
     // A count of none is left to fade, so what is there stands out from what is not.
-    let painted = |count: usize, what: &str, colour: style::Style| {
+    let painted = |count: usize, what: &str, color: style::Style| {
         let text = format!("{count} {what}");
         if count == 0 {
             style::DETAIL.paint(&text).to_string()
         } else {
-            colour.paint(&text).to_string()
+            color.paint(&text).to_string()
         }
     };
     let mut said = match drift_is_judged {
@@ -296,7 +296,7 @@ fn format_summary(judged: &[Judged], drift_is_judged: bool) -> String {
         ]
         .join(", "),
     };
-    for (count, what, colour) in [
+    for (count, what, color) in [
         (broke, "broke", style::DIFFERS),
         (measured(&|m| m.agrees_through_its_exception()), "agreeing through an exception", style::RECORDED),
         (measured(&|m| m.conformance == Conformance::Agrees && m.drift == Some(Drift::Changed)),
@@ -305,7 +305,7 @@ fn format_summary(judged: &[Judged], drift_is_judged: bool) -> String {
         (measured(&|m| m.drift == Some(Drift::NowClaimed)), "claimed for the first time", style::RECORDED),
     ] {
         if count > 0 {
-            said.push_str(&format!(", {}", painted(count, what, colour)));
+            said.push_str(&format!(", {}", painted(count, what, color)));
         }
     }
     said

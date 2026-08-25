@@ -14,6 +14,7 @@ mod report;
 mod style;
 
 use std::env;
+use std::fs;
 use std::io::{self, ErrorKind, IsTerminal, Write};
 use std::path::{self, Path, PathBuf};
 use std::process::{self, ExitCode};
@@ -25,7 +26,9 @@ use linejudge::dialects::{DIALECTS_DIR, Dialects};
 use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
-use linejudge::shipped::create_the_shipped_dir;
+use linejudge::shipped::{
+    create_the_shipped_dir, holds_the_carried_cases, replaces_nothing_carried_under,
+};
 use linejudge::verdict::measure_and_judge_every_case;
 
 use crate::counters::Counters;
@@ -39,10 +42,12 @@ use crate::report::{
 
 const COMMAND_OPENS: &str = "linejudge ";
 const SITE_DIR: &str = "site";
+const NO_BADGE_OVER_A_FOREIGN_CORPUS: &str =
+    "a badge says how many of this suite's cases ran, and the corpus in use is not this suite's";
 const USAGE: &str = "\
 linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <file>]
                 [--corpus <dir>] [--adapters <dir>] [--dialects <dir>] [--recorded <dir>]
-                [--disabled <case>]
+                [--disabled <case>] [--badge <file>]
 
     Runs each counter over every case and asks two things of every answer: does it match what that
     counter's own rules say, and does it match what the counter answered when it was last recorded.
@@ -55,10 +60,17 @@ linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <fi
     --bin <path>             the binary to run it with; needs --counter
     --known-failures <file>  fail only on cases this file does not list; needs --counter
     --disabled <case>        leave one more case out of this run
+    --badge <file>           write an SVG saying this run happened and over how many cases
     --corpus <dir>           use these cases instead of the built-in ones
     --adapters <dir>         replace the built-in adapters for the counters named inside
     --dialects <dir>         replace the built-in dialects for the counters named inside
     --recorded <dir>         replace the built-in records for the counters named inside
+
+    The badge carries no verdict, only the number of cases the run was held against, since the
+    rules your counter is judged by are your own and nobody has reviewed them. It is written
+    whether the run passed or failed, and only over this suite's cases, which are told apart by
+    what is inside them and not by the directory they sit in. The badges on the published page
+    are a different thing: those are a verdict and those are the ones served from the site.
 
     Binaries are found in .linejudge/counters.toml, or given with --bin, or downloaded by fetch.
     linejudge looks for .linejudge here and in every directory above, the way cargo does. Its
@@ -95,16 +107,24 @@ linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <
                 [--recorded <dir>]
 
     Measures the way check does and writes web pages instead of a report: the overview, a page
-    per case, and data.json holding the whole measurement.
+    per case, data.json holding the whole measurement, and a verdict badge per counter.
 
     --out <dir>              where to write them; ./site by default
 
     --corpus, --adapters, --dialects and --recorded mean what they mean in check.
 
+    Where any of those four name cases or declarations that are not this suite's, the pages are
+    written, the badges are not, any badge an earlier run left there is taken away, and the run
+    says which of them it was. A badge is read as this suite's verdict wherever somebody embeds
+    it, and a verdict comes from all four: the cases judged, the rules judged by, the command that
+    produced the answer, and the answers it is held against. What is this suite's is told by what
+    is inside these directories, so a copy of them somewhere else still counts, and so does a
+    folder naming one counter and leaving the rest alone.
+
     The overview opens in a browser when the output is a terminal, so a build machine writes the
     pages and opens nothing. A counter with no binary is left out and named on stderr.
 
-Output to a terminal has colour and output to a file or a pipe does not. Set NO_COLOR to turn it
+Output to a terminal has color and output to a file or a pipe does not. Set NO_COLOR to turn it
 off, or CLICOLOR_FORCE to keep it through a pipe.
 ";
 #[cfg(feature = "maintenance")]
@@ -232,8 +252,8 @@ fn paint_a_command_line(line: &str) -> String {
 fn paint_the_arguments(text: &str, rest: style::Style) -> String {
     cut_the_arguments(text)
         .iter()
-        .map(|(colour, piece)| match *colour == style::FLAG {
-            true => colour.paint(piece).to_string(),
+        .map(|(color, piece)| match *color == style::FLAG {
+            true => color.paint(piece).to_string(),
             false => rest.paint(piece).to_string(),
         })
         .collect()
@@ -347,6 +367,21 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         };
         return Ok(bump::bump_every_version(&mut out, &chosen, into, settings.as_json)?);
     }
+    // Asked of the resolved directory and not of the flags, since settings.toml can name a corpus
+    // too. Below fetch and bump-versions, which read none of this, and above the measuring, so a
+    // refusal costs nothing and does not arrive at the end of a run that passed.
+    let the_corpus_is_ours =
+        dirs.corpus.starts_with(&shipped) || holds_the_carried_cases(&dirs.corpus);
+    if settings.badge.is_some() && !the_corpus_is_ours {
+        return Err(Trouble::Said(format!(
+            "{NO_BADGE_OVER_A_FOREIGN_CORPUS}: {}",
+            dirs.corpus.display()
+        )));
+    }
+    let mut foreign = find_the_layers_not_carried(&dirs, &shipped);
+    if !the_corpus_is_ours {
+        foreign.insert(0, "the cases");
+    }
     let mut corpus = read_the_corpus(&dirs.corpus)?;
     set_aside_what_was_disabled(&mut corpus, &settings.disabled)?;
     let adapters = match &settings.name_of_counter {
@@ -409,6 +444,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             &dirs.recorded,
             &find_binary,
             &site,
+            foreign.is_empty(),
         )?;
         let index = site.join(render::INDEX_FILE);
         writeln!(
@@ -417,6 +453,11 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             index.display(),
             site.join(render::DATA_FILE).display()
         )?;
+        if !foreign.is_empty() {
+            writeln!(out, "{}", style::RECORDED.paint(&format!(
+                    "no badges: a badge is this suite's verdict, and {} this run measured with \
+                     are not this suite's", foreign.join(" and "))))?;
+        }
         if io::stdout().is_terminal() {
             open_the_page(&index);
         }
@@ -513,6 +554,13 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
              the project"
         )));
     }
+    // Written after a failing run as readily as after a passing one: it says the cases were faced,
+    // which is true either way.
+    if let Some(into) = &settings.badge {
+        let cases = corpus.cases.len();
+        write_the_badge(into, render::badge::render_the_self_run_badge(cases))?;
+        writeln!(out, "wrote {} over {cases} cases", into.display())?;
+    }
     Ok(broken)
 }
 
@@ -527,6 +575,7 @@ struct Settings {
     binary: Option<PathBuf>,
     known_failures: Option<PathBuf>,
     disabled: Vec<String>,
+    badge: Option<PathBuf>,
     out: Option<PathBuf>,
     #[cfg(feature = "maintenance")]
     as_json: bool,
@@ -562,6 +611,7 @@ impl Settings {
             binary: None,
             known_failures: None,
             disabled: Vec::new(),
+            badge: None,
             out: None,
             #[cfg(feature = "maintenance")]
             as_json: false,
@@ -604,6 +654,7 @@ impl Settings {
                     settings.known_failures = Some(PathBuf::from(value_of(&flag, &mut args)?))
                 }
                 "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
+                "--badge" => settings.badge = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--out" => settings.out = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 #[cfg(feature = "maintenance")]
                 "--json" => settings.as_json = true,
@@ -650,6 +701,26 @@ impl Settings {
         }
         if matches!(settings.command, Command::Check { .. }) && settings.out.is_some() {
             return Err("--out belongs to render".to_string());
+        }
+        if settings.badge.is_some() && !matches!(settings.command, Command::Check { .. }) {
+            return Err("--badge belongs to check".to_string());
+        }
+        // The badge says a number of cases and nothing else, so every flag that would change which
+        // cases those are takes the meaning out of the number. Whether the corpus itself is this
+        // suite's is not asked here, since that is answered by reading it and not by a flag.
+        if let Command::Check { case } = &settings.command
+            && settings.badge.is_some()
+        {
+            if !settings.disabled.is_empty() {
+                return Err(
+                    "a badge with a case left out of it is not the badge, so --disabled does not \
+                     belong beside it"
+                        .to_string(),
+                );
+            }
+            if !case.is_empty() {
+                return Err("a badge is written over the whole corpus, not over one case".to_string());
+            }
         }
         #[cfg(feature = "maintenance")]
         if settings.as_json && !matches!(settings.command, Command::BumpVersions { .. }) {
@@ -757,6 +828,25 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
     })
 }
 
+// Which of the three replace any of what this build carries, named for a message. A verdict is
+// worked out from all of them and not from the cases alone: the dialect holds the rules, the
+// adapter the command that produced the answer, the record what the answer is held against.
+fn find_the_layers_not_carried(dirs: &Dirs, shipped: &Path) -> Vec<&'static str> {
+    [
+        (&dirs.adapters, ADAPTERS_DIR, "the adapters"),
+        (&dirs.dialects, DIALECTS_DIR, "the dialects"),
+        (&dirs.recorded, RECORDED_DIR, "the recorded answers"),
+    ]
+    .into_iter()
+    .filter(|(layered, under, _)| {
+        !layered
+            .iter()
+            .all(|dir| dir.starts_with(shipped) || replaces_nothing_carried_under(dir, under))
+    })
+    .map(|(_, _, said)| said)
+    .collect()
+}
+
 // Nothing is checked and nothing is waited for: the pages are written either way, and a machine
 // with no browser is not a run that failed.
 fn open_the_page(page: &Path) {
@@ -771,6 +861,16 @@ fn open_the_page(page: &Path) {
         process::Command::new("xdg-open")
     };
     let _ = opener.arg(page).spawn();
+}
+
+// A CI step names a directory of its own that may not be there yet, so it is made rather than
+// reported as missing.
+fn write_the_badge(into: &Path, svg: String) -> Result<(), String> {
+    if let Some(dir) = into.parent().filter(|dir| !dir.as_os_str().is_empty()) {
+        fs::create_dir_all(dir)
+            .map_err(|error| format!("{} could not be created: {error}", dir.display()))?;
+    }
+    fs::write(into, svg).map_err(|error| format!("{} could not be written: {error}", into.display()))
 }
 
 // `check` and `explain` name a case the same way, so they refuse an unknown one the same way and
@@ -849,6 +949,7 @@ fn anchor_every_path_of(settings: &mut Settings) {
         &mut settings.recorded,
         &mut settings.binary,
         &mut settings.known_failures,
+        &mut settings.badge,
         &mut settings.out,
     ]
     .into_iter()
@@ -947,7 +1048,7 @@ mod tests {
         for named in ["check", "explain", "fetch", "render"] {
             assert!(whole.contains(&format!("linejudge {named} ")), "{named} is missing");
         }
-        assert!(whole.contains("CLICOLOR_FORCE"), "the note about colour is missing");
+        assert!(whole.contains("CLICOLOR_FORCE"), "the note about color is missing");
     }
 
     #[test]
@@ -1033,6 +1134,29 @@ mod tests {
         assert!(one_out.unwrap_err().contains("is not the page"));
         let on_check = settings_of(&["check", "--out", "pages"]);
         assert!(on_check.unwrap_err().contains("belongs to render"));
+    }
+
+    // Everything the badge could be narrowed with, since the whole of what it says is a number of
+    // cases and every one of these changes which cases those are.
+    #[test]
+    fn a_badge_belongs_to_check_and_only_over_the_whole_of_this_suite_s_corpus() {
+        assert!(settings_of(&["check", "--badge", "run.svg"]).unwrap().badge.is_some());
+        assert!(settings_of(&["check", "--counter", "mine", "--badge", "run.svg"]).is_ok());
+        for elsewhere in [
+            vec!["render", "--badge", "run.svg"],
+            vec!["explain", "2160", "--badge", "run.svg"],
+            vec!["fetch", "--badge", "run.svg"],
+        ] {
+            let refused = settings_of(&elsewhere).unwrap_err();
+            assert!(refused.contains("--badge belongs to check"), "{refused}");
+        }
+        // Whether a corpus of one's own is this suite's is decided by reading it, so the flag on
+        // its own is no reason to refuse and the run answers that one.
+        assert!(settings_of(&["check", "--corpus", "mine", "--badge", "run.svg"]).is_ok());
+        let one_out = settings_of(&["check", "--disabled", "0400-a_case", "--badge", "run.svg"]);
+        assert!(one_out.unwrap_err().contains("is not the badge"));
+        let one_case = settings_of(&["check", "2160", "--badge", "run.svg"]);
+        assert!(one_case.unwrap_err().contains("not over one case"));
     }
 
     #[test]

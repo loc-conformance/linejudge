@@ -1,13 +1,19 @@
+use crate::render::MARK_LINES;
 use crate::render::StateCounts;
 use crate::render::data::Answer;
 
 const HEIGHT: usize = 20;
 const LABEL: &str = "conformance";
 const LABEL_WIDTH: usize = 90;
+const SELF_RUN_LABEL: &str = "linejudge";
+const SELF_RUN_LABEL_WIDTH: usize = 74;
 // A block is this wide whatever its number, so the blocks of one badge are even. Only a single
-// digit gets a narrower one, which would otherwise swim in its own colour.
+// digit gets a narrower one, which would otherwise swim in its own color.
 const BLOCK: usize = 40;
 const NARROW_BLOCK: usize = 34;
+// The self-run block carries words rather than a digit, so its width is measured off the text.
+const PER_CHARACTER: usize = 7;
+const AROUND_THE_WORDS: usize = 14;
 
 // One badge for one way of counting: the label, then a block per state, each carrying its count. A
 // block of nought is left out, apart from the green one, which is what the badge is for and stays.
@@ -26,38 +32,61 @@ pub fn render_one_badge(answers: &[Answer]) -> String {
     .map(|(_, block)| block)
     .collect();
 
-    let mut boxes = String::new();
-    let mut words = String::new();
-    let mut at = LABEL_WIDTH;
-    for (count, symbol, colour) in &blocks {
-        let width = match *count < 10 {
-            true => NARROW_BLOCK,
-            false => BLOCK,
-        };
-        boxes.push_str(&format!(
-            "<rect x=\"{at}\" width=\"{width}\" height=\"{HEIGHT}\" fill=\"{colour}\"/>"
-        ));
-        words.push_str(&format!(
-            "<text x=\"{}\" y=\"14\">{count} {symbol}</text>",
-            at + width / 2
-        ));
-        at += width;
-    }
+    let drawn: Vec<(String, usize, &str)> = blocks
+        .iter()
+        .map(|(count, symbol, color)| {
+            let width = match *count < 10 {
+                true => NARROW_BLOCK,
+                false => BLOCK,
+            };
+            (format!("{count} {symbol}"), width, *color)
+        })
+        .collect();
     let said: Vec<String> = blocks
         .iter()
         .map(|(count, symbol, _)| format!("{count} {}", name_of(symbol)))
         .collect();
+    build_the_svg(LABEL, LABEL_WIDTH, &drawn, &said.join(", "))
+}
+
+// How many cases a counter was held against, and no verdict, since the rules it was judged by are
+// its author's own and nobody has reviewed them. The blue is the mark's, and is none of the five
+// colors a verdict is painted in.
+pub fn render_the_self_run_badge(cases: usize) -> String {
+    let words = format!("{cases} cases");
+    let width = words.len() * PER_CHARACTER + AROUND_THE_WORDS;
+    let said = format!("measured against {words}");
+    build_the_svg(SELF_RUN_LABEL, SELF_RUN_LABEL_WIDTH, &[(words, width, MARK_LINES)], &said)
+}
+
+// Both badges are this drawing, so the frame, the font and the rounding are decided once. `said`
+// is what somebody hearing the badge read out gets instead of seeing it.
+fn build_the_svg(
+    label: &str,
+    label_width: usize,
+    blocks: &[(String, usize, &str)],
+    said: &str,
+) -> String {
+    let mut boxes = String::new();
+    let mut words = String::new();
+    let mut at = label_width;
+    for (text, width, color) in blocks {
+        boxes.push_str(&format!(
+            "<rect x=\"{at}\" width=\"{width}\" height=\"{HEIGHT}\" fill=\"{color}\"/>"
+        ));
+        words.push_str(&format!("<text x=\"{}\" y=\"14\">{text}</text>", at + width / 2));
+        at += width;
+    }
+    let middle = label_width / 2;
     format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{at}\" height=\"{HEIGHT}\" role=\"img\" \
-         aria-label=\"{LABEL}: {}\">\
+         aria-label=\"{label}: {said}\">\
          <clipPath id=\"r\"><rect width=\"{at}\" height=\"{HEIGHT}\" rx=\"3\" fill=\"#fff\"/></clipPath>\
          <g clip-path=\"url(#r)\">\
-         <rect width=\"{LABEL_WIDTH}\" height=\"{HEIGHT}\" fill=\"#555\"/>{boxes}</g>\
+         <rect width=\"{label_width}\" height=\"{HEIGHT}\" fill=\"#555\"/>{boxes}</g>\
          <g fill=\"#fff\" font-family=\"Verdana,DejaVu Sans,sans-serif\" font-size=\"11\" \
          text-anchor=\"middle\">\
-         <text x=\"{}\" y=\"14\">{LABEL}</text>{words}</g></svg>\n",
-        said.join(", "),
-        LABEL_WIDTH / 2,
+         <text x=\"{middle}\" y=\"14\">{label}</text>{words}</g></svg>\n"
     )
 }
 
@@ -104,6 +133,31 @@ mod tests {
             assert!(badge.contains(said), "{said} is missing\n{badge}");
         }
         assert!(badge.contains("1 agree, 1 fail and nobody has reviewed them, 1 fail"), "{badge}");
+    }
+
+    #[test]
+    fn the_self_run_badge_says_how_many_cases_and_never_how_they_went() {
+        let badge = render_the_self_run_badge(84);
+        assert!(badge.contains(">84 cases<"), "{badge}");
+        assert!(badge.contains(">linejudge<"), "{badge}");
+        assert!(badge.contains("aria-label=\"linejudge: measured against 84 cases\""), "{badge}");
+        for verdict in ['✓', '?', '✗', '⊘', '!'] {
+            assert!(!badge.contains(verdict), "{verdict} is a verdict and has no place here\n{badge}");
+        }
+        for color in ["#2ea043", "#c99a06", "#cf222e"] {
+            assert!(!badge.contains(color), "{color} paints a verdict\n{badge}");
+        }
+    }
+
+    // The count reaches three digits the day the corpus does, and a fixed block would clip it.
+    #[test]
+    fn the_self_run_block_grows_with_the_number_inside_it() {
+        let narrow = render_the_self_run_badge(9);
+        let wide = render_the_self_run_badge(1084);
+        let width_of = |svg: &str| {
+            svg.split_once("width=\"").unwrap().1.split_once('"').unwrap().0.parse::<usize>().unwrap()
+        };
+        assert!(width_of(&wide) > width_of(&narrow), "{narrow}\n{wide}");
     }
 
     fn answer(verdict: Verdict, note: Option<&str>) -> Answer {

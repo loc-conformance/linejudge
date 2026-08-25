@@ -4,6 +4,8 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::corpus::CASES_DIR;
+
 include!(concat!(env!("OUT_DIR"), "/shipped.rs"));
 
 const APP_DIR: &str = "linejudge";
@@ -36,6 +38,59 @@ pub fn find_the_app_dirs() -> Vec<PathBuf> {
         .flatten()
         .map(|root| root.join(APP_DIR))
         .collect()
+}
+
+/// Whether this directory holds the cases this build carries. Compared by contents and not by
+/// path, because a checkout points every command at its own working copy and that copy is what the
+/// build was made from. Nothing may be missing and nothing may be extra: `--corpus` swaps the
+/// whole corpus, so a directory holding half our cases is a different corpus.
+pub fn holds_the_carried_cases(dir: &Path) -> bool {
+    let Some(found) = collect_every_file_under(dir) else { return false };
+    found.len() == count_the_files_carried_under(CASES_DIR)
+        && found.iter().all(|relative| is_what_was_carried(dir, relative, CASES_DIR))
+}
+
+/// Whether a directory given for the adapters, the dialects or the records changes any of what
+/// this build carries under `name_of_dir`. A file that is missing is no change, unlike in a
+/// corpus: these three replace only the counters they name.
+pub fn replaces_nothing_carried_under(dir: &Path, name_of_dir: &str) -> bool {
+    let Some(found) = collect_every_file_under(dir) else { return false };
+    found.iter().all(|relative| is_what_was_carried(dir, relative, name_of_dir))
+}
+
+fn collect_every_file_under(dir: &Path) -> Option<Vec<PathBuf>> {
+    let mut found = Vec::new();
+    walk_every_file_under(dir, dir, &mut found)?;
+    Some(found)
+}
+
+// file_type does not follow a symlink, so a link pointing back up cannot loop the walk for ever.
+fn walk_every_file_under(dir: &Path, root: &Path, found: &mut Vec<PathBuf>) -> Option<()> {
+    for entry in fs::read_dir(dir).ok()?.filter_map(|entry| entry.ok()) {
+        match entry.file_type().ok()?.is_dir() {
+            true => walk_every_file_under(&entry.path(), root, found)?,
+            false => found.push(entry.path().strip_prefix(root).ok()?.to_path_buf()),
+        }
+    }
+    Some(())
+}
+
+fn is_what_was_carried(dir: &Path, relative: &Path, name_of_dir: &str) -> bool {
+    let named = format!("{name_of_dir}/{}", relative.display().to_string().replace('\\', "/"));
+    let Some((_, contents)) = FILES.iter().find(|(carried, _)| *carried == named) else {
+        return false;
+    };
+    let Ok(found) = fs::read_to_string(dir.join(relative)) else { return false };
+    found.replace("\r\n", "\n") == contents.replace("\r\n", "\n")
+}
+
+fn count_the_files_carried_under(name_of_dir: &str) -> usize {
+    FILES
+        .iter()
+        .filter(|(relative, _)| {
+            relative.strip_prefix(name_of_dir).is_some_and(|rest| rest.starts_with('/'))
+        })
+        .count()
 }
 
 fn write_the_shipped_files_into(dir: &Path) -> Result<(), String> {
@@ -97,6 +152,58 @@ mod tests {
         }
         fs::remove_dir_all(&root).unwrap();
         assert!(wrong.is_empty(), "{wrong:?}");
+    }
+
+    #[test]
+    fn a_corpus_is_ours_by_what_is_in_it_and_not_by_where_it_sits() {
+        let root = env::temp_dir().join("linejudge-a_corpus_by_what_is_inside_it");
+        let _ = fs::remove_dir_all(&root);
+        write_the_shipped_files_into(&root).unwrap();
+        let cases = root.join(CASES_DIR);
+        let elsewhere = holds_the_carried_cases(&cases);
+
+        let extra = cases.join("one_more.toml");
+        fs::write(&extra, "a case nobody here carries").unwrap();
+        let with_more = holds_the_carried_cases(&cases);
+        fs::remove_file(&extra).unwrap();
+
+        fs::remove_file(cases.join("readings.toml")).unwrap();
+        let with_less = holds_the_carried_cases(&cases);
+        fs::remove_dir_all(&root).unwrap();
+
+        assert!(elsewhere, "a copy of our cases is our cases, wherever it was put");
+        assert!(!with_more, "a corpus with ours and more of its own is not ours");
+        assert!(!with_less, "a corpus missing one of ours is not ours");
+    }
+
+    #[test]
+    fn a_folder_naming_one_counter_replaces_nothing_and_an_edited_file_does() {
+        let root = env::temp_dir().join("linejudge-a_layer_that_replaces_nothing");
+        let _ = fs::remove_dir_all(&root);
+        write_the_shipped_files_into(&root).unwrap();
+
+        let one = root.join("one-counter");
+        let named = FILES
+            .iter()
+            .find(|(relative, _)| relative.starts_with(&format!("{DIALECTS_DIR}/")))
+            .map(|(relative, _)| relative.trim_start_matches(&format!("{DIALECTS_DIR}/")))
+            .unwrap();
+        let copied = one.join(named);
+        fs::create_dir_all(copied.parent().unwrap()).unwrap();
+        fs::copy(root.join(DIALECTS_DIR).join(named), &copied).unwrap();
+        let a_part_of_it = replaces_nothing_carried_under(&one, DIALECTS_DIR);
+
+        fs::write(&copied, "rules of my own\n").unwrap();
+        let edited = replaces_nothing_carried_under(&one, DIALECTS_DIR);
+
+        fs::copy(root.join(DIALECTS_DIR).join(named), &copied).unwrap();
+        fs::write(one.join("mycounter.toml"), "a counter nobody here carries").unwrap();
+        let added = replaces_nothing_carried_under(&one, DIALECTS_DIR);
+        fs::remove_dir_all(&root).unwrap();
+
+        assert!(a_part_of_it, "one counter's file, unchanged, leaves every other counter alone");
+        assert!(!edited, "the same file with something else in it replaces what we carry");
+        assert!(!added, "a file under a name we carry nothing of adds a counter of its own");
     }
 
     // The four names live twice: once in build.rs, which cannot import them because it runs before

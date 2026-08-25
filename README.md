@@ -187,6 +187,15 @@ That file is yours, and it is the only thing your build depends on. What we reco
 counter is our snapshot of it, it goes stale the moment you fix something, and your CI is
 deliberately not judged against it.
 
+Your run can also write a badge for your own README:
+
+```
+linejudge check --counter mycounter --badge linejudge.svg
+```
+
+It shows how many cases the run covered, and no score: your counter is judged by rules you wrote
+yourself.
+
 ## Adding native support for your counter here
 
 To be measured here and appear on the results page linked at the top, your counter needs three
@@ -196,6 +205,11 @@ and a way for us to download it.
 Your counter itself does not have to change. The command we run can be a wrapper script, in whatever
 language your project already uses. And if your counter already prints JSON of a plain shape, we read
 that directly with no wrapper at all.
+
+A counter on that page also gets a badge you can use, one per way it counts. That one shows how
+the cases went:
+
+<img src="assets/badge.png" width="198" alt="conformance: 76 agree, 1 fail and nobody has reviewed them, 8 fail">
 
 The steps are in [CONTRIBUTING.md](CONTRIBUTING.md) and the output formats are in
 [docs/counter-authors.md](docs/counter-authors.md).
