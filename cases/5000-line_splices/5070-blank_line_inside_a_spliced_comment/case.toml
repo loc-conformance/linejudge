@@ -1,0 +1,5 @@
+trap = """
+a backslash at the end of a line comment carries it onto the blank line under it, so a line
+holding nothing at all is still inside the comment. Blank to a counter that asks what the line
+itself says, comment to one that asks what it is inside, and a counter that never sees the
+splice does not face the question"""

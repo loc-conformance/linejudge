@@ -1,0 +1,6 @@
+// the blank line below is still this comment \
+CCccccccccccccccccccccccccccccccccccccccccccccc
+
+c
+int x = 1;
+... . . ..
