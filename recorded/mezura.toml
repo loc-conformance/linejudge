@@ -134,18 +134,10 @@ counted = { lines = 6, code = 2, comments = 3, extra = 1 }
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 
 [answer.1230-a_comment_word_at_the_head_of_a_longer_word.content]
-is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, extra = 0 }
-note = """
-a line whose first word begins with REM is taken as a comment whatever letters follow, so the
-command counts as one"""
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.1230-a_comment_word_at_the_head_of_a_longer_word.region]
-is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-note = """
-a line whose first word begins with REM is taken as a comment whatever letters follow, so the
-command counts as one"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2010-comment_symbol_inside_string.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
@@ -423,11 +415,7 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 1, comments = 1, extra = 1 }
 
 [answer.5070-blank_line_inside_a_spliced_comment.region]
-is-known-failure = true
-counted = { lines = 3, code = 1, comments = 1, blanks = 1 }
-note = """
-the comment is carried across the splice onto a line holding text, and not onto one holding
-nothing, so the empty line is read as an ordinary blank"""
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.6010-html_has_no_strings.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
@@ -478,18 +466,16 @@ counted-regions = [
 ]
 
 [answer.6050-script_closer_written_with_a_space.content]
-is-known-failure = true
 counted = { lines = 4, code = 4, comments = 0, extra = 0 }
-counted-regions = []
-note = """
-the block is not found, so its line is counted as the page and not as JavaScript"""
+counted-regions = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, extra = 0 },
+]
 
 [answer.6050-script_closer_written_with_a_space.region]
-is-known-failure = true
 counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
-counted-regions = []
-note = """
-the block is not found, so its line is counted as the page and not as JavaScript"""
+counted-regions = [
+    { language = "JavaScript", lines = 1, code = 1, comments = 0, blanks = 0 },
+]
 
 [answer.6060-script_closer_inside_a_string.content]
 counted = { lines = 5, code = 5, comments = 0, extra = 0 }
