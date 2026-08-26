@@ -413,6 +413,16 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 [answer.5060-code_then_a_spliced_line_comment.region]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
+[answer.5070-blank_line_inside_a_spliced_comment.content]
+counted = { lines = 3, code = 1, comments = 1, extra = 1 }
+
+[answer.5070-blank_line_inside_a_spliced_comment.region]
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 1, blanks = 1 }
+note = """
+the comment is carried across the splice onto a line holding text, and not onto one holding
+nothing, so the empty line is read as an ordinary blank"""
+
 [answer.6010-html_has_no_strings.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 

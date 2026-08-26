@@ -259,7 +259,7 @@ pub enum Predicate {
     /// Any part of the line is inside a comment, one that opened on an earlier line included.
     InComment,
     /// The line is inside a string that opened with three quotes at the start of a line, spaces
-    /// before them allowed. Only scc asks this.
+    /// before them allowed.
     InDocString,
     /// Any part of the line is inside a string, one that opened on an earlier line included.
     InString,
@@ -355,14 +355,15 @@ mod tests {
     #[test]
     fn the_shipped_dialects_are_read_and_a_dialect_off_the_roster_is_not_there() {
         let dialects = read_the_shipped_dialects();
-        assert_eq!(dialects.iter().count(), 4);
+        assert_eq!(dialects.iter().count(), 5);
         let content = dialects.find("mezura", "content").unwrap();
         assert_eq!(content.buckets, ["code", "comments", "extra"]);
         assert_eq!(content.rules.len(), 5);
         assert_eq!(content.rules[0].name, "words-outside-spans-are-code");
         assert_eq!(dialects.find("tokei", "default").unwrap().buckets[2], "blanks");
         assert!(dialects.find("tokei", "strict").is_none());
-        assert!(dialects.find("cloc", "default").is_none());
+        assert!(dialects.find("cloc", "default").is_some());
+        assert!(dialects.find("sloccount", "default").is_none());
     }
 
     #[test]
@@ -454,7 +455,7 @@ mod tests {
         let read = Dialects::read(&[shipped, empty.clone()]);
         fs::remove_dir_all(&empty).unwrap();
         let dialects = read.unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
-        assert_eq!(dialects.iter().count(), 4);
+        assert_eq!(dialects.iter().count(), 5);
     }
 
     #[test]

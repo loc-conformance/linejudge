@@ -1,5 +1,5 @@
-counter = "scc"
-version = "scc version 4.0.0"
+counter = "cloc"
+version = "2.10"
 
 [answer.1010-code_then_comment_on_one_line.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
@@ -35,7 +35,12 @@ counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
 [answer.1120-close_then_code_then_stray_and_reopen.default]
-counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note = """
+the block comment is cut out together with the line break inside it, so the code before the
+opener and the code after the closer become one line and the line that vanished is charged to
+comments"""
 
 [answer.1130-closer_in_code_with_nothing_open.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -54,9 +59,10 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.1180-cmake_bracket_comment.default]
 is-known-failure = true
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-the bracket comment is not recognised at all, so the whole file counts as code"""
+only a line beginning with a hash is a comment in CMake here, so the bracket comment ends with
+its opening line and its body and closing bracket count as code"""
 
 [answer.1190-nested_block_comment_that_does_not.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -65,21 +71,29 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 is-known-failure = true
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 note = """
-the inner closer ends the comment although Haskell's pair nests, so the text after it is left
-standing as code"""
+the inner closer ends the comment although Haskell's pair nests, so what follows it on that line
+is left standing and the line counts as code"""
 
 [answer.1210-close_touching_reopen_nesting.default]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
+note = """
+an opener that comes after a closer on the same line is not acted on, whether the two symbols
+touch or a space separates them, so the block it reopens is never a comment"""
 
 [answer.1220-nested_block_comment_in_odin.default]
 is-known-failure = true
 counted = { lines = 6, code = 4, comments = 2, blanks = 0 }
 note = """
-the block is ended at the inner closer, so the two lines after it are counted as code"""
+the inner closer ends the comment although Odin's pair nests, so the lines under it up to and
+including the outer closer are left as code"""
 
 [answer.1230-a_comment_word_at_the_head_of_a_longer_word.default]
 is-known-failure = true
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+a line whose first word begins with REM is taken as a comment whatever letters follow, so the
+command counts as one"""
 
 [answer.2010-comment_symbol_inside_string.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
@@ -97,34 +111,33 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.2060-backtick_template_holding_a_comment.default]
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
+note = """
+a // at the head of a line opens a comment inside a backtick template as readily as outside one,
+so that line of template text counts as a comment"""
 
 [answer.2070-verbatim_string_crossing_lines.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2080-odd_triple_quote_count.default]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+note = """
+a triple quoted string is read as documentation wherever it opens, the middle of a line of code
+included, so the lines holding its text and its closing quotes are added to the comment count"""
 
 [answer.2090-docstring_holding_a_comment_symbol.default]
 counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
-note = """
-any triple quoted block that opens a line is read as documentation, so the three lines of this one
-are comments by the definition it declares and not by a mistake"""
 
 [answer.2100-triple_quoted_data_not_documentation.default]
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
-note = """
-the same definition reaches a block that is data the program prints, so three lines of program
-data land in the comment count"""
 
 [answer.2110-here_string_holding_an_apostrophe.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.2120-heredoc_holding_an_apostrophe.default]
-is-known-failure = true
-counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
-note = """
-the apostrophe opens a string and every comment under it is counted as code"""
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
 
 [answer.2130-raw_string_holding_quotes.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -133,13 +146,14 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 
 [answer.2150-delimited_raw_string_names_its_own_closer.default]
-is-known-failure = true
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-note = """
-the delimited form is not recognised, so the block opener inside the string opens a comment"""
+counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 
 [answer.2160-long_bracket_string_holding_a_comment_symbol.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+note = """
+a line beginning with two hyphens is a comment even inside a long bracket string, so it counts as
+one while the lines holding the brackets stay code"""
 
 [answer.2170-lua_level_bracket_holding_plain_close.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
@@ -149,10 +163,10 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.2190-triple_quote_read_as_three_short_ones.default]
 is-known-failure = true
-counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 note = """
-the three apostrophes are read as short strings and not as one that runs on, so the // below
-counts as a comment and the /* under it opens a block that nothing closes"""
+a // at the head of a line opens a comment inside a triple apostrophe string too, so that line
+counts as one, while the /* under it opens nothing and takes no line with it"""
 
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
@@ -170,39 +184,22 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3060-wysiwyg_string_ending_in_a_backslash.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the backslash cancels the closing quote, so the string stays open and the comment under it is
-counted as code"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the backslash cancels the closing quote, and its strings cross lines, so the comment under the
-path is counted as string content"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3080-backtick_escapes_inside_a_double_quoted_string.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the backtick is no escape to it, so the last quote opens a string that crosses lines"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3090-backtick_before_a_single_quoted_string.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.4010-char_literal_holding_a_quote.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the quote opens a string, so both comments under it are counted as code"""
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.4020-two_char_literals_holding_escapes.default]
-is-known-failure = true
-counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
-note = """
-every comment under the line is lost"""
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 
 [answer.4030-character_written_with_a_backslash.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
@@ -226,72 +223,83 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.5010-line_splice_inside_a_string.default]
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
+note = """
+a // is stripped to the end of the line wherever it sits, inside an open string as readily as
+outside one, so the line of string text holding it counts as a comment"""
 
 [answer.5020-blank_line_inside_a_spliced_string.default]
 is-known-failure = true
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-the string is carried past the blank line, so the comment line is counted as code"""
+a blank line under a line ending in the language's continuation symbol is read as continuing it
+and is never blank, so the blank inside the spliced string comes out code"""
 
 [answer.5030-line_splice_inside_a_comment.default]
 is-known-failure = true
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 note = """
-the comment ends at the newline, so the line joined to it is counted as code"""
+a line comment stops at the line break whatever the line ends with, so the line spliced onto it
+counts as code"""
 
 [answer.5040-line_splice_in_a_comment_with_no_words.default]
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-the comment ends at the newline, so the line joined to it is counted as code"""
+a comment carrying no letter or digit is read like any other and still stops at the line break,
+so the line spliced onto it counts as code"""
 
 [answer.5050-line_splice_after_a_closed_block_comment.default]
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-the line with the two comments on it is read correctly and the splice is not, so the line joined
-to the comment counts as code"""
+a block comment closing earlier on the line does not move where the line comment after it stops,
+which is still the line break, so the line spliced onto it counts as code"""
 
 [answer.5060-code_then_a_spliced_line_comment.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the comment ends at the newline, so the line joined to it is counted as code"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.5070-blank_line_inside_a_spliced_comment.default]
 is-known-failure = true
-counted = { lines = 3, code = 1, comments = 1, blanks = 1 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 note = """
-the comment ends at the newline, so the empty line joined to it is counted as blank"""
+the blank line under the spliced comment is read as continuing it and is never blank, so it
+comes out comment where its own blanks-first rule says a line of nothing is blank"""
 
 [answer.6010-html_has_no_strings.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.6020-comment_opener_inside_an_attribute.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+a comment opener inside a quoted attribute value opens a comment all the same, and nothing below
+closes it, so both lines under it count as comments"""
 
 [answer.6030-opening_tag_split_over_two_lines.default]
 is-known-failure = true
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the block is not found, so the comment inside it is read with the page's symbols, and HTML has
-no //"""
+the file is counted as one language from beginning to end and no script block is separated out
+however its tag is written, so the js comment inside it counts as markup"""
 
 [answer.6040-script_tag_in_upper_case.default]
 is-known-failure = true
 counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the tag is not recognised, so the block is not found and the comment inside it counts as markup"""
+no script block is separated out of the page at all, so the case of the tag never comes up: the
+same file written in lower case is counted exactly the same way"""
 
 [answer.6050-script_closer_written_with_a_space.default]
 is-known-failure = true
 counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the block is not found, so its line is counted as the page and not as JavaScript"""
+every number comes out as the rules ask while the javascript line is credited to the page and no
+second language is named, so nothing in the totals shows the block was never found"""
 
 [answer.6060-script_closer_inside_a_string.default]
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
@@ -304,60 +312,60 @@ is-known-failure = true
 counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the block is not found, so the comment inside it counts as markup"""
+the file is counted as one language from beginning to end, so a block named by a mime type is
+read with the page's symbols and the comment inside it lands in code"""
 
 [answer.6090-vue_blocks_count_as_their_own_languages.default]
 is-known-failure = true
-counted = { lines = 13, code = 13, comments = 0, blanks = 0 }
+counted = { lines = 13, code = 9, comments = 3, blanks = 1 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end, so neither block is found and both
-their comments are code"""
+the file is counted as one language from beginning to end, and every number comes out right only
+because the symbols it applies to a vue file already cover the markup, the js and the css
+comments, while neither block is named"""
 
 [answer.6100-block_language_named_by_the_tag.default]
 is-known-failure = true
 counted = { lines = 11, code = 9, comments = 2, blanks = 0 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end. The totals come out right because
-both block comment symbols happen to be the ones Vue's own markup already declares, and neither
-block is found"""
+the file is counted as one language from beginning to end and no lang attribute is read, so every
+number comes out right only because those symbols already treat // as a comment"""
 
 [answer.6110-php_block_holding_html_around_it.default]
 is-known-failure = true
 counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the file is read as php from beginning to end, so the html comment is counted as code"""
+the file is read as php from beginning to end and never switches language at the closing tag, so
+the markup comment between the blocks counts as code"""
 
 [answer.6120-script_inside_html_inside_php.default]
 is-known-failure = true
 counted = { lines = 11, code = 10, comments = 1, blanks = 0 }
 counted-regions = []
 note = """
-it has no notion of a file holding a second language, and the js comment survives only because
-php spells its line comment the same way"""
+the file is read as php from beginning to end, so the js comment two languages deep survives only
+because php spells its line comment the same way, and neither language inside is named"""
 
 [answer.7010-regex_literal_holding_a_quote.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the quote opens a string that runs on, so the comment under it is counted as code"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.7020-regex_holding_a_comment_opener.default]
-is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-note = """
-the /* opens a comment and swallows the two lines under it"""
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
 
 [answer.8010-punctuation_only_line.default]
 counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
 
 [answer.8020-blank_line_inside_block_comment.default]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+counted = { lines = 4, code = 1, comments = 2, blanks = 1 }
 
 [answer.8030-blank_line_inside_a_multiline_string.default]
-counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 2, comments = 3, blanks = 1 }
+note = """
+the empty line is set aside as blank before any comment rule runs, which is what its own rules
+ask, and the rest of the string around it is read as documentation"""
 
 [answer.8040-doc_comment_with_no_text.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }

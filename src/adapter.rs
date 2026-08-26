@@ -17,10 +17,29 @@ use crate::per_line::PerLineFormat;
 /// The directory the adapters are read from, one `<counter>.toml` inside it per counter.
 pub const ADAPTERS_DIR: &str = "adapters";
 
+/// Every channel a counter can be downloaded from, for a refusal that names them all.
+pub const CHANNELS: [&str; 3] = [CRATES_IO, GITHUB_RELEASE_ASSET, GITHUB_RELEASE_FILE];
+
+/// The channel that compiles a counter from its crates.io source.
+pub const CRATES_IO: &str = "crates-io";
+
+/// The channel that picks a release asset by the system and architecture in its name.
+pub const GITHUB_RELEASE_ASSET: &str = "github-release-asset";
+
+/// The channel that takes a release file named outright in `[acquisition.file]`.
+pub const GITHUB_RELEASE_FILE: &str = "github-release-file";
+
+/// The `[acquisition.file]` key for any system the table does not name.
+pub const OTHER_SYSTEM: &str = "other";
+
+/// Stands for the acquisition's version inside a release file name.
+pub const VERSION_PLACEHOLDER: &str = "{version}";
+
 pub(crate) const UNKNOWN_VERSION: &str = "unknown version";
 
 const ADAPTER_EXTENSION: &str = "toml";
 const FILE_PLACEHOLDER: &str = "{file}";
+const RELEASE_FILE_SYSTEMS: [&str; 4] = ["windows", "linux", "macos", OTHER_SYSTEM];
 const VERSION_FLAG: &str = "--version";
 
 /// Everything needed to run one counter and read its answer, as `adapters/<counter>.toml`
@@ -141,6 +160,41 @@ impl Adapter {
                 path.display()
             ));
         }
+        // Whether a channel is one this build can download from is asked by the two commands that
+        // download, since every other command reads an adapter without ever looking at the block.
+        if let Some(how) = &raw.acquisition {
+            if how.channel == GITHUB_RELEASE_FILE && how.file.is_none() {
+                return Err(format!(
+                    "{}: {GITHUB_RELEASE_FILE} needs an [acquisition.file] table saying which \
+                     release file to take",
+                    path.display()
+                ));
+            }
+            if how.channel != GITHUB_RELEASE_FILE && how.file.is_some() {
+                return Err(format!(
+                    "{}: an [acquisition.file] table belongs to {GITHUB_RELEASE_FILE}, and {} \
+                     picks its file itself",
+                    path.display(),
+                    how.channel
+                ));
+            }
+            for (system, named) in how.file.iter().flatten() {
+                if !RELEASE_FILE_SYSTEMS.contains(&system.as_str()) {
+                    return Err(format!(
+                        "{}: {system} is not a system a release file can be named for: it knows {}",
+                        path.display(),
+                        RELEASE_FILE_SYSTEMS.join(", ")
+                    ));
+                }
+                if !named.contains(VERSION_PLACEHOLDER) && named.contains(&how.version) {
+                    return Err(format!(
+                        "{}: {named} writes the version out and goes stale the day it is raised, \
+                         so say {VERSION_PLACEHOLDER}",
+                        path.display()
+                    ));
+                }
+            }
+        }
         let mut ways = Vec::new();
         let mut output_is_read = false;
         for (name, dialect) in raw.dialect {
@@ -230,11 +284,19 @@ impl Adapter {
     /// The version is a label on the report and never a condition of the run, so a binary that
     /// answers the flag with an error, or declares no flag at all, comes out "unknown version".
     pub fn read_version_or_unknown(&self, binary: &Path) -> String {
-        let Some(flag) = &self.version_flag else { return UNKNOWN_VERSION.to_string() };
-        match run_counter(binary, std::slice::from_ref(flag)) {
-            Ok(printed) if !printed.trim().is_empty() => printed.trim().to_string(),
-            _ => UNKNOWN_VERSION.to_string(),
-        }
+        self.read_version(binary).unwrap_or_else(|_| UNKNOWN_VERSION.to_string())
+    }
+
+    /// What the binary answers to its version flag. `Err` is a binary that could not run or
+    /// refused to, which fetch tells apart from a build that runs and answers another version.
+    pub fn read_version(&self, binary: &Path) -> Result<String, String> {
+        let Some(flag) = &self.version_flag else { return Ok(UNKNOWN_VERSION.to_string()) };
+        let printed = run_counter(binary, std::slice::from_ref(flag))?;
+        let trimmed = printed.trim();
+        Ok(match trimmed.is_empty() {
+            true => UNKNOWN_VERSION.to_string(),
+            false => trimmed.to_string(),
+        })
     }
 
     /// Runs the counter's own per-line command and hands back what it printed, as it printed it.
@@ -297,13 +359,17 @@ pub(crate) enum Reader {
 #[serde(deny_unknown_fields)]
 pub struct Acquisition {
     /// `github-release-asset` for a project that attaches built files to a release, `crates-io`
-    /// for one that publishes only source and has to be compiled.
+    /// for one that publishes only source and has to be compiled, `github-release-file` for one
+    /// whose release files say nothing about systems and are named in `file` below instead.
     pub channel: String,
     /// What the channel calls it: the `owner/repo` on GitHub, or the name of the crate.
     pub name: String,
     /// Downloaded exactly, never resolved to whatever is newest, so two runs on different days
     /// measure the same build.
     pub version: String,
+    /// The release file to take, named outright per system: `windows`, `linux`, `macos`, and
+    /// `other` for any system not named. `{version}` in a name stands for the version above.
+    pub file: Option<BTreeMap<String, String>>,
 }
 
 /// Whether a binary's version line is the version that was declared. It cannot be an equality: a
@@ -401,23 +467,28 @@ mod tests {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
         let names: Vec<&str> = adapters.iter().map(|a| a.name_of_counter.as_str()).collect();
-        assert_eq!(names, ["mezura", "scc", "tokei"]);
-        let mezura = &adapters[0];
+        assert_eq!(names, ["cloc", "mezura", "scc", "tokei"]);
+        let mezura = &adapters[1];
         let dialects: Vec<&str> = mezura.invocations.iter().map(|d| d.name.as_str()).collect();
         assert_eq!(dialects, ["content", "region"]);
         assert_eq!(mezura.invocations[0].buckets, ["code", "comments", "extra"]);
         assert_eq!(mezura.invocations[1].buckets, ["code", "comments", "blanks"]);
-        let tokei = adapters[2].acquisition.as_ref().unwrap();
+        let tokei = adapters[3].acquisition.as_ref().unwrap();
         assert_eq!((tokei.channel.as_str(), tokei.version.as_str()), ("crates-io", "14.0.0"));
+        let cloc = adapters[0].acquisition.as_ref().unwrap();
+        assert_eq!(cloc.channel, "github-release-file");
+        assert_eq!(cloc.file.as_ref().unwrap()["other"], "cloc-{version}.pl");
         assert!(mezura.acquisition.is_none(), "mezura is published nowhere to be fetched from");
         for adapter in &adapters {
             let home = adapter.repository.as_deref().unwrap_or_default();
             assert!(home.starts_with("https://"), "{}: {home}", adapter.name_of_counter);
         }
-        for dialect in mezura.invocations.iter().chain(&adapters[1].invocations) {
+        for dialect in
+            adapters[0].invocations.iter().chain(&mezura.invocations).chain(&adapters[2].invocations)
+        {
             assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
         }
-        assert!(matches!(adapters[2].invocations[0].reader, Reader::Written(OutputFormat::TokeiJson)));
+        assert!(matches!(adapters[3].invocations[0].reader, Reader::Written(OutputFormat::TokeiJson)));
     }
 
     #[test]
@@ -481,7 +552,7 @@ mod tests {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let dialects = read_the_shipped_dialects();
         assert_eq!(Adapter::read_one(&dirs, "scc", &dialects).unwrap().name_of_counter, "scc");
-        let missing = Adapter::read_one(&dirs, "cloc", &dialects).unwrap_err();
+        let missing = Adapter::read_one(&dirs, "sloccount", &dialects).unwrap_err();
         assert!(missing.contains("cannot run"), "{missing}");
     }
 
@@ -498,9 +569,55 @@ mod tests {
     }
 
     #[test]
+    fn every_acquisition_mistake_is_refused_when_the_adapter_is_read() {
+        let base = "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+                    [dialect.default]\nargs = []\n\
+                    [acquisition]\nchannel = \"github-release-file\"\nname = \"a/b\"\n\
+                    version = \"2.10\"\n";
+        let read = |dir: &str, text: &str| {
+            let path = write_an_adapter(dir, text);
+            let outcome = Adapter::read(&path, &read_the_shipped_dialects());
+            fs::remove_dir_all(path.parent().unwrap()).unwrap();
+            outcome
+        };
+        let table = "[acquisition.file]\nother = \"t-{version}.pl\"\n";
+
+        // A channel this build cannot download from is refused by the commands that download,
+        // and reading the file is not where that question belongs.
+        let unknown = read("a_channel_nobody_knows",
+                &base.replace("github-release-file", "gitlab-release"));
+        assert_eq!(unknown.unwrap().acquisition.unwrap().channel, "gitlab-release");
+
+        let bare = read("a_release_file_channel_with_no_table", base);
+        assert!(bare.unwrap_err().contains("needs an [acquisition.file] table"));
+
+        let mispaired = read("a_file_table_on_another_channel",
+                &format!("{}{table}", base.replace("github-release-file", "crates-io")));
+        assert!(mispaired.unwrap_err().contains("belongs to github-release-file"));
+
+        let crooked = read("a_system_nobody_ships_for",
+                &format!("{base}[acquisition.file]\nosx = \"t-{{version}}.pl\"\n"));
+        assert!(crooked.unwrap_err().contains("osx is not a system"));
+
+        let stale = read("a_file_name_with_the_version_written_out",
+                &format!("{base}[acquisition.file]\nother = \"t-2.10.pl\"\n"));
+        assert!(stale.unwrap_err().contains("say {version}"));
+
+        // The version can sit in a name for its own reasons, and only a name without the
+        // placeholder is the one that goes stale.
+        let both = read("a_name_holding_the_version_and_the_placeholder",
+                &format!("{base}[acquisition.file]\nother = \"t2.10-{{version}}.pl\"\n"));
+        assert!(both.is_ok(), "{:?}", both.unwrap_err());
+
+        let sound = read("an_acquisition_with_nothing_wrong", &format!("{base}{table}"));
+        let how = sound.unwrap().acquisition.unwrap();
+        assert_eq!(how.file.unwrap()["other"], "t-{version}.pl");
+    }
+
+    #[test]
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let mezura = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[0];
+        let mezura = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[1];
         let args = mezura.build_args(&mezura.invocations[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
@@ -510,13 +627,13 @@ mod tests {
     fn the_per_line_command_is_declared_per_counter_and_has_to_name_the_file() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let scc = &adapters[1];
+        let scc = &adapters[2];
         let command = scc
             .format_explain_command(&scc.invocations[0], Path::new("scc.exe"), Path::new("input.py"))
             .unwrap();
         assert_eq!(command, "scc.exe -t --no-cocomo -f csv input.py");
         assert_eq!(scc.explain_keep_from.as_deref(), Some("line "));
-        let tokei = &adapters[2];
+        let tokei = &adapters[3];
         assert!(tokei.explain_args.is_none());
         assert!(
             tokei
@@ -539,10 +656,10 @@ mod tests {
     fn the_format_an_analysis_is_read_as_needs_a_command_and_rules_out_trimming_it_as_text() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let mezura = &adapters[0];
+        let mezura = &adapters[1];
         assert_eq!(mezura.explain_output, Some(PerLineFormat::LinejudgePerLine));
         assert_eq!(mezura.explain_keep_from, None);
-        assert_eq!(adapters[1].explain_output, None);
+        assert_eq!(adapters[2].explain_output, None);
 
         let alone = write_an_adapter(
             "a_format_with_no_command",
@@ -593,7 +710,7 @@ mod tests {
     #[test]
     fn a_version_nobody_answers_is_unknown_and_stops_nothing() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let tokei = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[2];
+        let tokei = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[3];
         assert_eq!(tokei.version_flag.as_deref(), Some("--version"));
         assert_eq!(tokei.read_version_or_unknown(Path::new("a-binary-that-does-not-exist")), "unknown version");
 

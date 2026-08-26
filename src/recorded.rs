@@ -332,7 +332,7 @@ note = """
 the line comment is swallowed by the block above it"""
 "#;
 
-    // Completeness is demanded of this suite's own three counters and never at run time, where a
+    // Completeness is demanded of this suite's own counters and never at run time, where a
     // missing record is the ordinary state of anybody else's tool.
     #[test]
     fn every_roster_counter_records_every_case_and_nothing_contradicts_the_rules() {
@@ -341,7 +341,8 @@ the line comment is swallowed by the block above it"""
         let corpus =
             Corpus::read(&root.join("cases")).unwrap_or_else(|faults| panic!("{faults:?}"));
         let mut wrong = Vec::new();
-        for counter in ["mezura", "scc", "tokei"] {
+        for counter in collect_the_recorded_counters(root) {
+            let counter = counter.as_str();
             let record = RecordedAnswers::read(&[root.join(RECORDED_DIR)], counter, &dialects)
                 .unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
                 .unwrap_or_else(|| panic!("{counter} has no recorded answers"));
@@ -381,15 +382,15 @@ the line comment is swallowed by the block above it"""
     }
 
     // The other direction of the test above. A case that was deleted or renamed leaves its answers
-    // behind in three files, and nothing else in the suite reads them again to notice. A disabled
-    // case is still a case and keeps its answers.
+    // behind in the recorded files, and nothing else in the suite reads them again to notice. A
+    // disabled case is still a case and keeps its answers.
     #[test]
     fn a_recorded_answer_names_a_case_that_is_still_there() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let corpus =
             Corpus::read(&root.join("cases")).unwrap_or_else(|faults| panic!("{faults:?}"));
         let mut wrong = Vec::new();
-        for counter in ["mezura", "scc", "tokei"] {
+        for counter in collect_the_recorded_counters(root) {
             let text = fs::read_to_string(root.join(RECORDED_DIR).join(format!("{counter}.toml")))
                 .unwrap();
             let raw: RawRecorded = toml::from_str(&text).unwrap();
@@ -575,6 +576,20 @@ the line comment is swallowed by the block above it"""
         assert!(is_same_build("scc version 3.7.0", "scc version 3.7.0"));
         assert!(!is_same_build("scc version 3.7.0", "scc version 4.0.0"));
         assert!(!is_same_build("unknown version", "unknown version"));
+    }
+
+    // The roster comes off the recorded directory itself, so a counter joining the suite is
+    // covered by these tests without anybody remembering to name it here.
+    fn collect_the_recorded_counters(root: &Path) -> Vec<String> {
+        let mut counters: Vec<String> = fs::read_dir(root.join(RECORDED_DIR))
+            .unwrap()
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|path| path.extension().and_then(|e| e.to_str()) == Some("toml"))
+            .filter_map(|path| path.file_stem().map(|s| s.to_string_lossy().into_owned()))
+            .collect();
+        counters.sort();
+        assert!(!counters.is_empty(), "an empty roster would test nothing and say it passed");
+        counters
     }
 
     fn read_a_record(name: &str, text: &str) -> Result<Option<RecordedAnswers>, Faults> {

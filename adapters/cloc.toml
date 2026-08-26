@@ -1,0 +1,22 @@
+name       = "cloc"
+repository = "https://github.com/AlDanial/cloc"
+args       = ["--json", "{file}"]
+
+[acquisition]
+channel = "github-release-file"
+name    = "AlDanial/cloc"
+version = "2.10"
+
+[acquisition.file]
+windows = "cloc-{version}.exe"
+other   = "cloc-{version}.pl"
+
+[dialect.default]
+args = []
+
+[dialect.default.read]
+claims   = "SUM"
+lines    = "header.n_lines"
+code     = "SUM.code"
+comments = "SUM.comment"
+blanks   = "SUM.blank"

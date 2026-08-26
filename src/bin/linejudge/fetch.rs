@@ -1,10 +1,16 @@
 use std::env::consts::{ARCH, EXE_SUFFIX, OS};
 use std::fs;
 use std::io::{self, Write};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use linejudge::adapter::{Acquisition, Adapter, is_the_declared_version};
+use linejudge::adapter::{
+    CHANNELS, CRATES_IO, GITHUB_RELEASE_ASSET, GITHUB_RELEASE_FILE, OTHER_SYSTEM,
+    VERSION_PLACEHOLDER,
+};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
@@ -12,9 +18,7 @@ use crate::counters::Counters;
 use crate::fetched::{create_a_partial_dir_for, find_the_binary_of, finish_the_partial_dir};
 use crate::style;
 
-pub(crate) const CRATES_IO: &str = "crates-io";
 pub(crate) const GITHUB_API: &str = "https://api.github.com/repos";
-pub(crate) const GITHUB_RELEASE_ASSET: &str = "github-release-asset";
 
 const CHECKSUM_WORDS: [&str; 2] = ["checksum", "sha256"];
 // crates.io answers 403 to a request that arrives as plain curl, which reads exactly like a crate
@@ -81,15 +85,19 @@ fn fetch_one_counter(
     let assembled = match how.channel.as_str() {
         CRATES_IO => build_from_crates_io(out, name_of_counter, how, &partial),
         GITHUB_RELEASE_ASSET => download_a_release_asset(out, name_of_counter, how, &partial),
+        GITHUB_RELEASE_FILE => download_a_named_release_file(out, name_of_counter, how, &partial),
         other => Err(format!(
-            "{other} is not a channel this program knows: it knows {CRATES_IO} and \
-             {GITHUB_RELEASE_ASSET}"
+            "{other} is not a channel this program knows: it knows {}",
+            CHANNELS.join(", ")
         )),
     };
     let binary = assembled.inspect_err(|_| {
         let _ = fs::remove_dir_all(&partial);
     })?;
-    let printed = adapter.read_version_or_unknown(&binary);
+    let printed = adapter.read_version(&binary).map_err(|refused| {
+        let _ = fs::remove_dir_all(&partial);
+        format!("{name_of_counter} arrived and cannot answer its version flag on this machine: {refused}")
+    })?;
     if !is_the_declared_version(&how.version, &printed) {
         let _ = fs::remove_dir_all(&partial);
         return Err(format!(
@@ -147,18 +155,7 @@ fn download_a_release_asset(
     say(out, &format!("downloading {downloaded}"))?;
     let archive = into.join(&downloaded);
     save_a_url(&asset.browser_download_url, &archive)?;
-    if let Some(list) = find_the_checksums_among(&release.assets) {
-        let published = read_a_url(&list.browser_download_url)?;
-        if let Some(wanted) = find_the_checksum_of(&downloaded, &published) {
-            let arrived = calculate_the_checksum_of(&archive)?;
-            if arrived != wanted {
-                return Err(format!(
-                    "{downloaded} did not arrive whole: the release says its checksum is {wanted} \
-                     and the file that arrived is {arrived}"
-                ));
-            }
-        }
-    }
+    check_it_arrived_whole(&release.assets, &downloaded, &archive)?;
     let unpacking =
         ["-xf", &archive.display().to_string(), "-C", &into.display().to_string()].map(str::to_string);
     let asked: Vec<&str> = unpacking.iter().map(String::as_str).collect();
@@ -170,6 +167,59 @@ fn download_a_release_asset(
     find_the_file_named(&named, into).ok_or_else(|| {
         format!("{downloaded} holds no {named}, so this counter is packed under another name")
     })
+}
+
+// The release publishes plain files whose names say nothing about systems, so the adapter names
+// the one to take for each system outright. Nothing is unpacked, so it is saved straight under
+// the name the lookup goes by. A script among them runs off its own first line, which names its
+// interpreter, once it is marked runnable.
+fn download_a_named_release_file(
+    out: &mut dyn Write,
+    name_of_counter: &str,
+    how: &Acquisition,
+    into: &Path,
+) -> Result<PathBuf, String> {
+    let wanted = choose_the_file_for(how, OS)?;
+    let release = find_the_release_of(&how.name, &how.version)?;
+    let asset = release.assets.iter().find(|asset| asset.name == wanted).ok_or_else(|| {
+        format!(
+            "this release carries no {wanted}, only {}",
+            release.assets.iter().map(|a| a.name.as_str()).collect::<Vec<_>>().join(", ")
+        )
+    })?;
+    say(out, &format!("downloading {wanted}"))?;
+    let binary = into.join(format!("{name_of_counter}{EXE_SUFFIX}"));
+    save_a_url(&asset.browser_download_url, &binary)?;
+    check_it_arrived_whole(&release.assets, &wanted, &binary)?;
+    mark_it_runnable(&binary)?;
+    Ok(binary)
+}
+
+fn choose_the_file_for(how: &Acquisition, os: &str) -> Result<String, String> {
+    let files = how.file.as_ref().ok_or_else(|| {
+        format!("{GITHUB_RELEASE_FILE} needs an [acquisition.file] table naming the file to take")
+    })?;
+    let named = files.get(os).or_else(|| files.get(OTHER_SYSTEM)).ok_or_else(|| {
+        format!("its adapter names no release file for {os} and none for {OTHER_SYSTEM}")
+    })?;
+    Ok(named.replace(VERSION_PLACEHOLDER, &how.version))
+}
+
+// What arrives is a plain file, and unix runs only what is marked runnable. Windows decides by
+// extension and needs nothing.
+#[cfg(unix)]
+fn mark_it_runnable(binary: &Path) -> Result<(), String> {
+    let mut runnable = fs::metadata(binary)
+        .map_err(|error| format!("{} could not be read: {error}", binary.display()))?
+        .permissions();
+    runnable.set_mode(runnable.mode() | 0o755);
+    fs::set_permissions(binary, runnable)
+        .map_err(|error| format!("{} could not be marked runnable: {error}", binary.display()))
+}
+
+#[cfg(not(unix))]
+fn mark_it_runnable(_binary: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 // The name is kept as the release gives it, since that is what the published checksums name and
@@ -190,6 +240,22 @@ fn find_the_checksums_among(assets: &[Asset]) -> Option<&Asset> {
         let name = asset.name.to_lowercase();
         CHECKSUM_WORDS.iter().any(|word| name.contains(word))
     })
+}
+
+// The checksums published beside the release say whether the download arrived whole. A release
+// that publishes none, or one that skips this file, is taken without the check.
+fn check_it_arrived_whole(assets: &[Asset], downloaded: &str, file: &Path) -> Result<(), String> {
+    let Some(list) = find_the_checksums_among(assets) else { return Ok(()) };
+    let published = read_a_url(&list.browser_download_url)?;
+    let Some(wanted) = find_the_checksum_of(downloaded, &published) else { return Ok(()) };
+    let arrived = calculate_the_checksum_of(file)?;
+    match arrived == wanted {
+        true => Ok(()),
+        false => Err(format!(
+            "{downloaded} did not arrive whole: the release says its checksum is {wanted} and \
+             the file that arrived is {arrived}"
+        )),
+    }
 }
 
 // The shape of a tag is the project's own habit, `v3.7.0` here and `3.7.0` there, so both are
@@ -406,6 +472,23 @@ mod tests {
     }
 
     #[test]
+    fn a_named_release_file_is_chosen_by_system_and_other_stands_for_the_rest() {
+        let how = an_acquisition(&[("windows", "cloc-{version}.exe"), ("other", "cloc-{version}.pl")]);
+        assert_eq!(choose_the_file_for(&how, "windows").unwrap(), "cloc-2.10.exe");
+        assert_eq!(choose_the_file_for(&how, "linux").unwrap(), "cloc-2.10.pl");
+        assert_eq!(choose_the_file_for(&how, "macos").unwrap(), "cloc-2.10.pl");
+
+        let windows_only = an_acquisition(&[("windows", "cloc-{version}.exe")]);
+        let refused = choose_the_file_for(&windows_only, "linux").unwrap_err();
+        assert!(refused.contains("no release file for linux"), "{refused}");
+
+        let mut unnamed = an_acquisition(&[]);
+        unnamed.file = None;
+        let refused = choose_the_file_for(&unnamed, "windows").unwrap_err();
+        assert!(refused.contains("[acquisition.file]"), "{refused}");
+    }
+
+    #[test]
     fn a_release_carrying_nothing_for_this_machine_says_what_it_does_carry() {
         let assets = vec![
             Asset { name: "scc_Plan9_sparc.tar.gz".to_string(), browser_download_url: String::new() },
@@ -527,6 +610,17 @@ AB12CD34  scc_Windows_x86_64.zip
         Asset {
             name: name.to_string(),
             browser_download_url: format!("https://example.invalid/{name}"),
+        }
+    }
+
+    fn an_acquisition(files: &[(&str, &str)]) -> Acquisition {
+        Acquisition {
+            channel: GITHUB_RELEASE_FILE.to_string(),
+            name: "AlDanial/cloc".to_string(),
+            version: "2.10".to_string(),
+            file: Some(
+                files.iter().map(|(system, name)| (system.to_string(), name.to_string())).collect(),
+            ),
         }
     }
 }

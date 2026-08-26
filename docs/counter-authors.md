@@ -23,13 +23,13 @@ comments = "Comment"
 blanks   = "Blank"
 ```
 
-A block whose paths are absolute reads the document as it stands. `claims` names a path that has to
-match at least one element, or the file counts as unclaimed. A `regions` block under it reads the
-stretches of another language the same way, with `language` naming where the name of that language
-sits.
+A block whose paths are absolute reads the document as it stands. `claims` names a path that has
+to match something, one value or at least one element of a list, or the file counts as unclaimed.
+A `regions` block under it reads the stretches of another language the same way, with `language`
+naming where the name of that language sits.
 
-scc and mezura are both read this way. tokei is not: its document is a map with a key to exclude, it
-nests without bound, and it prints no line count at all. A shape like that wants a wrapper rather
+cloc, scc and mezura are all read this way. tokei is not: its document is a map with a key to
+exclude, it nests without bound, and it prints no line count at all. A shape like that wants a wrapper rather
 than three more path features, so tokei is read by a reader written here on purpose.
 
 ## If it does not: the uniform format

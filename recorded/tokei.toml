@@ -288,6 +288,12 @@ counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
 note = """
 the comment ends at the newline, so the line joined to it is counted as code"""
 
+[answer.5070-blank_line_inside_a_spliced_comment.default]
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 1, blanks = 1 }
+note = """
+the comment ends at the newline, so the empty line joined to it is counted as blank"""
+
 [answer.6010-html_has_no_strings.default]
 is-known-failure = true
 counted = { lines = 3, code = 3, comments = 0, blanks = 0 }

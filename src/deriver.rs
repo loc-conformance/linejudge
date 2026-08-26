@@ -287,7 +287,7 @@ fn add_one_line(counts: &mut Counts, bucket: &str) {
 }
 
 // A tag like <script> decides which language the lines inside it belong to, and does not change
-// what its own line is: all three counters call that line code.
+// what its own line is: every counter here calls that line code.
 fn is_residue(mark: char) -> bool {
     matches!(mark, RESIDUE | TAG_OPENS | TAG_CLOSES)
 }

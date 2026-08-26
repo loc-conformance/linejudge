@@ -3,9 +3,10 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use linejudge::adapter::{Acquisition, Adapter};
+use linejudge::adapter::{CHANNELS, CRATES_IO, GITHUB_RELEASE_ASSET, GITHUB_RELEASE_FILE};
 use serde::{Deserialize, Serialize};
 
-use crate::fetch::{CRATES_IO, GITHUB_API, GITHUB_RELEASE_ASSET, read_a_url};
+use crate::fetch::{GITHUB_API, read_a_url};
 use crate::style;
 
 const ACQUISITION_BLOCK: &str = "[acquisition]";
@@ -109,13 +110,13 @@ fn ask_the_channel_for_the_newest(how: &Acquisition) -> Result<String, String> {
             let url = format!("{CRATES_IO_API}/{}", how.name);
             read_the_newest_from_crates_io(&read_a_url(&url)?)
         }
-        GITHUB_RELEASE_ASSET => {
+        GITHUB_RELEASE_ASSET | GITHUB_RELEASE_FILE => {
             let url = format!("{GITHUB_API}/{}/releases/latest", how.name);
             read_the_newest_from_a_release(&read_a_url(&url)?)
         }
         other => Err(format!(
-            "{other} is not a channel this knows, and it speaks {CRATES_IO} and \
-             {GITHUB_RELEASE_ASSET}"
+            "{other} is not a channel this knows, and it speaks {}",
+            CHANNELS.join(", ")
         )),
     }
 }
@@ -234,6 +235,21 @@ mod tests {
         let none = "name = \"mezura\"\n\n[dialect.default]\nargs = []\n";
         let refused = raise_the_version_line(none, "3.8.0").unwrap_err();
         assert!(refused.contains("[acquisition]"), "{refused}");
+    }
+
+    // Asking a channel nobody knows is refused before any network call, which is what keeps this
+    // test off the network.
+    #[test]
+    fn a_channel_this_build_cannot_ask_is_refused_by_name() {
+        let how = Acquisition {
+            channel: "gitlab-release".to_string(),
+            name: "a/b".to_string(),
+            version: "1.0.0".to_string(),
+            file: None,
+        };
+        let refused = ask_the_channel_for_the_newest(&how).unwrap_err();
+        assert!(refused.contains("gitlab-release is not a channel this knows"), "{refused}");
+        assert!(refused.contains(GITHUB_RELEASE_FILE), "{refused}");
     }
 
     #[test]

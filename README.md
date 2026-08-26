@@ -143,11 +143,9 @@ line of the file with the rule that took it.
 
 ## Running it against your own counter
 
-84 cases, each built around one thing counters get wrong: an escaped quote before a comment, a block
+A corpus of cases, each built around one thing counters get wrong: an escaped quote before a comment, a block
 comment that nests, a string carrying a comment symbol, a line spliced onto the next with a
-backslash, a second language inside the file. **Every counter measured here fails cases its own
-tests never caught**: tokei 40, scc 26, and mezura 8, which was written by the person who built this
-suite.
+backslash, a second language inside the file.
 
 Use it as a CI step, or by hand while you are working on your counter. Either way it takes two
 files, and both of them go in your own repository.

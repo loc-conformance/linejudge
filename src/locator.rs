@@ -27,7 +27,7 @@ impl Locator {
     pub fn of(raw: RawLocator, buckets: &[String]) -> Result<Locator, String> {
         check_count_names(&raw.counts, buckets)?;
         let each = raw.each.map(|path| parse_elements_path("each", &path)).transpose()?;
-        let claims = raw.claims.map(|path| parse_elements_path("claims", &path)).transpose()?;
+        let claims = raw.claims.map(|path| parse_path("claims", &path)).transpose()?;
         if each.is_some() && claims.is_some() {
             return Err("names both each and claims, and an each that matches nothing already \
                         means the file is not claimed"
@@ -50,8 +50,9 @@ impl Locator {
     pub fn read(&self, text: &str) -> Result<Option<Answer>, String> {
         let document: Value = serde_json::from_str(text)
             .map_err(|e| format!("what the counter printed does not parse: {e}"))?;
+        // A key that is present but null is the counter saying nothing, not a claim.
         if let Some(claims) = &self.claims
-            && walk(&document, &claims.steps).is_empty()
+            && walk(&document, &claims.steps).iter().all(|value| value.is_null())
         {
             return Ok(None);
         }
@@ -310,6 +311,14 @@ comments = \"Comment\"
 blanks   = \"Blank\"
 ";
 
+    const CLOC_READ: &str = "\
+claims   = \"SUM\"
+lines    = \"header.n_lines\"
+code     = \"SUM.code\"
+comments = \"SUM.comment\"
+blanks   = \"SUM.blank\"
+";
+
     #[test]
     fn an_absolute_block_reads_the_totals_and_its_regions_from_every_element() {
         let mezura = read_with(MEZURA_READ, &["code", "comments", "extra"], MEZURA).unwrap();
@@ -343,6 +352,19 @@ blanks   = \"Blank\"
         let empty = r#"{"total":{"lines":0,"code":0,"comments":0,"extra":0},"languages":[]}"#;
         assert!(read_with(MEZURA_READ, &["code", "comments", "extra"], empty).is_none());
         assert!(read_with(SCC_READ, &["code", "comments", "blanks"], "[]").is_none());
+        assert!(read_with(CLOC_READ, &["code", "comments", "blanks"], "{}").is_none());
+        let null = r#"{"SUM": null, "header": null}"#;
+        assert!(read_with(CLOC_READ, &["code", "comments", "blanks"], null).is_none());
+    }
+
+    #[test]
+    fn claims_may_name_one_value_and_a_document_holding_it_is_claimed() {
+        let printed = r#"{"header": {"n_lines": 3}, "SUM": {"blank": 0, "comment": 1, "code": 2}}"#;
+        let cloc = read_with(CLOC_READ, &["code", "comments", "blanks"], printed).unwrap();
+        assert_eq!(cloc.counts.lines, 3);
+        assert_eq!(cloc.counts.buckets["code"], 2);
+        assert_eq!(cloc.counts.buckets["comments"], 1);
+        assert_eq!(cloc.counts.buckets["blanks"], 0);
     }
 
     #[test]
@@ -374,8 +396,8 @@ blanks   = \"Blank\"
                 &["code", "comments", "blanks"]);
         assert!(fanned.unwrap_err().contains("fans out over []"));
 
-        let single = try_create(&MEZURA_READ.replace("claims   = \"languages[]\"",
-                "claims   = \"total\""), &["code", "comments", "extra"]);
+        let single = try_create(&SCC_READ.replace("each     = \"[]\"",
+                "each     = \"rows\""), &["code", "comments", "blanks"]);
         assert!(single.unwrap_err().contains("does not end in []"));
 
         let both = try_create(&SCC_READ.replace("each     = \"[]\"",

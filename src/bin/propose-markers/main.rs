@@ -345,7 +345,13 @@ fn paint(
                     paint_run(&mut markers[last][..at], inside);
                     paint_run(&mut markers[last][at..at + closing.len()], closes);
                 }
-                None => paint_run(&mut markers[last], inside),
+                None => {
+                    if sources[last].is_empty() {
+                        lone.insert(last, inside);
+                    } else {
+                        paint_run(&mut markers[last], inside);
+                    }
+                }
             }
             note_label(id, labels, first, label)?;
             Ok(())
@@ -504,6 +510,16 @@ mod tests {
     fn a_closing_bar_at_the_very_end_bounds_a_span_that_has_no_closing_symbol() {
         let truth = propose(&["(def q \\\")"], &["1 S \\|\"|"]);
         assert_eq!(truth, "(def q \\\")\n.... . Ss.\n");
+    }
+
+    #[test]
+    fn an_unclosed_crossing_span_still_marks_an_empty_line_it_ends_on() {
+        let source = ["// spliced onto nothing \\", "", "int x = 1;"];
+        let truth = propose(&source, &["1-2 C //| ..."]);
+        assert_eq!(
+            truth,
+            "// spliced onto nothing \\\nCCccccccccccccccccccccccc\n\nc\nint x = 1;\n... . . ..\n"
+        );
     }
 
     #[test]
