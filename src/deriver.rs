@@ -60,6 +60,7 @@ pub fn derive_answer(
 /// One line of the file as this dialect's rules read it, for a person asking why the counts came
 /// out the way they did.
 pub struct ExplainedLine {
+    /// The bucket the line was counted in.
     pub bucket: String,
     /// The rules that took the line, two names where two rules agree on it.
     pub rules: Vec<String>,

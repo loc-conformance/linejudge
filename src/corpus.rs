@@ -138,6 +138,8 @@ pub struct Case {
     pub input_file: PathBuf,
     /// What this case is trying to catch, written for a person, and empty for a disabled case.
     pub trap: String,
+    /// Where every string and comment in the input begins and ends. This is the part that belongs
+    /// to no counter.
     pub truth: Truth,
 }
 

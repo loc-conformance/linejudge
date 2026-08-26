@@ -20,6 +20,7 @@ const RECORDED_EXTENSION: &str = "toml";
 /// only the question of whether the counter still answers the way it did.
 #[derive(Debug)]
 pub struct RecordedAnswers {
+    /// The counter these answers came from.
     pub counter: String,
     /// The version line the measured binary printed, kept whole.
     pub version: String,

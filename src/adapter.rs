@@ -46,6 +46,7 @@ const VERSION_FLAG: &str = "--version";
 /// declares it.
 #[derive(Debug)]
 pub struct Adapter {
+    /// The counter this runs, which is also what its file is named after.
     pub name_of_counter: String,
     /// Where the counter itself lives, for a report that links to it. `None` is not linked.
     pub repository: Option<String>,
@@ -287,8 +288,8 @@ impl Adapter {
         self.read_version(binary).unwrap_or_else(|_| UNKNOWN_VERSION.to_string())
     }
 
-    /// What the binary answers to its version flag. `Err` is a binary that could not run or
-    /// refused to, which fetch tells apart from a build that runs and answers another version.
+    /// What the binary answers to its version flag. `Err` is a binary that could not be run at
+    /// all, which is a different trouble from one that runs and names a version nobody asked for.
     pub fn read_version(&self, binary: &Path) -> Result<String, String> {
         let Some(flag) = &self.version_flag else { return Ok(UNKNOWN_VERSION.to_string()) };
         let printed = run_counter(binary, std::slice::from_ref(flag))?;

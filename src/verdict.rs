@@ -45,7 +45,9 @@ pub enum Drift {
 /// One counter's answer to one case.
 #[derive(Debug)]
 pub struct Judged<'a> {
+    /// The case it was run over.
     pub case: &'a Case,
+    /// What came of running it.
     pub outcome: Outcome<'a>,
 }
 
@@ -81,6 +83,7 @@ pub struct Measured<'a> {
     pub record: Option<&'a RecordedAnswer>,
     /// The exception this case was judged through, and `None` for the ordinary case.
     pub exception: Option<&'a Exception>,
+    /// Whether it did what its own rules say, which is the verdict this suite exists to give.
     pub conformance: Conformance,
     /// Whether it still answers the way it did. `None` where there is no record to hold the run
     /// against, or the build being run is not the recorded one.

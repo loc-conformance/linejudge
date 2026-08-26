@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 //! Holds line-of-code counters to their own declared way of counting.
 //!

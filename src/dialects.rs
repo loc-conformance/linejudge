@@ -122,6 +122,7 @@ impl Dialects {
 /// put each line in one of them, and its answer to each reading a case can mark as optional.
 #[derive(Debug)]
 pub struct Dialect {
+    /// The counter that counts this way.
     pub counter: String,
     /// `default` for a counter that counts only the one way.
     pub name: String,
@@ -129,6 +130,8 @@ pub struct Dialect {
     pub file: PathBuf,
     /// In the order the file lists them.
     pub buckets: Vec<String>,
+    /// In the order the file lists them, which decides nothing: a rule is not reached by falling
+    /// through the ones above it.
     pub rules: Vec<Rule>,
     /// Its answer to each reading a case can mark as optional: `true` where it counts that stretch
     /// as a language of its own, `false` where it leaves those lines to the code around them. A
@@ -225,7 +228,9 @@ impl Dialect {
 pub struct Rule {
     /// What the file calls it, which is how a report names the rule that took a line.
     pub name: String,
+    /// Every one of these has to hold for the rule to take a line.
     pub when: Vec<Condition>,
+    /// Where a line it takes is counted.
     pub bucket: String,
 }
 
