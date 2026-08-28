@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Sweep {
+    pub linejudge: String,
     pub measured_on: String,
     pub groups: Vec<Group>,
     pub counters: Vec<Counter>,
@@ -183,6 +184,7 @@ mod tests {
     #[test]
     fn a_sweep_survives_the_trip_through_its_own_json() {
         let sweep = Sweep {
+            linejudge: "0.1.0".to_string(),
             measured_on: "2026-08-20".to_string(),
             groups: vec![Group {
                 name: "1000-comments".to_string(),

@@ -1,9 +1,27 @@
-# Writing a case's truth
+# The cases
 
-What the groups mean, how a case is numbered and what its three files are is covered in the
-[README](../README.md) and in [CONTRIBUTING.md](../CONTRIBUTING.md). This page documents one of
-the three files: `truth.txt`, the hand-verified record of which bytes of the input are string and
-which are comment.
+A case is a directory with three files:
+
+- `input.<ext>`: the code being counted, carrying only the trap: no header, no explanation.
+- `case.toml`: one field, the trap, a sentence saying what trips counters up in this file. It
+  shows on the case's public page.
+- `truth.txt`: the hand-verified record of which bytes of the input are string and which are
+  comment.
+
+The groups are one directory per thousand, named by what they trip up:
+
+```
+1000-comments                            where a comment begins and ends, and how two pairs meet
+2000-string_forms                        where a raw, verbatim, heredoc or triple quoted form ends
+3000-escapes_and_the_closing_quote       a backslash or backtick before the quote that would close it
+4000-a_quote_that_opens_nothing          char literals, primed identifiers, a lone apostrophe
+5000-line_splices                        a backslash joining two lines, in a string, a comment or code
+6000-another_language_inside_the_file    markup, script and style tags, Vue blocks, PHP
+7000-literals_with_their_own_delimiters  a regular expression, and whatever else carries its bounds
+8000-what_the_line_counts_as             a blank line inside a comment, a line of punctuation only
+```
+
+The rest of this page documents `truth.txt`: the marker language, and the command that writes it.
 
 ## The marker language
 

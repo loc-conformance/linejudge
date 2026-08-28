@@ -1,0 +1,38 @@
+->mix.c                          Original file:
+    1 | int a;
+    2 | 
+    3 | /* two
+    4 |    lines */
+    5 | int b; // tail
+->mix.c                          Blank lines removed:
+    1 | int a;
+    2 | /* two
+    3 |    lines */
+    4 | int b; // tail
+->mix.c                          After call_regexp_common(C++)
+    1 | int a;
+    2 | 
+    3 | 
+    4 | 
+    5 | int b; 
+->mix.c                          post call_regexp_common(C++) blank cleanup:
+    1 | int a;
+    2 | int b; 
+{"header" : {
+  "cloc_url"           : "github.com/AlDanial/cloc",
+  "cloc_version"       : "2.10",
+  "elapsed_seconds"    : 0.00748491287231445,
+  "n_files"            : 1,
+  "n_lines"            : 5,
+  "files_per_second"   : 133.602089571256,
+  "lines_per_second"   : 668.010447856278},
+"C" :{
+  "nFiles": 1,
+  "blank": 1,
+  "comment": 2,
+  "code": 2},
+"SUM": {
+  "blank": 1,
+  "comment": 2,
+  "code": 2,
+  "nFiles": 1} }

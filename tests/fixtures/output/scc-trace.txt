@@ -1,0 +1,11 @@
+TRACE 2026-08-27T15:19:34Z: nanoseconds build extension to language: 505300
+TRACE 2026-08-27T15:19:34Z: configured to lazy load language features
+TRACE 2026-08-27T15:19:34Z: nanoseconds to build language C features: 0
+TRACE 2026-08-27T15:19:34Z: nanoseconds read into memory: mix.c: 670400
+TRACE 2026-08-27T15:19:34Z: mix.c line 1 ended with state: 1: counted as code
+TRACE 2026-08-27T15:19:34Z: mix.c line 2 ended with state: 1: counted as blank
+TRACE 2026-08-27T15:19:34Z: mix.c line 3 ended with state: 5: counted as comment
+TRACE 2026-08-27T15:19:34Z: mix.c line 4 ended with state: 1: counted as comment
+TRACE 2026-08-27T15:19:34Z: mix.c line 5 ended with state: 1: counted as code
+TRACE 2026-08-27T15:19:34Z: nanoseconds process: mix.c: 9005500
+[{"Name":"C","Bytes":42,"CodeBytes":0,"Lines":5,"Code":2,"Comment":2,"Blank":1,"Complexity":0,"Count":1,"WeightedComplexity":0,"Files":[],"LineLength":null,"ULOC":0}]

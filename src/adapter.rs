@@ -35,10 +35,15 @@ pub const OTHER_SYSTEM: &str = "other";
 /// Stands for the acquisition's version inside a release file name.
 pub const VERSION_PLACEHOLDER: &str = "{version}";
 
+/// The directory the explain scripts are read from, one per counter that needs one.
+pub const EXPLAIN_SCRIPTS_DIR: &str = "explain-scripts";
+
 pub(crate) const UNKNOWN_VERSION: &str = "unknown version";
 
 const ADAPTER_EXTENSION: &str = "toml";
+const BINARY_PLACEHOLDER: &str = "{binary}";
 const FILE_PLACEHOLDER: &str = "{file}";
+const EXPLAIN_SCRIPTS_PLACEHOLDER: &str = "{explain-scripts}";
 const RELEASE_FILE_SYSTEMS: [&str; 4] = ["windows", "linux", "macos", OTHER_SYSTEM];
 const VERSION_FLAG: &str = "--version";
 
@@ -53,15 +58,16 @@ pub struct Adapter {
     /// The command line it is run with, `{file}` standing for the file, and the arguments of the
     /// chosen way of counting appended after these.
     pub args: Vec<String>,
-    /// The command line that asks the counter for its own reading of a file line by line, used in
-    /// place of `args`. `None` is a counter with no such command, which is not a failure.
+    /// The command line that asks for a reading of a file line by line, used in place of `args`.
+    /// `None` is a counter with no such command, which is not a failure.
     pub explain_args: Option<Vec<String>>,
-    /// The format that reading is printed in, where it is one this suite can compare line by line.
-    /// `None` is a counter whose reading is text for a person and nothing more.
+    /// The program those arguments go to, for a counter that reads no file line by line itself
+    /// and has a wrapper doing it. `None` sends them to the counter's own binary, and then
+    /// `{binary}` and `{explain-scripts}` mean nothing and are left as they are written.
+    pub explain_command: Option<String>,
+    /// The format that reading is printed in, declared together with `explain-args` or not at
+    /// all: a reading nobody could compare would not be asked for.
     pub explain_output: Option<PerLineFormat>,
-    /// Show only the lines of it holding this text, each from the text to its end. Where nothing
-    /// holds it, everything is shown and the report says so.
-    pub explain_keep_from: Option<String>,
     /// The flag that asks the counter for its version, `None` for one that answers no such flag.
     pub version_flag: Option<String>,
     /// `None` is a counter that cannot be fetched: it is left out of any scheduled sweep, loudly,
@@ -131,33 +137,32 @@ impl Adapter {
                 path.display()
             ));
         }
-        match &raw.explain_keep_from {
-            Some(_) if raw.explain_args.is_none() => {
-                return Err(format!(
-                    "{} declares explain-keep-from with no explain-args to trim",
-                    path.display()
-                ));
-            }
-            Some(keep) if keep.is_empty() => {
-                return Err(format!(
-                    "{} declares an empty explain-keep-from, which keeps everything, so leave \
-                     the field out",
-                    path.display()
-                ));
-            }
-            Some(_) if raw.explain_output.is_some() => {
-                return Err(format!(
-                    "{} declares both explain-output and explain-keep-from, and they are two ways \
-                     of taking the same output: one reads it as a document, the other picks lines \
-                     out of it for a person to read",
-                    path.display()
-                ));
-            }
-            _ => {}
-        }
         if raw.explain_output.is_some() && raw.explain_args.is_none() {
             return Err(format!(
                 "{} declares explain-output with no explain-args to print it",
+                path.display()
+            ));
+        }
+        if raw.explain_args.is_some() && raw.explain_output.is_none() {
+            return Err(format!(
+                "{} declares explain-args with no explain-output to read what they print",
+                path.display()
+            ));
+        }
+        if raw.explain_command.is_some() && raw.explain_args.is_none() {
+            return Err(format!(
+                "{} declares explain-command with no explain-args to give it",
+                path.display()
+            ));
+        }
+        if raw.explain_command.is_none()
+            && let Some(explain) = &raw.explain_args
+            && let Some(misplaced) =
+                explain.iter().find(|a| a.contains(BINARY_PLACEHOLDER) || a.contains(EXPLAIN_SCRIPTS_PLACEHOLDER))
+        {
+            return Err(format!(
+                "{} writes {misplaced} with no explain-command, and those two stand for something \
+                 only in the arguments of a wrapper",
                 path.display()
             ));
         }
@@ -253,8 +258,8 @@ impl Adapter {
             repository: raw.repository,
             args: raw.args,
             explain_args: raw.explain_args,
+            explain_command: raw.explain_command,
             explain_output: raw.explain_output,
-            explain_keep_from: raw.explain_keep_from,
             version_flag: match raw.version_flag {
                 Some(flag) if flag.is_empty() => None,
                 Some(flag) => Some(flag),
@@ -300,16 +305,26 @@ impl Adapter {
         })
     }
 
-    /// Runs the counter's own per-line command and hands back what it printed, as it printed it.
-    /// `None` is an adapter that declares no such command.
+    /// Runs the per-line command and hands back what it printed, as it printed it. `None` is an
+    /// adapter that declares no such command.
     pub fn run_explain(
         &self,
         invocation: &Invocation,
         binary: &Path,
         file: &Path,
+        scripts: &[PathBuf],
     ) -> Option<Result<String, String>> {
         let base = self.explain_args.as_ref()?;
-        Some(run_counter(binary, &build_command_args(base, invocation, file)))
+        // A wrapper named by `explain-command` takes the counter as `{binary}`; otherwise the
+        // counter is run directly.
+        let (program, args) = match &self.explain_command {
+            Some(program) => (
+                PathBuf::from(program),
+                build_wrapper_args(base, invocation, binary, file, scripts),
+            ),
+            None => (binary.to_path_buf(), build_command_args(base, invocation, file)),
+        };
+        Some(run_counter(&program, &args))
     }
 
     /// The command as a person would retype it, meant to be pasted into a shell. Paths under the
@@ -319,21 +334,10 @@ impl Adapter {
         format!("{} {}", shorten(binary), args.join(" "))
     }
 
-    /// The same for the per-line command, and `None` where the adapter declares none.
-    pub fn format_explain_command(
-        &self,
-        invocation: &Invocation,
-        binary: &Path,
-        file: &Path,
-    ) -> Option<String> {
-        let base = self.explain_args.as_ref()?;
-        let args = build_command_args(base, invocation, &shorten_the_path(file));
-        Some(format!("{} {}", shorten(binary), args.join(" ")))
-    }
-
     fn build_args(&self, invocation: &Invocation, file: &Path) -> Vec<String> {
         build_command_args(&self.args, invocation, file)
     }
+
 }
 
 /// How this counter is asked for one of its ways of counting, and how what it prints is read. The
@@ -407,6 +411,42 @@ fn build_command_args(base: &[String], invocation: &Invocation, file: &Path) -> 
     args
 }
 
+// A wrapper is handed the counter it speaks for and the directory it was itself written to, since
+// it is run from wherever the person running this happened to be. The directories are layered like
+// every other, so `{explain-scripts}` becomes the last of them that holds the script named after it, and
+// the one this build carries where none does, which is what makes the refusal name a real path.
+fn build_wrapper_args(
+    base: &[String],
+    invocation: &Invocation,
+    binary: &Path,
+    file: &Path,
+    scripts: &[PathBuf],
+) -> Vec<String> {
+    build_command_args(base, invocation, file)
+        .iter()
+        .map(|a| a.replace(BINARY_PLACEHOLDER, &binary.display().to_string()))
+        .map(|a| fill_in_the_scripts_dir(&a, scripts))
+        .collect()
+}
+
+fn fill_in_the_scripts_dir(arg: &str, scripts: &[PathBuf]) -> String {
+    let Some((_, after)) = arg.split_once(EXPLAIN_SCRIPTS_PLACEHOLDER) else {
+        return arg.to_string();
+    };
+    // The script is what the placeholder is followed by, so the winning layer is the last one that
+    // holds that file, not the last whose whole substituted argument happens to be a file. The two
+    // differ the moment the placeholder sits inside a longer token, `--script={explain-scripts}/x`.
+    let script = after.trim_start_matches(['/', '\\']);
+    let fill = |dir: &PathBuf| arg.replace(EXPLAIN_SCRIPTS_PLACEHOLDER, &dir.display().to_string());
+    scripts
+        .iter()
+        .rev()
+        .find(|dir| dir.join(script).is_file())
+        .map(&fill)
+        .or_else(|| scripts.first().map(&fill))
+        .unwrap_or_else(|| arg.to_string())
+}
+
 // Only stdout is read. mezura writes its warnings to stderr, and a counter that says something
 // there while answering correctly has said nothing about the file.
 fn run_counter(binary: &Path, args: &[String]) -> Result<String, String> {
@@ -438,10 +478,10 @@ struct RawAdapter {
     args: Vec<String>,
     #[serde(rename = "explain-args")]
     explain_args: Option<Vec<String>>,
+    #[serde(rename = "explain-command")]
+    explain_command: Option<String>,
     #[serde(rename = "explain-output")]
     explain_output: Option<PerLineFormat>,
-    #[serde(rename = "explain-keep-from")]
-    explain_keep_from: Option<String>,
     #[serde(rename = "version-flag")]
     version_flag: Option<String>,
     acquisition: Option<Acquisition>,
@@ -569,6 +609,66 @@ mod tests {
         assert!(refused.contains("the file named after it"), "{refused}");
     }
 
+    // The layered directory holds the script, so it is the one named. This is what lets somebody
+    // measuring their own counter keep its wrapper in their own repository.
+    #[test]
+    fn a_wrapper_is_taken_from_the_last_directory_that_holds_it() {
+        let path = write_an_adapter(
+            "an_adapter_bringing_a_wrapper",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             explain-command = \"perl\"\n\
+             explain-args = [\"{explain-scripts}/probe.pl\", \"{binary}\", \"{file}\"]\n\
+             explain-output = \"linejudge-per-line\"\n\
+             [dialect.default]\nargs = []\n",
+        );
+        let adapter = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+
+        let carried = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(EXPLAIN_SCRIPTS_DIR);
+        let theirs = env::temp_dir().join("linejudge-a_wrapper_of_their_own");
+        let _ = fs::remove_dir_all(&theirs);
+        fs::create_dir_all(&theirs).unwrap();
+        fs::write(theirs.join("probe.pl"), "not really a wrapper").unwrap();
+
+        let asked = |scripts: &[PathBuf]| {
+            build_wrapper_args(adapter.explain_args.as_ref().unwrap(), &adapter.invocations[0],
+                    Path::new("t.exe"), Path::new("a.py"), scripts)
+        };
+        let layered = asked(&[carried.clone(), theirs.clone()]);
+        // A directory holding no such script is passed over, and the first layer answers.
+        let empty = env::temp_dir().join("linejudge-a_scripts_dir_with_nothing_in_it");
+        let _ = fs::remove_dir_all(&empty);
+        fs::create_dir_all(&empty).unwrap();
+        let missing = asked(&[carried, empty.clone()]);
+        fs::remove_dir_all(&theirs).unwrap();
+        fs::remove_dir_all(&empty).unwrap();
+
+        assert!(layered[0].contains("a_wrapper_of_their_own"), "{layered:?}");
+        assert_eq!(layered[1..], ["t.exe".to_string(), "a.py".to_string()]);
+        assert!(missing[0].replace('\\', "/").ends_with("explain-scripts/probe.pl"), "{missing:?}");
+    }
+
+    #[test]
+    fn a_placeholder_inside_a_longer_token_still_finds_the_script() {
+        let theirs = env::temp_dir().join("linejudge-embedded_placeholder_theirs");
+        let empty = env::temp_dir().join("linejudge-embedded_placeholder_empty");
+        for dir in [&theirs, &empty] {
+            let _ = fs::remove_dir_all(dir);
+            fs::create_dir_all(dir).unwrap();
+        }
+        fs::write(theirs.join("cloc.pl"), "not really a wrapper").unwrap();
+        // The placeholder is glued onto a flag, so the script is what follows it. The directory
+        // that holds cloc.pl wins, not the one whose whole substituted argument is a file, which
+        // none is once "--script=" sits in front.
+        let filled =
+            fill_in_the_scripts_dir("--script={explain-scripts}/cloc.pl", &[empty.clone(), theirs.clone()]);
+        fs::remove_dir_all(&theirs).unwrap();
+        fs::remove_dir_all(&empty).unwrap();
+        assert!(filled.starts_with("--script="), "{filled}");
+        assert!(filled.contains("theirs"), "{filled}");
+        assert!(!filled.contains("empty"), "{filled}");
+    }
+
     #[test]
     fn every_acquisition_mistake_is_refused_when_the_adapter_is_read() {
         let base = "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
@@ -629,16 +729,23 @@ mod tests {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
         let scc = &adapters[2];
-        let command = scc
-            .format_explain_command(&scc.invocations[0], Path::new("scc.exe"), Path::new("input.py"))
-            .unwrap();
-        assert_eq!(command, "scc.exe -t --no-cocomo -f csv input.py");
-        assert_eq!(scc.explain_keep_from.as_deref(), Some("line "));
+        let scripts = [PathBuf::from(EXPLAIN_SCRIPTS_DIR)];
+        let scripts = scripts.as_slice();
+        assert_eq!(
+            scc.explain_args.as_deref().unwrap(),
+            ["-t", "--no-cocomo", "--format", "json", "{file}"]
+        );
+        assert_eq!(scc.explain_output, Some(PerLineFormat::SccTrace));
+
+        let cloc = &adapters[0];
+        assert_eq!(cloc.explain_args.as_deref().unwrap(), ["--print-filter-stages", "--json", "{file}"]);
+        assert_eq!(cloc.explain_output, Some(PerLineFormat::ClocStages));
+
         let tokei = &adapters[3];
         assert!(tokei.explain_args.is_none());
         assert!(
             tokei
-                .format_explain_command(&tokei.invocations[0], Path::new("t.exe"), Path::new("a.py"))
+                .run_explain(&tokei.invocations[0], Path::new("t.exe"), Path::new("a.py"), scripts)
                 .is_none()
         );
 
@@ -654,13 +761,11 @@ mod tests {
     }
 
     #[test]
-    fn the_format_an_analysis_is_read_as_needs_a_command_and_rules_out_trimming_it_as_text() {
+    fn explain_args_and_explain_output_are_declared_together_or_not_at_all() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let mezura = &adapters[1];
-        assert_eq!(mezura.explain_output, Some(PerLineFormat::LinejudgePerLine));
-        assert_eq!(mezura.explain_keep_from, None);
-        assert_eq!(adapters[2].explain_output, None);
+        assert_eq!(adapters[1].explain_output, Some(PerLineFormat::LinejudgePerLine));
+        assert_eq!(adapters[3].explain_output, None);
 
         let alone = write_an_adapter(
             "a_format_with_no_command",
@@ -672,40 +777,15 @@ mod tests {
         fs::remove_dir_all(alone.parent().unwrap()).unwrap();
         assert!(refused.contains("no explain-args to print it"), "{refused}");
 
-        let both = write_an_adapter(
-            "a_format_and_a_trim",
+        let unreadable = write_an_adapter(
+            "a_command_with_no_format",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             explain-args = [\"-t\", \"{file}\"]\nexplain-output = \"linejudge-per-line\"\n\
-             explain-keep-from = \"line \"\n\
+             explain-args = [\"-t\", \"{file}\"]\n\
              [dialect.default]\nargs = []\n",
         );
-        let refused = Adapter::read(&both, &read_the_shipped_dialects()).unwrap_err();
-        fs::remove_dir_all(both.parent().unwrap()).unwrap();
-        assert!(refused.contains("two ways of taking the same output"), "{refused}");
-
-    }
-
-    #[test]
-    fn a_keep_from_needs_a_command_to_trim_and_may_not_be_empty() {
-        let alone = write_an_adapter(
-            "a_keep_from_with_no_command",
-            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             explain-keep-from = \"line \"\n\
-             [dialect.default]\nargs = []\n",
-        );
-        let refused = Adapter::read(&alone, &read_the_shipped_dialects()).unwrap_err();
-        fs::remove_dir_all(alone.parent().unwrap()).unwrap();
-        assert!(refused.contains("no explain-args to trim"), "{refused}");
-
-        let empty = write_an_adapter(
-            "an_empty_keep_from",
-            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             explain-args = [\"-t\", \"{file}\"]\nexplain-keep-from = \"\"\n\
-             [dialect.default]\nargs = []\n",
-        );
-        let refused = Adapter::read(&empty, &read_the_shipped_dialects()).unwrap_err();
-        fs::remove_dir_all(empty.parent().unwrap()).unwrap();
-        assert!(refused.contains("keeps everything"), "{refused}");
+        let refused = Adapter::read(&unreadable, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(unreadable.parent().unwrap()).unwrap();
+        assert!(refused.contains("no explain-output to read what they print"), "{refused}");
     }
 
     #[test]

@@ -6,16 +6,24 @@ use serde::Deserialize;
 
 use crate::answer::Counts;
 use crate::dialects::check_buckets;
+use crate::readers::{cloc, scc};
 
 const KNOWN_FORMAT: u32 = 1;
 
-/// The shape a counter prints that account in. There is one, and it is the same for every counter:
-/// a tool that prints it needs no reader written for it here.
+/// The shape a counter prints that account in. `linejudge-per-line` is the uniform document any
+/// counter can print for itself; the other values name the output of one counter, turned into
+/// that document by a reader under `src/readers/`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 pub enum PerLineFormat {
     /// The JSON document this module reads, declared in an adapter as `linejudge-per-line`.
     #[serde(rename = "linejudge-per-line")]
     LinejudgePerLine,
+    /// What `cloc --print-filter-stages --json` prints.
+    #[serde(rename = "cloc-stages")]
+    ClocStages,
+    /// What `scc -t` prints beside its JSON counts.
+    #[serde(rename = "scc-trace")]
+    SccTrace,
 }
 
 /// What one counter says about one file, line by line.
@@ -27,9 +35,24 @@ pub struct PerLineAnswer {
     pub counts: Counts,
 }
 
-/// Reads such a document, given the buckets this way of counting has and how many lines the file
-/// really holds. A counter that answers a seventeen line file with eighteen verdicts is told what
-/// is wrong with its document instead of being compared against the wrong lines.
+/// Reads what a counter's per-line command printed, in whichever of the formats the adapter
+/// declares.
+pub fn read_output(
+    format: PerLineFormat,
+    buckets: &[String],
+    lines_of_the_file: usize,
+    text: &str,
+) -> Result<PerLineAnswer, String> {
+    match format {
+        PerLineFormat::LinejudgePerLine => read_per_line(text, buckets, lines_of_the_file),
+        PerLineFormat::ClocStages => cloc::read_per_line(buckets, lines_of_the_file, text),
+        PerLineFormat::SccTrace => scc::read_per_line(buckets, lines_of_the_file, text),
+    }
+}
+
+/// Reads the uniform document, given the buckets this way of counting has and how many lines the
+/// file really holds. A counter that answers a seventeen line file with eighteen verdicts is told
+/// what is wrong with its document instead of being compared against the wrong lines.
 pub fn read_per_line(
     text: &str,
     buckets: &[String],
@@ -43,44 +66,51 @@ pub fn read_per_line(
             raw.format
         ));
     }
-    check_buckets(&raw.buckets, buckets).map_err(|e| format!("it {e}"))?;
-    if raw.per_line.len() != lines_of_the_file {
+    let verdicts = raw.per_line.into_iter().map(|verdict| (verdict.line, verdict.bucket)).collect();
+    build_answer(raw.lines, raw.buckets, verdicts, buckets, lines_of_the_file)
+}
+
+// Every format lands here, so a compiled reader is held to the same promises as the uniform
+// document: one verdict per line, numbered from 1, in a declared bucket, adding up to the totals.
+pub(crate) fn build_answer(
+    lines: u32,
+    totals: BTreeMap<String, u32>,
+    verdicts: Vec<(u32, String)>,
+    buckets: &[String],
+    lines_of_the_file: usize,
+) -> Result<PerLineAnswer, String> {
+    check_buckets(&totals, buckets).map_err(|e| format!("it {e}"))?;
+    if verdicts.len() != lines_of_the_file {
         return Err(format!(
             "it answers {} lines, and the file has {lines_of_the_file}",
-            raw.per_line.len()
+            verdicts.len()
         ));
     }
-    if raw.lines as usize != lines_of_the_file {
-        return Err(format!(
-            "it says the file has {} lines, and it has {lines_of_the_file}",
-            raw.lines
-        ));
+    if lines as usize != lines_of_the_file {
+        return Err(format!("it says the file has {lines} lines, and it has {lines_of_the_file}"));
     }
 
-    let mut buckets_of_lines = Vec::with_capacity(raw.per_line.len());
-    let mut summed: BTreeMap<&str, u32> = BTreeMap::new();
-    for (index, verdict) in raw.per_line.iter().enumerate() {
+    let mut buckets_of_lines = Vec::with_capacity(verdicts.len());
+    let mut summed: BTreeMap<String, u32> = BTreeMap::new();
+    for (index, (line, bucket)) in verdicts.into_iter().enumerate() {
         let expected = index as u32 + 1;
-        if verdict.line != expected {
+        if line != expected {
             return Err(format!(
-                "its answer number {expected} is for line {}, and the format numbers them from 1 \
-                 with none missing",
-                verdict.line
+                "its answer number {expected} is for line {line}, and the format numbers them \
+                 from 1 with none missing"
             ));
         }
-        if !buckets.contains(&verdict.bucket) {
+        if !buckets.contains(&bucket) {
             return Err(format!(
-                "it puts line {} in {}, which is not one of its buckets: {}",
-                verdict.line,
-                verdict.bucket,
+                "it puts line {line} in {bucket}, which is not one of its buckets: {}",
                 buckets.join(", ")
             ));
         }
-        *summed.entry(verdict.bucket.as_str()).or_default() += 1;
-        buckets_of_lines.push(verdict.bucket.clone());
+        *summed.entry(bucket.clone()).or_default() += 1;
+        buckets_of_lines.push(bucket);
     }
-    for (name, total) in &raw.buckets {
-        let counted = summed.get(name.as_str()).copied().unwrap_or_default();
+    for (name, total) in &totals {
+        let counted = summed.get(name).copied().unwrap_or_default();
         if counted != *total {
             return Err(format!(
                 "it counts {total} {name} for the file and {counted} of its lines say {name}"
@@ -88,10 +118,7 @@ pub fn read_per_line(
         }
     }
 
-    Ok(PerLineAnswer {
-        buckets_of_lines,
-        counts: Counts { lines: raw.lines, buckets: raw.buckets },
-    })
+    Ok(PerLineAnswer { buckets_of_lines, counts: Counts { lines, buckets: totals } })
 }
 
 // No `deny_unknown_fields`, deliberately: a counter is free to print detail of its own beside each
@@ -164,6 +191,26 @@ mod tests {
         let extra_total = a_document().replace("\"extra\": 0", "\"extra\": 0, \"docs\": 0");
         let refused = read_per_line(&extra_total, &buckets(), 3).unwrap_err();
         assert!(refused.contains("has a bucket named docs"), "{refused}");
+    }
+
+    // The two compiled readers take the same arguments and hand back the same type, so a rewired
+    // match arm in the dispatch above would still compile; this is what notices it.
+    #[test]
+    fn each_format_is_read_by_its_own_reader_through_the_dispatch() {
+        let scc = "TRACE 12:00: a.c line 1 ended with state: 1: counted as code\n\
+                   [{\"Name\":\"C\",\"Lines\":1,\"Code\":1,\"Comment\":0,\"Blank\":0}]\n";
+        let read = read_output(PerLineFormat::SccTrace, &three(), 1, scc).unwrap();
+        assert_eq!(read.buckets_of_lines, ["code"]);
+
+        let cloc = "->a.c Original file:\n    1 | int x;\n\
+                    ->a.c Blank lines removed:\n    1 | int x;\n\
+                    {\"SUM\": {\"blank\": 0, \"comment\": 0, \"code\": 1}}\n";
+        let read = read_output(PerLineFormat::ClocStages, &three(), 1, cloc).unwrap();
+        assert_eq!(read.buckets_of_lines, ["code"]);
+    }
+
+    fn three() -> Vec<String> {
+        ["code", "comments", "blanks"].map(String::from).to_vec()
     }
 
     fn a_document() -> String {

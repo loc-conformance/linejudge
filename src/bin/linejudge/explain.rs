@@ -1,12 +1,12 @@
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use linejudge::adapter::{Adapter, Invocation};
 use linejudge::answer::{Answer, Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::deriver::{ExplainedLine, derive_answer, explain_every_line};
 use linejudge::dialects::Dialects;
-use linejudge::per_line::{PerLineAnswer, PerLineFormat, read_per_line};
+use linejudge::per_line::{self, PerLineAnswer};
 use linejudge::readings::Readings;
 use linejudge::truth::{Covering, TruthLine};
 
@@ -39,6 +39,7 @@ pub fn explain_one_counter(
     case: &Case,
     dialects: &Dialects,
     readings: &Readings,
+    scripts: &[PathBuf],
 ) -> io::Result<()> {
     for way in &adapter.invocations {
         let block = OneWay { counter: &adapter.name_of_counter, way: &way.name, case };
@@ -59,18 +60,10 @@ pub fn explain_one_counter(
                 continue;
             }
         };
-        let theirs = read_what_the_counter_says(adapter, way, binary, case);
+        let theirs = read_what_the_counter_says(adapter, way, binary, case, scripts);
         let its = run_the_counter(adapter, way, binary, case);
         write_the_header(out, &block, &real, &its, &theirs, &explained)?;
         write_every_line(out, &block, &explained, &theirs)?;
-        if let (TheirAnswer::Text(printed), Some(binary)) = (&theirs, binary) {
-            if let Some(command) = adapter.format_explain_command(way, binary, &case.input_file) {
-                writeln!(out, "\n  {} {}",
-                        style::LABEL.paint(&format!("what {} itself says, from", adapter.name_of_counter)),
-                        style::DETAIL.paint(&command))?;
-            }
-            write_what_it_printed(out, printed, adapter.explain_keep_from.as_deref())?;
-        }
     }
     Ok(())
 }
@@ -97,15 +90,14 @@ enum ItsAnswer {
     Counted(Answer),
 }
 
-// What the counter itself said about the file: nothing for one that declares no per-line command,
-// and text for a person where it declares no format to read.
+// What the counter itself said about the file, nothing being the answer of one that declares no
+// per-line command.
 enum TheirAnswer {
     NoCommand,
     NoBinary,
     Broken(String),
     Unreadable(String),
     PerLine(PerLineAnswer),
-    Text(String),
 }
 
 impl TheirAnswer {
@@ -140,24 +132,18 @@ fn read_what_the_counter_says(
     way: &Invocation,
     binary: Option<&Path>,
     case: &Case,
+    scripts: &[PathBuf],
 ) -> TheirAnswer {
-    if adapter.explain_args.is_none() {
-        return TheirAnswer::NoCommand;
-    }
+    let Some(format) = adapter.explain_output else { return TheirAnswer::NoCommand };
     let Some(binary) = binary else { return TheirAnswer::NoBinary };
-    let printed = match adapter.run_explain(way, binary, &case.input_file) {
+    let printed = match adapter.run_explain(way, binary, &case.input_file, scripts) {
         Some(Ok(printed)) => printed,
         Some(Err(message)) => return TheirAnswer::Broken(message),
         None => return TheirAnswer::NoCommand,
     };
-    match adapter.explain_output {
-        None => TheirAnswer::Text(printed),
-        Some(PerLineFormat::LinejudgePerLine) => {
-            match read_per_line(&printed, &way.buckets, case.truth.lines.len()) {
-                Ok(answer) => TheirAnswer::PerLine(answer),
-                Err(message) => TheirAnswer::Unreadable(message),
-            }
-        }
+    match per_line::read_output(format, &way.buckets, case.truth.lines.len(), &printed) {
+        Ok(answer) => TheirAnswer::PerLine(answer),
+        Err(message) => TheirAnswer::Unreadable(message),
     }
 }
 
@@ -221,7 +207,6 @@ fn write_the_header(
         TheirAnswer::Unreadable(message) => writeln!(out, "  {} {}",
                 style::DIFFERS.paint(&format!("what {counter} printed could not be read:")),
                 style::DETAIL.paint(message)),
-        TheirAnswer::Text(_) => Ok(()),
         TheirAnswer::PerLine(_) => {
             let how = match theirs.count_lines_read_differently(explained) {
                 0 => style::DETAIL.paint(&format!("{counter} reads every line the same way")),
@@ -321,35 +306,6 @@ fn write_every_line(
     Ok(())
 }
 
-// Shows the lines holding the declared text, each from that text to its end. Lines are chosen and
-// cut, never read. Where nothing holds it, everything is shown and this says so, so a tool that
-// changed what it prints falls back to the whole of it instead of to silence.
-fn write_what_it_printed(
-    out: &mut dyn Write,
-    printed: &str,
-    keep_from: Option<&str>,
-) -> io::Result<()> {
-    if let Some(text) = keep_from {
-        let kept: Vec<&str> = printed
-            .lines()
-            .filter_map(|line| line.find(text).map(|at| &line[at..]))
-            .collect();
-        if kept.is_empty() {
-            writeln!(out, "    {}", style::DIFFERS.paint(&format!(
-                    "nothing it printed holds [{text}], so here is the whole of it:")))?;
-        } else {
-            for line in kept {
-                writeln!(out, "    {}", style::DETAIL.paint(line))?;
-            }
-            return Ok(());
-        }
-    }
-    for line in printed.lines() {
-        writeln!(out, "    {}", style::DETAIL.paint(line))?;
-    }
-    Ok(())
-}
-
 fn paint_by_marks(line: &TruthLine) -> String {
     line.cut_into_stretches()
         .iter()
@@ -365,6 +321,8 @@ fn paint_by_marks(line: &TruthLine) -> String {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    use linejudge::adapter::EXPLAIN_SCRIPTS_DIR;
 
     use super::*;
 
@@ -391,7 +349,8 @@ mod tests {
         let case = find_case(&corpus, "8040-doc_comment_with_no_text").unwrap();
         let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
         let mut written = Vec::new();
-        explain_one_counter(&mut written, tokei, None, case, &dialects, &corpus.readings).unwrap();
+        explain_one_counter(&mut written, tokei, None, case, &dialects, &corpus.readings,
+                &[PathBuf::from(EXPLAIN_SCRIPTS_DIR)]).unwrap();
         let text = String::from_utf8(written).unwrap();
         assert!(text.contains("tokei.default on 8040-doc_comment_with_no_text"), "{text}");
         assert!(text.contains("by a-comment-alone-is-comments"), "{text}");
@@ -407,7 +366,8 @@ mod tests {
         let case = find_case(&corpus, "8040-doc_comment_with_no_text").unwrap();
         let scc = adapters.iter().find(|a| a.name_of_counter == "scc").unwrap();
         let mut written = Vec::new();
-        explain_one_counter(&mut written, scc, None, case, &dialects, &corpus.readings).unwrap();
+        explain_one_counter(&mut written, scc, None, case, &dialects, &corpus.readings,
+                &[PathBuf::from(EXPLAIN_SCRIPTS_DIR)]).unwrap();
         let text = String::from_utf8(written).unwrap();
         assert!(text.contains("no binary named for scc, so neither what it answers nor how it \
                                reads the lines was measured"), "{text}");
@@ -505,27 +465,6 @@ mod tests {
         };
         assert_eq!(source, paint_by_marks(&marked("... SsssZ. CCcccc")));
         assert_eq!(source, paint_by_marks(&marked("")));
-    }
-
-    #[test]
-    fn only_the_lines_holding_the_declared_text_are_kept_and_from_that_text_on() {
-        colored::control::set_override(false);
-        let printed = "TRACE 12:00: a/b.py line 1 ended: counted as code\n\
-                       TRACE 12:00: nanoseconds process: 0\n\
-                       Language,Lines\nPython,5\n";
-        let mut written = Vec::new();
-        write_what_it_printed(&mut written, printed, Some("line ")).unwrap();
-        assert_eq!(String::from_utf8(written).unwrap(), "    line 1 ended: counted as code\n");
-
-        let mut nothing_matches = Vec::new();
-        write_what_it_printed(&mut nothing_matches, printed, Some("counted lines:")).unwrap();
-        let text = String::from_utf8(nothing_matches).unwrap();
-        assert!(text.contains("nothing it printed holds [counted lines:]"), "{text}");
-        assert!(text.contains("    TRACE 12:00: nanoseconds process: 0"), "{text}");
-
-        let mut verbatim = Vec::new();
-        write_what_it_printed(&mut verbatim, printed, None).unwrap();
-        assert!(String::from_utf8(verbatim).unwrap().starts_with("    TRACE 12:00: a/b.py"));
     }
 
     fn a_header(

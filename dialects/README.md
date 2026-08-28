@@ -70,7 +70,7 @@ be inside a string or comment that is open across it.
 - `in-doc-string`: the line is in a string whose opening delimiter is a tripled quote at the start
   of its own line, whitespace before it allowed.
 
-The vocabulary is implemented once, in the harness, and shared by every dialect; a dialect file
+The vocabulary is implemented once, in the engine, and shared by every dialect; a dialect file
 holds no code. A new predicate lands only together with a case that uses it.
 
 ## What a dialect answers in `[counts-as-its-own-language]`

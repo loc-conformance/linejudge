@@ -206,11 +206,11 @@ mod tests {
         assert!(!added, "a file under a name we carry nothing of adds a counter of its own");
     }
 
-    // The four names live twice: once in build.rs, which cannot import them because it runs before
-    // the library is compiled, and once as the constants a consumer joins onto the directory. This
-    // is what holds the two lists together.
+    // The names live twice: once in build.rs, which cannot import them because it runs before the
+    // library is compiled, and once as the constants a consumer joins onto the directory. This is
+    // what holds the two lists together.
     #[test]
-    fn what_was_carried_sits_under_exactly_the_four_named_directories() {
+    fn what_was_carried_sits_under_exactly_the_named_directories() {
         let mut top: Vec<&str> =
             FILES.iter().filter_map(|(relative, _)| relative.split('/').next()).collect();
         top.sort_unstable();

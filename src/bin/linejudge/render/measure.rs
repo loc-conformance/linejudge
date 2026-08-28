@@ -63,6 +63,7 @@ pub fn measure_every_counter(
             .to_string());
     }
     Ok(data::Sweep {
+        linejudge: crate::VERSION.to_string(),
         measured_on: format_the_utc_date(),
         groups: collect_the_groups_of(corpus),
         counters,

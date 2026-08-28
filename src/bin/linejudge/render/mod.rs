@@ -369,6 +369,7 @@ mod tests {
             answers: vec![answer("1010-a_case", first), answer("2010-another_case", second)],
         };
         Sweep {
+            linejudge: "0.1.0".to_string(),
             measured_on: "2026-08-20".to_string(),
             groups: vec![
                 Group {

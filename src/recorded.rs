@@ -24,6 +24,8 @@ pub struct RecordedAnswers {
     pub counter: String,
     /// The version line the measured binary printed, kept whole.
     pub version: String,
+    /// The linejudge that wrote the record, absent on records older than the stamp.
+    pub measured_with: Option<String>,
     answers: BTreeMap<(String, String), RecordedAnswer>,
     exceptions: BTreeMap<(String, String), Exception>,
 }
@@ -104,7 +106,13 @@ impl RecordedAnswers {
         if !faults.is_empty() {
             return Err(faults.into());
         }
-        Ok(Some(RecordedAnswers { counter: raw.counter, version: raw.version, answers, exceptions }))
+        Ok(Some(RecordedAnswers {
+            counter: raw.counter,
+            version: raw.version,
+            measured_with: raw.measured_with,
+            answers,
+            exceptions,
+        }))
     }
 
     /// What the counter printed for this case in this way of counting, and `None` where the record
@@ -261,6 +269,8 @@ fn collect_regions(raw: Option<Vec<RawRegionCounts>>) -> Vec<RegionCounts> {
 struct RawRecorded {
     counter: String,
     version: String,
+    #[serde(rename = "measured-with", default)]
+    measured_with: Option<String>,
     #[serde(default)]
     answer: BTreeMap<String, BTreeMap<String, RawAnswer>>,
     #[serde(default)]

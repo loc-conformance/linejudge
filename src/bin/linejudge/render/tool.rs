@@ -199,6 +199,7 @@ mod tests {
             command: String::new(),
         };
         Sweep {
+            linejudge: "0.1.0".to_string(),
             measured_on: "2026-08-20".to_string(),
             groups: Vec::new(),
             counters: vec![Counter {

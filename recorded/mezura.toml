@@ -1,5 +1,6 @@
 counter = "mezura"
 version = "v3.0.0 (unreleased)"
+measured-with = "linejudge 0.1.0"
 
 [answer.1010-code_then_comment_on_one_line.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }

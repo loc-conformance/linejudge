@@ -53,9 +53,9 @@ pub fn render_one_badge(answers: &[Answer]) -> String {
 // its author's own and nobody has reviewed them. The blue is the mark's, and is none of the five
 // colors a verdict is painted in.
 pub fn render_the_self_run_badge(cases: usize) -> String {
-    let words = format!("{cases} cases");
+    let words = format!("{cases} cases, v{}", crate::VERSION);
     let width = words.len() * PER_CHARACTER + AROUND_THE_WORDS;
-    let said = format!("measured against {words}");
+    let said = format!("measured against {cases} cases by linejudge {}", crate::VERSION);
     build_the_svg(SELF_RUN_LABEL, SELF_RUN_LABEL_WIDTH, &[(words, width, MARK_LINES)], &said)
 }
 
@@ -138,9 +138,15 @@ mod tests {
     #[test]
     fn the_self_run_badge_says_how_many_cases_and_never_how_they_went() {
         let badge = render_the_self_run_badge(84);
-        assert!(badge.contains(">84 cases<"), "{badge}");
+        assert!(badge.contains(&format!(">84 cases, v{}<", crate::VERSION)), "{badge}");
         assert!(badge.contains(">linejudge<"), "{badge}");
-        assert!(badge.contains("aria-label=\"linejudge: measured against 84 cases\""), "{badge}");
+        assert!(
+            badge.contains(&format!(
+                "aria-label=\"linejudge: measured against 84 cases by linejudge {}\"",
+                crate::VERSION
+            )),
+            "{badge}"
+        );
         for verdict in ['✓', '?', '✗', '⊘', '!'] {
             assert!(!badge.contains(verdict), "{verdict} is a verdict and has no place here\n{badge}");
         }

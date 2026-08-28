@@ -1,8 +1,9 @@
 # Contributing
 
-This file tells you which command does each job. For what the pieces actually are, the corpus, the
-dialects, the adapters, the recorded answers, read the [README](README.md); the dialect file format
-has its own page in [dialects/README.md](dialects/README.md).
+This file provides useful context and info for whoever wants to touch this repository. For what the pieces actually are, the dialects,
+the adapters, the recorded answers, read [docs/counter-authors.md](docs/counter-authors.md); the
+cases have their own page in [cases/README.md](cases/README.md), and the dialect file format in
+[dialects/README.md](dialects/README.md).
 
 ## What CI runs
 
@@ -24,12 +25,37 @@ byte for byte. Watch out for editors that rewrite line endings on save.
 `propose-markers` and `linejudge record` only exist when built with `--features maintenance`, and
 no installed copy has them. The jobs below that use them are done in a checkout of this repository.
 
+## Releases and versioning
+
+One crate carries everything: the engine, the corpus, the dialects, the adapters and the recorded
+answers. A release is a snapshot of all of it, so one version number says which cases, which rules
+and which records a run used.
+
+A separate corpus crate was rejected:
+
+- The case files are read only by this engine, so a corpus version can require a specific engine
+  version, and the two numbers would need to be kept compatible by hand.
+- The recorded answers are only valid for the corpus they were measured on, so they change
+  together with it.
+- The executable embeds everything at build time, so for its users a split changes nothing.
+- A different corpus can already be used with `--corpus`.
+
+Every release is tagged `vX.Y.Z`. Cargo does not move a `"0.x"` pin to the next minor on its own,
+so a consumer's CI only changes when they raise the pin themselves. A release whose corpus changed
+re-measures every recorded counter first, as [Re-measuring a counter](#re-measuring-a-counter)
+describes, so the records it
+ships are answers over the cases it ships.
+
+The version is printed by `linejudge version`, at the top of the `check` report, inside the badge
+and in `data.json`, and every re-measured record carries a `measured-with` line naming the
+linejudge that wrote it.
+
 ## Adding a case
 
 First pick the directory, then the number.
 
-The directory: the tests under `cases/` are grouped semantically and the categories are listed in the README.
-Pick the one your case belongs to.
+The directory: the tests under `cases/` are grouped semantically and the categories are listed in
+[cases/README.md](cases/README.md). Pick the one your case belongs to.
 
 The number: cases in a group are numbered 2010, 2020, 2030, and so on, so it can allow inserting 
 a case between two existing ones, depending on context. Find the existing case most
@@ -63,9 +89,14 @@ Two things that come up:
   "optional reading". Define it in `cases/readings.toml` with a sentence and the case that shows
   it. Then add a line for it in the `[counts-as-its-own-language]` table of every dialect file:
   `true` if that counter counts the stretch as a separate language, `false` if it counts those lines
-  as part of the surrounding file. A dialect file without that line fails every case that marks
-  the reading.
-- If people disagree about the spans themselves, the language decides, never a counter: its lexer
+  as part of the surrounding file. Concretely, case 6090 is a 13 line Vue file whose `<template>`
+  holds two lines, one markup and one comment. The file totals are the same under both answers:
+  13 lines, 1 blank, 9 code, 3 comments. What changes is the regions of the right answer. With
+  `true`, which is tokei's answer, it must hold an HTML region with those two lines, 1 code and
+  1 comment. With `false`, mezura's answer, it must hold no HTML region, and the two lines count
+  as plain lines of the file. The `<template>` tag lines belong to the file either way. A dialect
+  file without that line fails every case that marks the reading.
+- If people disagree about the spans themselves, the language itself decides: its lexer
   if it has one, its documentation if not.
 
 A case whose directory name starts with `disabled-` is skipped: reports mention it, but no counter
@@ -82,34 +113,17 @@ Around that:
   rule that matches no line in the whole corpus (a dead rule, named in the failure).
 - A new predicate needs a case that uses it, in the same change.
 - Declare only what the counter does on purpose, documented or consistent everywhere. If it looks
-  like a bug, leave it as a recorded failure with a note instead of writing a rule around it.
-- An exception says: for this one case, expect these exact counts instead of what the rules
-  derive. It lives in `recorded/<counter>.toml` with a mandatory note, and the case then passes
-  but is counted separately in every report. Use one only for behavior that is deliberate and
-  consistent but impossible to write as a rule over spans using the predicates: bugs and
-  unintentional behavior must not be turned into exceptions, so expect this to be rare. A
-  justified exception also documents a limit of the dialect model, a deliberate behavior the
-  rules could not express. The [README](README.md) has a full example.
+  like a bug or has inconsistent behavior it should be marked as a recorded failure with a note.
+  The best way to figure out apart from observations, documentation of the counter, and reading
+  the code, is to contact the creators of the counter to verify your interpretation of the rules.
+  We don't want to misrepresent them.
 
 ## Adding first-class support for a new counter
 
-To be merged here, a counter needs three things: an adapter, `adapters/<counter>.toml`, a dialect
-folder, `dialects/<counter>/`, and an `[acquisition]` block inside the adapter, naming where the
-binary is downloaded from and at which version. The adapter says how to run the counter and how to
-read what it prints, either a `read` block over the counter's own JSON or a wrapper that prints the
-uniform format; both are described in [docs/counter-authors.md](docs/counter-authors.md).
-
-The `[acquisition]` block should be provided because without it nobody here can download the counter: we
-could not check what we are merging, could not re-measure it when it releases, and the automated
-runs that build the public page would leave it out. If your counter is distributed in a way the
-existing download channels do not cover, open an issue about adding a channel instead of leaving
-the block out.
-
-A counter that cannot be downloaded at all still gets everything except the public page, from its own
-side: declare it through a `.linejudge` folder in your own repository and measure it there, as the
-README describes. The same path also works before merging: measure privately for as long as you
-want, and the pull request that adds the dialect just makes it public. Once it is merged, record
-the counter's answers as described below.
+Everything a counter needs is described in [docs/counter-authors.md](docs/counter-authors.md):
+the files it brings, the ways its answers are read, the `[acquisition]` block that makes it
+downloadable, and how to measure privately before the pull request. Once a counter is merged,
+record its answers as described below.
 
 ## Re-measuring a counter
 

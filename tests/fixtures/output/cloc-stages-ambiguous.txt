@@ -1,0 +1,29 @@
+->trap.c                         Original file:
+    1 | // x = 1;
+    2 | x = 1;
+->trap.c                         Blank lines removed:
+    1 | // x = 1;
+    2 | x = 1;
+->trap.c                         After call_regexp_common(C++)
+    1 | 
+    2 | x = 1;
+->trap.c                         post call_regexp_common(C++) blank cleanup:
+    1 | x = 1;
+{"header" : {
+  "cloc_url"           : "github.com/AlDanial/cloc",
+  "cloc_version"       : "2.10",
+  "elapsed_seconds"    : 0.00729513168334961,
+  "n_files"            : 1,
+  "n_lines"            : 2,
+  "files_per_second"   : 137.077717497876,
+  "lines_per_second"   : 274.155434995751},
+"C" :{
+  "nFiles": 1,
+  "blank": 0,
+  "comment": 1,
+  "code": 1},
+"SUM": {
+  "blank": 0,
+  "comment": 1,
+  "code": 1,
+  "nFiles": 1} }

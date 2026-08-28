@@ -2,6 +2,11 @@ name       = "cloc"
 repository = "https://github.com/AlDanial/cloc"
 args       = ["--json", "{file}"]
 
+# cloc says nothing about where it put each line, so the reader works that out from the filter
+# stages it prints.
+explain-args   = ["--print-filter-stages", "--json", "{file}"]
+explain-output = "cloc-stages"
+
 [acquisition]
 channel = "github-release-file"
 name    = "AlDanial/cloc"

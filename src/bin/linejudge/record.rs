@@ -115,8 +115,12 @@ fn format_the_file(
     measured: &BTreeMap<(String, String), Recorded>,
     held: Option<&RecordedAnswers>,
 ) -> Result<String, String> {
-    let mut text =
-        format!("counter = {}\nversion = {}\n", quote(name_of_counter), quote(version));
+    let mut text = format!(
+        "counter = {}\nversion = {}\nmeasured-with = {}\n",
+        quote(name_of_counter),
+        quote(version),
+        quote(&format!("linejudge {}", crate::VERSION))
+    );
     for case in &corpus.cases {
         for way in &adapter.invocations {
             let buckets = match dialects.find(name_of_counter, &way.name) {
