@@ -11,7 +11,6 @@ use crate::corpus::{Case, Corpus};
 use crate::deriver::derive_answer;
 use crate::dialects::Dialects;
 use crate::faults::Faults;
-use crate::known_failures::KnownFailures;
 use crate::recorded::{Exception, RecordedAnswer, RecordedAnswers, is_same_build};
 
 const AT_ONCE: usize = 8;
@@ -51,17 +50,6 @@ pub struct Judged<'a> {
     pub outcome: Outcome<'a>,
 }
 
-impl Judged<'_> {
-    fn breaks_a_run_with_no_list(&self) -> bool {
-        match &self.outcome {
-            Outcome::Broke(_) => true,
-            Outcome::Measured(measured) => {
-                measured.is_a_failure() && !measured.fails_exactly_as_recorded()
-            }
-        }
-    }
-}
-
 /// What came of asking one counter about one case. Breaking is an outcome like any other, and the
 /// rest of the corpus is measured anyway.
 #[derive(Debug)]
@@ -91,15 +79,13 @@ pub struct Measured<'a> {
 }
 
 impl Measured<'_> {
-    /// Whether it fails in exactly the way the record holds. This asks the record and never a
-    /// known-failures list, which is a different question and belongs to whoever wrote the list:
-    /// see [`find_what_breaks_the_run`].
+    /// Whether it fails in exactly the way the record holds. That is the one failure a run is
+    /// allowed to carry, since somebody wrote those numbers down knowing they were wrong.
     pub fn fails_exactly_as_recorded(&self) -> bool {
         self.conformance == Conformance::Fails && self.drift == Some(Drift::Same)
     }
 
-    /// What a known-failures list is asked to name: a wrong answer, or a change in what the
-    /// counter claims at all.
+    /// A wrong answer, or a change in what the counter claims at all.
     pub fn is_a_failure(&self) -> bool {
         self.conformance == Conformance::Fails
             || matches!(self.drift, Some(Drift::NoLongerClaimed | Drift::NowClaimed))
@@ -113,25 +99,17 @@ impl Measured<'_> {
 
 /// The cases that should fail the build of whoever ran this, which is nothing where they all pass.
 ///
-/// `allowed` is the counter's own list, the file in its own repository saying which cases it is
-/// content to fail. With one, a case counts here when it failed or broke and the list does not
-/// name it. Without one, the record stands in: a case counts when it fails in a way the record
-/// does not already hold.
-pub fn find_what_breaks_the_run<'a, 'c>(
-    judged: &'a [Judged<'c>],
-    name_of_dialect: &str,
-    allowed: Option<&KnownFailures>,
-) -> Vec<&'a Judged<'c>> {
+/// A case counts when it broke, or when it failed in a way the record does not already hold. A
+/// counter with no record fails on everything it gets wrong, and writing the record is how it says
+/// which of those it already knows about.
+pub fn find_what_breaks_the_run<'a, 'c>(judged: &'a [Judged<'c>]) -> Vec<&'a Judged<'c>> {
     judged
         .iter()
-        .filter(|one| match allowed {
-            None => one.breaks_a_run_with_no_list(),
-            Some(list) => match &one.outcome {
-                Outcome::Broke(_) => !list.names(name_of_dialect, &one.case.name),
-                Outcome::Measured(measured) => {
-                    measured.is_a_failure() && !list.names(name_of_dialect, &one.case.name)
-                }
-            },
+        .filter(|one| match &one.outcome {
+            Outcome::Broke(_) => true,
+            Outcome::Measured(measured) => {
+                measured.is_a_failure() && !measured.fails_exactly_as_recorded()
+            }
         })
         .collect()
 }
@@ -310,52 +288,44 @@ mod tests {
     }
 
     #[test]
-    fn with_no_list_the_failure_that_fails_exactly_as_recorded_breaks_nothing() {
+    fn the_failure_that_fails_exactly_as_recorded_breaks_nothing_and_a_new_one_breaks_the_run() {
         let known = measured(Conformance::Fails, Some(Drift::Same));
         assert!(known.fails_exactly_as_recorded());
         assert!(known.is_a_failure());
-        assert!(!breaks_the_run(known, None));
+        assert!(!breaks_the_run(known));
 
         let new = measured(Conformance::Fails, Some(Drift::Changed));
         assert!(!new.fails_exactly_as_recorded());
-        assert!(breaks_the_run(new, None));
+        assert!(breaks_the_run(new));
 
-        assert!(breaks_the_run(measured(Conformance::Fails, None), None));
+        assert!(breaks_the_run(measured(Conformance::Fails, None)), "no record holds it");
 
         let fixed = measured(Conformance::Agrees, Some(Drift::Changed));
         assert!(!fixed.is_a_failure());
-        assert!(!breaks_the_run(fixed, None));
+        assert!(!breaks_the_run(fixed));
     }
 
     #[test]
     fn a_change_in_what_the_counter_claims_breaks_the_run() {
         let gone = measured(Conformance::Unclaimed, Some(Drift::NoLongerClaimed));
         assert!(gone.is_a_failure());
-        assert!(breaks_the_run(gone, None));
+        assert!(breaks_the_run(gone));
 
         let appeared = measured(Conformance::Agrees, Some(Drift::NowClaimed));
         assert!(appeared.is_a_failure());
-        assert!(breaks_the_run(appeared, None));
+        assert!(breaks_the_run(appeared));
 
         let quiet = measured(Conformance::Unclaimed, None);
         assert!(!quiet.is_a_failure());
     }
 
+    // A record is refused while the counter breaks on any case, so a break has no recorded form
+    // to be held against.
     #[test]
-    fn a_list_answers_for_every_failure_and_the_record_is_not_asked() {
-        let named = KnownFailures::of("default:0400-a_case_built_by_a_test\n");
-        let other = KnownFailures::of("9999-a_case_nobody_wrote\n");
-        for drift in [Some(Drift::Same), Some(Drift::Changed), None] {
-            let one = measured(Conformance::Fails, drift);
-            assert!(!breaks_the_run(one, Some(&named)), "{drift:?} is named by the list");
-            let same = measured(Conformance::Fails, drift);
-            assert!(breaks_the_run(same, Some(&other)), "{drift:?} is not named by the list");
-        }
-        let broke = Judged {
-            case: &a_case(),
-            outcome: Outcome::Broke("it fell over".to_string()),
-        };
-        assert!(find_what_breaks_the_run(&[broke], "default", Some(&other)).len() == 1);
+    fn a_case_the_counter_broke_on_breaks_the_run() {
+        let case = a_case();
+        let broke = Judged { case: &case, outcome: Outcome::Broke("it fell over".to_string()) };
+        assert_eq!(find_what_breaks_the_run(&[broke]).len(), 1);
     }
 
     #[test]
@@ -441,10 +411,10 @@ mod tests {
         }
     }
 
-    fn breaks_the_run(one: Measured<'_>, allowed: Option<&KnownFailures>) -> bool {
+    fn breaks_the_run(one: Measured<'_>) -> bool {
         let case = a_case();
         let judged = [Judged { case: &case, outcome: Outcome::Measured(one) }];
-        !find_what_breaks_the_run(&judged, "default", allowed).is_empty()
+        !find_what_breaks_the_run(&judged).is_empty()
     }
 
     fn a_case() -> Case {

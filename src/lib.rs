@@ -19,7 +19,6 @@ pub mod corpus;
 pub mod deriver;
 pub mod dialects;
 pub mod faults;
-pub mod known_failures;
 pub mod per_line;
 pub mod readings;
 pub mod recorded;

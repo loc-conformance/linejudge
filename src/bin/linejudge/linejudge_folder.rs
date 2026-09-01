@@ -11,16 +11,15 @@ use linejudge::recorded::RECORDED_DIR;
 
 pub const FOLDER_NAME: &str = ".linejudge";
 pub const COUNTERS_FILE: &str = "counters.toml";
-pub const KNOWN_FAILURES_DIR: &str = "known-failures";
 
 const SETTINGS_FILE: &str = "settings.toml";
 
 // The `.linejudge` folder, found by walking up from the working directory the way cargo finds its
-// own. It holds what was not said on the command line: `counters.toml` naming the binaries, and
-// the declaration itself under fixed names, `cases`, `adapters`, `dialects`, `explain-scripts`,
-// `recorded` and a `known-failures` directory of one `<counter>.txt` per counter, each taken
-// whenever it exists. `settings.toml` names one of those that lives elsewhere and beats the fixed
-// name. A flag beats everything in the folder, and the folder beats the defaults.
+// own. It holds what was not said on the command line. `counters.toml` names the binaries, and the
+// declaration itself sits under fixed names, `cases`, `adapters`, `dialects`, `explain-scripts`
+// and `recorded`, each taken whenever it exists. `settings.toml` names one of those that lives
+// elsewhere and beats the fixed name. A flag beats everything in the folder, and the folder beats
+// the defaults.
 pub struct Folder {
     dir: PathBuf,
     settings: Settings,
@@ -63,14 +62,10 @@ impl Folder {
         self.resolve(self.settings.recorded.as_deref()).or_else(|| self.find_inside(RECORDED_DIR))
     }
 
-    // The single-file flag path only. A file names one counter's failures, so which counter is
-    // read from `--counter`; the per-counter directory below carries the counter in its own name.
-    pub fn find_known_failures(&self) -> Option<PathBuf> {
-        self.resolve(self.settings.known_failures.as_deref())
-    }
-
-    pub fn find_known_failures_dir(&self) -> Option<PathBuf> {
-        self.find_inside(KNOWN_FAILURES_DIR)
+    // Where a record goes when nobody named a directory for it, whether or not it is there yet,
+    // which is what tells this apart from find_recorded above.
+    pub fn get_recorded_dir(&self) -> PathBuf {
+        self.dir.join(RECORDED_DIR)
     }
 
     pub fn get_counters_file(&self) -> PathBuf {
@@ -108,8 +103,6 @@ struct Settings {
     #[serde(rename = "explain-scripts")]
     explain_scripts: Option<String>,
     recorded: Option<String>,
-    #[serde(rename = "known-failures")]
-    known_failures: Option<String>,
 }
 
 impl Settings {
@@ -146,18 +139,18 @@ mod tests {
     #[test]
     fn a_relative_path_in_the_settings_resolves_against_the_folders_root() {
         let root = env::temp_dir().join("linejudge-a_folder_with_settings");
-        let absolute = env::temp_dir().join("known.txt").display().to_string().replace('\\', "/");
+        let absolute = env::temp_dir().join("elsewhere").display().to_string().replace('\\', "/");
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join(FOLDER_NAME)).unwrap();
         fs::write(
             root.join(FOLDER_NAME).join(SETTINGS_FILE),
-            format!("corpus = \"cases\"\nknown-failures = \"{absolute}\"\n"),
+            format!("corpus = \"cases\"\nrecorded = \"{absolute}\"\n"),
         )
         .unwrap();
         let folder = Folder::find(&root).unwrap().unwrap_or_else(|| panic!("nothing found"));
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(folder.find_corpus().unwrap(), root.join("cases"));
-        assert_eq!(folder.find_known_failures().unwrap(), PathBuf::from(&absolute));
+        assert_eq!(folder.find_recorded().unwrap(), PathBuf::from(&absolute));
         assert!(folder.find_dialects().is_none());
     }
 
@@ -168,27 +161,24 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(inside.join(ADAPTERS_DIR)).unwrap();
         fs::create_dir_all(inside.join(DIALECTS_DIR)).unwrap();
-        fs::create_dir_all(inside.join(KNOWN_FAILURES_DIR)).unwrap();
         // A stray file sharing a fixed name is passed over, not taken and later refused.
         fs::write(inside.join(RECORDED_DIR), "").unwrap();
         let folder = Folder::find(&root).unwrap().unwrap_or_else(|| panic!("nothing found"));
         let found = (
             folder.find_adapters(),
             folder.find_dialects(),
-            folder.find_known_failures_dir(),
             folder.find_explain_scripts(),
             folder.find_corpus(),
             folder.find_recorded(),
-            folder.find_known_failures(),
+            folder.get_recorded_dir(),
         );
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(found.0.unwrap(), inside.join(ADAPTERS_DIR));
         assert_eq!(found.1.unwrap(), inside.join(DIALECTS_DIR));
-        assert_eq!(found.2.unwrap(), inside.join(KNOWN_FAILURES_DIR));
+        assert!(found.2.is_none());
         assert!(found.3.is_none());
-        assert!(found.4.is_none());
-        assert!(found.5.is_none(), "a plain file sharing a fixed name is not taken");
-        assert!(found.6.is_none(), "the per-counter directory is not the single-file flag");
+        assert!(found.4.is_none(), "a plain file sharing a fixed name is not taken");
+        assert_eq!(found.5, inside.join(RECORDED_DIR), "where a record goes, found or not");
     }
 
     #[test]

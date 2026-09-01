@@ -7,7 +7,6 @@ mod explain;
 mod fetch;
 mod fetched;
 mod linejudge_folder;
-#[cfg(feature = "maintenance")]
 mod record;
 mod render;
 mod report;
@@ -24,7 +23,6 @@ use linejudge::adapter::{ADAPTERS_DIR, EXPLAIN_SCRIPTS_DIR};
 use linejudge::adapter::Adapter;
 use linejudge::corpus::{CASES_DIR, Corpus};
 use linejudge::dialects::{DIALECTS_DIR, Dialects};
-use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
 use linejudge::shipped::{
@@ -34,12 +32,10 @@ use linejudge::verdict::measure_and_judge_every_case;
 
 use crate::counters::Counters;
 use crate::explain::{explain_one_counter, find_case};
-use crate::linejudge_folder::{COUNTERS_FILE, Folder};
+use crate::linejudge_folder::Folder;
+use crate::linejudge_folder::{COUNTERS_FILE, FOLDER_NAME};
 use crate::report::OneRun;
-use crate::report::{
-    report_entries_that_name_nothing, report_recorded_answers_that_name_nothing,
-    report_the_verdicts_of_one_dialect,
-};
+use crate::report::{report_recorded_answers_that_name_nothing, report_the_verdicts_of_one_dialect};
 
 const COMMAND_OPENS: &str = "linejudge ";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -47,20 +43,22 @@ const SITE_DIR: &str = "site";
 const NO_BADGE_OVER_A_FOREIGN_CORPUS: &str =
     "a badge says how many of this suite's cases ran, and the corpus in use is not this suite's";
 const USAGE: &str = "\
-linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <file>]
-                [--corpus <dir>] [--adapters <dir>] [--dialects <dir>]
-                [--recorded <dir>] [--disabled <case>] [--badge <file>]
+linejudge check [<case>] [--counter <name>] [--bin <path>] [--corpus <dir>] [--adapters <dir>]
+                [--dialects <dir>] [--recorded <dir>] [--disabled <case>] [--badge <file>]
 
     Runs each counter over every case and asks two things of every answer: does it match what that
     counter's own rules say, and does it match what the counter answered when it was last recorded.
     A counter that crashes on a case is reported apart from one that answers wrongly, and the
     remaining cases still run.
 
+    The run breaks on a case that fails in a way the record does not already hold, so a counter
+    with no record of its own breaks on every case it gets wrong. Writing that record with the
+    record command is how it says which failures it already knows about.
+
     Name a case to run only that one. Any part of the name is enough if it fits exactly one case.
 
     --counter <name>         run this counter and no other
     --bin <path>             the binary to run it with; needs --counter
-    --known-failures <file>  fail only on cases this file does not list; needs --counter
     --disabled <case>        leave one more case out of this run
     --badge <file>           write an SVG saying this run happened and over how many cases
     --corpus <dir>           use these cases instead of the built-in ones
@@ -76,14 +74,9 @@ linejudge check [<case>] [--counter <name>] [--bin <path>] [--known-failures <fi
 
     Binaries are found in .linejudge/counters.toml, or given with --bin, or downloaded by fetch.
     linejudge looks for .linejudge here and in every directory above, the way cargo does. A folder
-    it holds under a fixed name is taken with no flag: cases, adapters, dialects, explain-scripts and
-    recorded, and a known-failures directory holding one <counter>.txt per counter. settings.toml
-    names any of those that lives elsewhere, and a flag on the command line beats both.
-
-    A known-failures file holds one case per line and '#' starts a comment. '8010-blank_line'
-    allows that case for every way the counter counts; 'region:8010-blank_line' allows it for the
-    'region' way only. --known-failures names one such file and needs --counter to say whose it is;
-    .linejudge/known-failures/<counter>.txt is read for that counter with no flag.
+    it holds under a fixed name is taken with no flag: cases, adapters, dialects, explain-scripts
+    and recorded. settings.toml names any of those that lives elsewhere, and a flag on the command
+    line beats both.
 
 linejudge explain <case> [--counter <name>] [--bin <path>] [--corpus <dir>] [--adapters <dir>]
                 [--dialects <dir>] [--explain-scripts <dir>]
@@ -126,6 +119,22 @@ linejudge render [--out <dir>] [--corpus <dir>] [--adapters <dir>] [--dialects <
     is inside these directories, so a copy of them somewhere else still counts, and so does a
     folder naming one counter and leaving the rest alone.
 
+linejudge record --counter <name> [--bin <path>] [--corpus <dir>] [--adapters <dir>]
+                [--dialects <dir>] [--recorded <dir>]
+
+    Writes recorded/<name>.toml from scratch: runs that counter over every case and records what
+    it answered, at the version its binary printed. check then holds every later run against that
+    file, so a case that fails the way the record holds passes and one that fails in a new way
+    breaks the run.
+
+    Without --recorded it writes into .linejudge/recorded, and makes that directory when it is not
+    there yet. That is where a run with no --corpus reads its answers back from, so a record over
+    a corpus of your own has to name --recorded and is refused without it.
+
+    A note is kept exactly as long as the answer it was written about, and every note dropped is
+    named, since the sentence is owed by a person. A counter that breaks on any case is refused
+    rather than written down with a hole in it.
+
 linejudge version
 
     Prints this build's version. A release is the engine and the corpus together, so the one
@@ -136,19 +145,6 @@ linejudge version
 
 Output to a terminal has color and output to a file or a pipe does not. Set NO_COLOR to turn it
 off, or CLICOLOR_FORCE to keep it through a pipe.
-";
-#[cfg(feature = "maintenance")]
-const RECORD_USAGE: &str = "
-linejudge record --counter <name> [--bin <path>] [--corpus <dir>] [--adapters <dir>]
-                [--dialects <dir>] [--recorded <dir>]
-
-    Writes recorded/<name>.toml from scratch: runs that counter over every case and records what
-    it answered, at the version its binary printed. It maintains this suite's own record and no
-    consumer of the corpus needs it, so it is built only with --features maintenance.
-
-    A note is kept exactly as long as the answer it was written about, and every note dropped is
-    named, since the sentence is owed by a person. A counter that breaks on any case is refused
-    rather than written down with a hole in it.
 ";
 #[cfg(feature = "maintenance")]
 const BUMP_USAGE: &str = "
@@ -200,7 +196,7 @@ fn get_the_usage() -> String {
     #[cfg(not(feature = "maintenance"))]
     return USAGE.to_string();
     #[cfg(feature = "maintenance")]
-    format!("{USAGE}{RECORD_USAGE}{BUMP_USAGE}")
+    format!("{USAGE}{BUMP_USAGE}")
 }
 
 // A flag that does not exist is a mistake inside one command, so that command's own block answers
@@ -423,15 +419,6 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
                 .and_then(|how| fetched::find_the_binary_of(name_of_counter, &how.version))
         })
     };
-    let known_failures = match (&dirs.known_failures, &settings.name_of_counter) {
-        (Some(path), Some(_)) => Some(KnownFailures::read(path)?),
-        (Some(_), None) => {
-            return Err(Trouble::Said(
-                "a known-failures list needs --counter to say whose failures it names".to_string(),
-            ));
-        }
-        (None, _) => None,
-    };
 
     // Naming one case narrows the corpus itself, so everything below judges that case alone.
     let one_case = matches!(&settings.command, Command::Check { case } if !case.is_empty());
@@ -488,18 +475,23 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
                 "{} {what} set aside as disabled and not judged: {}",
                 corpus.disabled.len(), corpus.disabled.join(", "))))?;
     }
-    #[cfg(feature = "maintenance")]
     if let Command::Record = &settings.command {
         let name = &adapters[0].name_of_counter;
         let Some(binary) = find_binary(name) else {
             return Err(Trouble::Said(format!("{name}: no binary named for it, nothing to record")));
         };
-        let into = dirs.recorded.last().filter(|dir| !dir.starts_with(&shipped));
-        let Some(into) = into else {
-            return Err(Trouble::Said(
-                "record writes into a recorded directory of your own, and none was named"
-                    .to_string(),
-            ));
+        let into = match dirs.recorded.last().filter(|dir| !dir.starts_with(&shipped)) {
+            Some(named) => named.clone(),
+            // The made directory is where a run with no --corpus reads its answers back from, so
+            // answers to somebody else's cases go there only when somebody asks for it.
+            None if settings.corpus.is_some() => {
+                return Err(Trouble::Said(
+                    "a record over a corpus of your own goes where you say, so --recorded belongs \
+                     beside --corpus"
+                        .to_string(),
+                ));
+            }
+            None => create_the_recorded_dir(&mut out, folder.as_ref())?,
         };
         let held = RecordedAnswers::read(&dirs.recorded, name, &dialects)
             .map_err(|faults| faults.join("\n"))?;
@@ -510,7 +502,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             &corpus,
             &dialects,
             held.as_ref(),
-            into,
+            &into,
         )?;
         return Ok(false);
     }
@@ -526,15 +518,6 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             continue;
         };
         ran += 1;
-        // The flag's file if one was named, otherwise this counter's own file in the directory.
-        let from_dir = match &dirs.known_failures_dir {
-            Some(dir) => {
-                let file = dir.join(format!("{name}.txt"));
-                file.is_file().then(|| KnownFailures::read(&file)).transpose()?
-            }
-            None => None,
-        };
-        let this_known = known_failures.as_ref().or(from_dir.as_ref());
         let version = adapter.read_version_or_unknown(&binary);
         let record = RecordedAnswers::read(&dirs.recorded, name, &dialects)
             .map_err(|faults| faults.join("\n"))?;
@@ -559,18 +542,14 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             )
             .map_err(|faults| faults.join("\n"))?;
             let run = OneRun { adapter, dialect, binary: &binary, version: &version, drift_is_judged };
-            broken |= report_the_verdicts_of_one_dialect(&mut out, &run, &judged, this_known)?;
+            broken |= report_the_verdicts_of_one_dialect(&mut out, &run, &judged)?;
         }
-        // Both hold a list against the whole corpus, and the corpus is one case here, so asking
-        // would report every other case as named by a list and missing.
-        if one_case {
-            continue;
-        }
-        if let Some(record) = &record {
+        // The record is held against the whole corpus, and the corpus is one case here, so asking
+        // would report every other case it speaks about as missing.
+        if let Some(record) = &record
+            && !one_case
+        {
             report_recorded_answers_that_name_nothing(&mut out, record, &corpus)?;
-        }
-        if let Some(known_failures) = this_known {
-            report_entries_that_name_nothing(&mut out, adapter, &corpus, known_failures)?;
         }
     }
     // A run that counted nothing and reported success is the one failure a green build hides, and
@@ -601,7 +580,6 @@ struct Settings {
     recorded: Option<PathBuf>,
     name_of_counter: Option<String>,
     binary: Option<PathBuf>,
-    known_failures: Option<PathBuf>,
     disabled: Vec<String>,
     badge: Option<PathBuf>,
     out: Option<PathBuf>,
@@ -621,7 +599,6 @@ enum Command {
     Fetch { counter: String },
     Render,
     Version,
-    #[cfg(feature = "maintenance")]
     Record,
     // An empty name asks every channel and writes nothing.
     #[cfg(feature = "maintenance")]
@@ -639,7 +616,6 @@ impl Settings {
             recorded: None,
             name_of_counter: None,
             binary: None,
-            known_failures: None,
             disabled: Vec::new(),
             badge: None,
             out: None,
@@ -659,7 +635,6 @@ impl Settings {
             "fetch" => settings.command = Command::Fetch { counter: String::new() },
             "render" => settings.command = Command::Render,
             "version" | "--version" => settings.command = Command::Version,
-            #[cfg(feature = "maintenance")]
             "record" => settings.command = Command::Record,
             #[cfg(feature = "maintenance")]
             "bump-versions" => {
@@ -684,9 +659,6 @@ impl Settings {
                 "--recorded" => settings.recorded = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--counter" => settings.name_of_counter = Some(value_of(&flag, &mut args)?),
                 "--bin" => settings.binary = Some(PathBuf::from(value_of(&flag, &mut args)?)),
-                "--known-failures" => {
-                    settings.known_failures = Some(PathBuf::from(value_of(&flag, &mut args)?))
-                }
                 "--disabled" => settings.disabled.push(value_of(&flag, &mut args)?),
                 "--badge" => settings.badge = Some(PathBuf::from(value_of(&flag, &mut args)?)),
                 "--out" => settings.out = Some(PathBuf::from(value_of(&flag, &mut args)?)),
@@ -719,9 +691,6 @@ impl Settings {
         if let Command::Explain { case } = &settings.command {
             if case.is_empty() {
                 return Err("explain needs the name of a case".to_string());
-            }
-            if settings.known_failures.is_some() {
-                return Err("--known-failures belongs to check".to_string());
             }
             if !settings.disabled.is_empty() {
                 return Err("--disabled belongs to check".to_string());
@@ -769,7 +738,6 @@ impl Settings {
                 (settings.corpus.is_some(), "--corpus"),
                 (settings.explain_scripts.is_some(), "--explain-scripts"),
                 (settings.recorded.is_some(), "--recorded"),
-                (settings.known_failures.is_some(), "--known-failures"),
                 (!settings.disabled.is_empty(), "--disabled"),
                 (settings.out.is_some(), "--out"),
             ] {
@@ -787,7 +755,6 @@ impl Settings {
                 (settings.dialects.is_some(), "--dialects"),
                 (settings.explain_scripts.is_some(), "--explain-scripts"),
                 (settings.recorded.is_some(), "--recorded"),
-                (settings.known_failures.is_some(), "--known-failures"),
                 (!settings.disabled.is_empty(), "--disabled"),
                 (settings.badge.is_some(), "--badge"),
                 (settings.out.is_some(), "--out"),
@@ -804,22 +771,15 @@ impl Settings {
                         .to_string(),
                 );
             }
-            if settings.known_failures.is_some() {
-                return Err("--known-failures belongs to check".to_string());
-            }
             if !settings.disabled.is_empty() {
                 return Err("--disabled belongs to check, and a page with a case left out of it \
                             is not the page"
                     .to_string());
             }
         }
-        #[cfg(feature = "maintenance")]
         if let Command::Record = &settings.command {
             if settings.name_of_counter.is_none() {
                 return Err("record needs --counter to say whose answers it writes".to_string());
-            }
-            if settings.known_failures.is_some() {
-                return Err("--known-failures belongs to check".to_string());
             }
             if !settings.disabled.is_empty() {
                 return Err("--disabled belongs to check, and a record with a case left out of it \
@@ -838,25 +798,18 @@ impl Settings {
         if settings.binary.is_some() && settings.name_of_counter.is_none() {
             return Err("--bin needs --counter to say whose binary it is".to_string());
         }
-        if settings.known_failures.is_some() && settings.name_of_counter.is_none() {
-            return Err("--known-failures needs --counter to say whose failures it names".to_string());
-        }
         Ok(settings)
     }
 }
 
 // A corpus is replaced whole, since half of one beside half of another is neither. The rest are
-// layered over what this build carries, the last directory winning per counter. The known-failures
-// paths are a counter's own and layer over nothing: the file names one counter, the directory
-// holds one file per counter.
+// layered over what this build carries, the last directory winning per counter.
 struct Dirs {
     corpus: PathBuf,
     adapters: Vec<PathBuf>,
     dialects: Vec<PathBuf>,
     recorded: Vec<PathBuf>,
     explain_scripts: Vec<PathBuf>,
-    known_failures: Option<PathBuf>,
-    known_failures_dir: Option<PathBuf>,
 }
 
 fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) -> Result<Dirs, String> {
@@ -887,11 +840,6 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
         adapters: layer(ADAPTERS_DIR, adapters),
         dialects: layer(DIALECTS_DIR, dialects),
         explain_scripts: layer(EXPLAIN_SCRIPTS_DIR, explain_scripts),
-        known_failures: settings
-            .known_failures
-            .clone()
-            .or_else(|| folder.and_then(Folder::find_known_failures)),
-        known_failures_dir: folder.and_then(Folder::find_known_failures_dir),
     })
 }
 
@@ -938,6 +886,19 @@ fn write_the_badge(into: &Path, svg: String) -> Result<(), String> {
             .map_err(|error| format!("{} could not be created: {error}", dir.display()))?;
     }
     fs::write(into, svg).map_err(|error| format!("{} could not be written: {error}", into.display()))
+}
+
+// Only reached where no directory of one's own was found, so what it makes is always new and the
+// line it prints is always true.
+fn create_the_recorded_dir(out: &mut dyn Write, folder: Option<&Folder>) -> Result<PathBuf, Trouble> {
+    let dir = match folder {
+        Some(folder) => folder.get_recorded_dir(),
+        None => PathBuf::from(FOLDER_NAME).join(RECORDED_DIR),
+    };
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("{} could not be created: {error}", dir.display()))?;
+    writeln!(out, "{}", style::DETAIL.paint(&format!("made {}", dir.display())))?;
+    Ok(dir)
 }
 
 // `check` and `explain` name a case the same way, so they refuse an unknown one the same way and
@@ -1016,7 +977,6 @@ fn anchor_every_path_of(settings: &mut Settings) {
         &mut settings.recorded,
         &mut settings.explain_scripts,
         &mut settings.binary,
-        &mut settings.known_failures,
         &mut settings.badge,
         &mut settings.out,
     ]
@@ -1068,10 +1028,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_binary_and_a_list_of_failures_both_need_the_counter_they_belong_to() {
+    fn a_binary_needs_the_counter_it_belongs_to() {
         assert!(settings_of(&["check", "--bin", "tokei.exe"]).unwrap_err().contains("--counter"));
-        let no_counter = settings_of(&["check", "--known-failures", "known.txt"]);
-        assert!(no_counter.unwrap_err().contains("--counter"));
         assert!(settings_of(&["check", "--counter", "tokei", "--bin", "tokei.exe"]).is_ok());
     }
 
@@ -1118,7 +1076,7 @@ mod tests {
         assert!(!version.contains("linejudge check "), "{version}");
 
         let whole = settings_of(&["--help"]).unwrap().help.unwrap();
-        for named in ["check", "explain", "fetch", "render"] {
+        for named in ["check", "explain", "fetch", "render", "record"] {
             assert!(whole.contains(&format!("linejudge {named} ")), "{named} is missing");
         }
         assert!(whole.contains("CLICOLOR_FORCE"), "the note about color is missing");
@@ -1151,7 +1109,6 @@ mod tests {
         let second = settings_of(&["explain", "one-case", "another-case"]).unwrap_err();
         assert!(second.contains("not a flag"), "{second}");
         for check_only in [
-            ["explain", "one-case", "--known-failures", "known.txt"],
             ["explain", "one-case", "--disabled", "one-case"],
             ["explain", "one-case", "--recorded", "recorded"],
         ] {
@@ -1176,7 +1133,6 @@ mod tests {
         assert_eq!(named_corpus.corpus, mine);
         assert_eq!(named_corpus.adapters, [carried.join(ADAPTERS_DIR)]);
         assert!(named_corpus.recorded.is_empty(), "{:?}", named_corpus.recorded);
-        assert_eq!(named_corpus.known_failures, None);
 
         assert_eq!(layered.corpus, carried.join(CASES_DIR));
         assert_eq!(layered.adapters, [carried.join(ADAPTERS_DIR), mine]);
@@ -1201,12 +1157,24 @@ mod tests {
         ] {
             assert!(settings_of(&narrowed).unwrap_err().contains("whole roster"));
         }
-        let with_list = settings_of(&["render", "--known-failures", "known.txt"]);
-        assert!(with_list.unwrap_err().contains("belongs to check"));
         let one_out = settings_of(&["render", "--disabled", "0400-a_case"]);
         assert!(one_out.unwrap_err().contains("is not the page"));
         let on_check = settings_of(&["check", "--out", "pages"]);
         assert!(on_check.unwrap_err().contains("belongs to render"));
+    }
+
+    // A counter measured from its own repository writes the record its own runs are held against,
+    // so this is a command of every build and not of a feature.
+    #[test]
+    fn record_names_the_counter_it_writes_and_refuses_what_belongs_elsewhere() {
+        let parsed = settings_of(&["record", "--counter", "mine"]).unwrap();
+        assert!(matches!(parsed.command, Command::Record));
+        let no_counter = settings_of(&["record"]).unwrap_err();
+        assert!(no_counter.contains("needs --counter"), "{no_counter}");
+        let one_out = settings_of(&["record", "--counter", "mine", "--disabled", "0400-a_case"]);
+        assert!(one_out.unwrap_err().contains("is not a record"));
+        let elsewhere = settings_of(&["record", "--counter", "mine", "--out", "pages"]);
+        assert!(elsewhere.unwrap_err().contains("belongs to render"));
     }
 
     // The per-line scripts are only ever run by explain, so the flag naming them belongs to it

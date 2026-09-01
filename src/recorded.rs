@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::adapter::UNKNOWN_VERSION;
 use crate::answer::{Answer, Counts, RegionCounts};
 use crate::dialects::{Dialects, check_buckets};
 use crate::faults::Faults;
@@ -219,10 +218,13 @@ impl Exception {
     }
 }
 
-/// Whether the record and the running binary are the same build. An unknown version on either
-/// side is the same build as nothing, itself included.
+/// Whether the record and the running binary are the same build.
+///
+/// A counter that names no version answers the same "unknown version" on both sides and is taken
+/// at its word, so its record holds its runs the way a versioned counter's does. Held apart from
+/// it and asked for nothing, such a counter could never have a record that judges anything.
 pub fn is_same_build(recorded: &str, running: &str) -> bool {
-    recorded != UNKNOWN_VERSION && running != UNKNOWN_VERSION && recorded == running
+    recorded == running
 }
 
 fn find_buckets<'a>(
@@ -322,6 +324,7 @@ mod tests {
     use std::path::Path;
     use std::slice;
 
+    use crate::adapter::UNKNOWN_VERSION;
     use crate::adapter::{Adapter, is_the_declared_version};
     use crate::corpus::Corpus;
     use crate::deriver::derive_answer;
@@ -583,10 +586,12 @@ the line comment is swallowed by the block above it"""
     }
 
     #[test]
-    fn the_same_build_is_the_same_version_and_never_the_unknown_one() {
+    fn the_same_build_is_the_same_version_and_a_counter_naming_none_is_its_own() {
         assert!(is_same_build("scc version 3.7.0", "scc version 3.7.0"));
         assert!(!is_same_build("scc version 3.7.0", "scc version 4.0.0"));
-        assert!(!is_same_build("unknown version", "unknown version"));
+        assert!(is_same_build(UNKNOWN_VERSION, UNKNOWN_VERSION));
+        assert!(!is_same_build("scc version 4.0.0", UNKNOWN_VERSION));
+        assert!(!is_same_build(UNKNOWN_VERSION, "scc version 4.0.0"));
     }
 
     // The roster comes off the recorded directory itself, so a counter joining the suite is

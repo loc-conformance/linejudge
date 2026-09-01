@@ -169,23 +169,30 @@ line of the file with the rule that took it.
 
 ## Running it against your own counter
 
-Use the corpus as a CI gate, a test suite, or by hand while you are working on your counter. Point
-`.linejudge/counters.toml` at your binary, keep a known-failures list of the cases you already
-fail, and the build breaks only when a case fails that the list does not name:
+Use the corpus in your CI, in your test suite, or by hand while you are working on your counter.
+Point `.linejudge/counters.toml` at your binary, write down what it answers today, and from then on
+the build breaks only when a case answers something the record does not hold:
 
 ```
-linejudge check --counter mycounter --known-failures known-failures.txt
+linejudge record --counter mycounter
+linejudge check --counter mycounter
 ```
 
-The run can also write a badge for your own README. The files, the list and the whole local setup
-are in [docs/counter-authors.md](docs/counter-authors.md).
+`record` writes `.linejudge/recorded/mycounter.toml`, one entry per case saying what your counter
+printed and, where that is not what your rules ask, that it is a failure you know about. Commit it.
+A case that starts failing, or an old failure that changes its answer, breaks the run and shows the
+recorded numbers beside the new ones. When you fix one, run `record` again and the diff is the list
+of what your fix moved.
+
+The run can also write a badge for your own README. The files, the record and the whole local
+setup are in [FOR-COUNTER-AUTHORS.md](FOR-COUNTER-AUTHORS.md).
 
 ## Adding native support for your counter here
 
 To be measured here and appear on the results page linked at the top, your counter needs three
 things: a file saying how it counts, a file saying how to run it and how to read what it prints,
 and a way for us to download it. The files, the formats and the steps are in
-[docs/counter-authors.md](docs/counter-authors.md).
+[FOR-COUNTER-AUTHORS.md](FOR-COUNTER-AUTHORS.md).
 
 A counter on that page also gets a badge you can use, one per way it counts. That one shows how
 the cases went:

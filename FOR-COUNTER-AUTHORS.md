@@ -22,7 +22,7 @@ in its code to do so.
 Three things privately, four with native support.   
 A **dialect**, `dialects/<counter>/`, holds the
 counter's own rules: the categories it names, and what goes into each, one file per way it counts;
-the format has its own page in [dialects/README.md](../dialects/README.md).  
+the format has its own page in [dialects/README.md](dialects/README.md).  
 An **adapter**, `adapters/<counter>.toml`, says how to run the binary and how to read what it prints,
 and most of this page is about that.  
 And the **binary** itself. It can be named by a path or downloaded by the `fetch`
@@ -126,8 +126,8 @@ to read the by-line explanations, if a counter provides such functionality
 ## Measuring from your own repository
 
 Use the corpus as a CI step, as a test inside your own test suite, or by hand while you work on
-your counter. `linejudge check` exits non-zero when a case fails that your `--known-failures` list
-does not name, so any test suite that can run a program and read an exit code can include it as a
+your counter. `linejudge check` exits non-zero when a case answers something your recorded file
+does not hold, so any test suite that can run a program and read an exit code can include it as a
 test, whatever language the suite is written in. Everything below lives in your repository.
 
 This whole section is for a counter this binary knows nothing about. For one already supported
@@ -135,13 +135,22 @@ here, see [If your counter already has native support](#if-your-counter-already-
 
 The declaration travels with your repository in a `.linejudge` folder, which linejudge finds by
 walking up from wherever it runs. What sits inside it under a fixed name is taken with no flag and
-no declaration: an `adapters`, `dialects`, `explain-scripts` or `recorded` folder in there is layered
-over what the binary carries, and a `known-failures` folder holds one `<counter>.txt` per counter.
-A `cases` folder is taken too, but it replaces the built-in corpus rather than adding to it. The
-one file always needed is `counters.toml`, naming the binary so nobody has to pass `--bin` again:
+no declaration: an `adapters`, `dialects`, `explain-scripts` or `recorded` folder in there is
+layered over what the binary carries. A `cases` folder is taken too, but it replaces the built-in
+corpus rather than adding to it. The one file always needed is `counters.toml`, naming the binary
+so nobody has to pass `--bin` again:
 
 ```toml
 mycounter = "target/release/mycounter"
+```
+
+A relative path resolves against the folder holding `.linejudge`, so the line above works from
+anywhere in the repository. An absolute Windows path in double quotes has to double its backslashes,
+`"C:\\dev\\mycounter.exe"`, because TOML reads a backslash there as the start of an escape. Forward
+slashes work on Windows too, and single quotes take the path exactly as written:
+
+```toml
+mycounter = 'C:\dev\mycounter.exe'
 ```
 
 So the whole folder of a typical counter is:
@@ -151,23 +160,30 @@ So the whole folder of a typical counter is:
   counters.toml
   adapters/mycounter.toml
   dialects/mycounter/default.toml
-  known-failures/mycounter.txt
+  recorded/mycounter.toml
 ```
 
-The `known-failures` file is the gate: one case per line, named exactly as the report names them,
-and a `#` line for a comment:
+The recorded file is what decides whether your build passes, and `record` writes it for you. Run
+this once, and again whenever you have changed how your counter counts:
 
 ```
-# the tag it does not recognise, and the two raw string forms
-6040-script_tag_in_upper_case
-3030-raw_string_ending_in_backslash
-3040-bare_raw_string_ending_in_backslash
+linejudge record --counter mycounter
 ```
 
-If a case on the list starts passing, the run tells you to delete the line, and it does not fail
-the build. The run can also write a badge for your repository, `--badge linejudge.svg`, showing
+It runs your counter over every case and writes down what it answered, one entry per case, marking
+the ones that differ from what your rules ask as failures you know about. The directory is made if
+it is not there. Commit the file: from then on `check` breaks only on a case that answers something
+this file does not hold, and it prints the recorded numbers beside the new ones so you can see what
+moved. A failure you fix shows up as a line in the diff the next time you run `record`.
+
+A note is yours to add under any entry, in whatever words you like, and it survives every later
+`record` for as long as the answer it was written about stays the same. When that answer moves, the
+run drops the note and names it, so you can write the new one.
+
+The run can also write a badge for your repository, `--badge linejudge.svg`, showing
 the version it ran as and how many cases it covered. Pin the LineJudge version your CI installs,
-and when you raise it, update the list in the same change.
+and when you raise it, run `record` again in the same change: a release that added cases has
+answers your file does not hold yet.
 
 A declaration kept elsewhere is named in a `settings.toml` beside `counters.toml`, whose keys are
 `adapters`, `dialects`, `explain-scripts`, `recorded` and `corpus`; a relative path there resolves against
@@ -188,9 +204,15 @@ args = []
 `args` is the command line, with `{file}` standing for the case being counted, and one
 `[dialect.<name>]` block exists per way the counter counts, each adding its own arguments. The
 rules themselves go in `dialects/mycounter/default.toml`, as the tree above shows. `output` here
-names the second of the three ways above; a `read` block takes its place when the first fits. A `version-flag` line is
-optional, and without one the version reads as unknown, which costs nothing privately, since a
-counter measured privately has no recorded snapshot to be judged against.
+names the second of the three ways above; a `read` block takes its place when the first fits.
+
+`version-flag` names the flag that asks your counter for its version, and it is `--version` unless
+you say otherwise. What the counter prints is written at the top of your recorded file and compared
+with what it prints on every later run: the two have to match for the recorded answers to be held
+against that run at all. So a counter whose version string changes with every build, a git hash or
+a date, would make its own recorded file useless. Write `version-flag = ""` there, which says
+plainly that this counter names no version, and its recorded file holds its runs the way a
+versioned counter's does.
 
 Of the three ways of handing over the numbers, the first two work unchanged here. The third
 cannot: a reader is code compiled into linejudge itself, and nothing in your repository can add to
@@ -209,9 +231,13 @@ your program, which prints the per-line document described further down.
 
 Its `adapter` and dialects ship inside the linejudge binary, so almost nothing is declared. All
 your repository needs is a `.linejudge` folder holding a `counters.toml` pointing to your binary,
-which wins over the fetched release, and a `known-failures/<counter>.txt`: that can be updated
-along with your bugfixes. Or skip the folder and hand the same things over as flags: `--bin <path>`
-names your binary, and `--known-failures <file>` your list.
+which wins over the fetched release, and a `recorded/<counter>.toml` written by `linejudge record
+--counter <name>`, which is updated along with your bugfixes. Or skip the counters file and name
+your binary as a flag, `--bin <path>`, which both `check` and `record` take.
+
+Your own recorded file wins over the copy shipped inside the binary. `record` keeps the notes of
+whichever record is in force, the shipped one until you have written your own, so every note we
+wrote about your counter carries over into yours.
 
 To try a deliberate change to your counting rules before it is merged here, put a copy of your
 dialect file with the changed rule under `.linejudge/dialects/<counter>/`: a folder there wins
@@ -238,7 +264,7 @@ scc both are, each by a reader compiled under `src/readers/`, as
 Once it is merged, the counter's answers are recorded: `recorded/<counter>.toml` holds what it
 printed for every case at the version written at the top, and every failure in it carries a note
 saying what the counter did, written from runs of the counter itself. The commands for that live
-in [CONTRIBUTING.md](../CONTRIBUTING.md#re-measuring-a-counter), under *Re-measuring a counter*.
+in [CONTRIBUTING.md](CONTRIBUTING.md#re-measuring-a-counter), under *Re-measuring a counter*.
 A counter on the results
 page also gets a badge per way it counts, showing how the cases went.
 
@@ -348,8 +374,8 @@ fn every_case_is_counted_the_way_our_rules_say() {
 
 `count_the_way_the_library_does` is your own code handing back an `Answer`, which is the same
 mapping your adapter would otherwise declare. A counter we do not ship a declaration for reads its own
-file instead of `tokei`'s. The cases you deliberately fail are filtered by `case.name`, using the
-same names a known-failures file carries.
+file instead of `tokei`'s. The cases you deliberately fail are filtered by `case.name`, which is
+the name the report and the recorded file both use.
 
 That `Answer` carries `regions` as well as `counts`, and both are compared. A counter that does not
 split a page into its embedded languages leaves `regions` empty and then fails every case holding

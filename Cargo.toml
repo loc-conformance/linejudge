@@ -22,7 +22,7 @@ default = ["cli"]
 # Only the linejudge executable needs these three, so a project that brings the library as a
 # dependency turns the feature off and does not build them.
 cli = ["dep:colored", "dep:maud", "dep:sha2"]
-# What this suite runs on itself: propose-markers above, and the record and bump-versions commands.
+# Holds propose-markers above and the bump-versions command, both run in a checkout of this repo.
 maintenance = ["cli"]
 
 [dependencies]

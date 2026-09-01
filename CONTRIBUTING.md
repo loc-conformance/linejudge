@@ -2,7 +2,7 @@
 
 This file provides useful context and info for whoever wants to touch this repository. For what the
 pieces actually are, the dialects, the adapters, the recorded answers, read
-[docs/counter-authors.md](docs/counter-authors.md) 
+[FOR-COUNTER-AUTHORS.md](FOR-COUNTER-AUTHORS.md) 
 the cases have their own page in [cases/README.md](cases/README.md), 
 and the dialect file format in [dialects/README.md](dialects/README.md).
 
@@ -36,8 +36,10 @@ byte for byte. Watch out for editors that rewrite line endings on save.
 
 ## The maintenance feature
 
-`propose-markers` and `linejudge record` only exist when built with `--features maintenance`, and
-no installed copy has them. The jobs below that use them are done in a checkout of this repository.
+`propose-markers` and `linejudge bump-versions` only exist when built with `--features
+maintenance`, and an installed copy does not have them. Both write into this repository's own
+files, the marker columns of a case and the version line of an adapter, so the jobs below that use
+them are done in a checkout.
 
 ## Releases and versioning
 
@@ -158,7 +160,7 @@ Around that:
 
 ## Adding first-class support for a new counter
 
-Everything a counter needs is described in [docs/counter-authors.md](docs/counter-authors.md):
+Everything a counter needs is described in [FOR-COUNTER-AUTHORS.md](FOR-COUNTER-AUTHORS.md):
 the files it brings, the ways its answers are read, the `[acquisition]` block that makes it
 downloadable, and how to measure privately before the pull request. Once a counter is merged,
 record its answers as described below.
@@ -166,7 +168,7 @@ record its answers as described below.
 ## Re-measuring a counter
 
 ```
-cargo run --features maintenance -- record --counter <name>
+cargo run -- record --counter <name>
 ```
 
 rewrites `recorded/<counter>.toml` from scratch, with the version at the top exactly as the counter
@@ -179,8 +181,11 @@ pull request.
 
 ## What a recorded file holds
 
-The version at the top is written exactly as the counter printed it, and never parsed. Under it
-comes one entry per case and per way of counting, saying what the counter printed for that case.
+The version at the top is written exactly as the counter printed it, and compared letter for letter
+with what the running binary prints. The recorded answers are held against a run only when the two
+match, so a difference that comes from running another build stays out of the verdict. A counter that declares `version-flag = ""` prints no version, says `unknown
+version` on both sides, and is judged against its own record all the same. Under it comes one entry
+per case and per way of counting, saying what the counter printed for that case.
 
 `is-known-failure = true` declares out loud that those numbers differ from what the rules ask. A
 `note` is allowed with or without the flag: under it the note is the reason for the failure, without

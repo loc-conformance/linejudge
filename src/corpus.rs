@@ -130,9 +130,9 @@ impl Corpus {
 /// One case: a small input file, the spans marked in it, and what it is trying to catch.
 #[derive(Debug)]
 pub struct Case {
-    /// The directory name, number and words together, which is how the report and a
-    /// known-failures file name it. The group is no part of it, so moving a case between groups
-    /// is a renumbering and nothing else.
+    /// The directory name, number and words together, which is how the report and a recorded file
+    /// name it. The group is no part of it, so moving a case between groups is a renumbering and
+    /// nothing else.
     pub name: String,
     /// The one file a counter is ever pointed at, `input.<extension>` inside the case directory.
     pub input_file: PathBuf,

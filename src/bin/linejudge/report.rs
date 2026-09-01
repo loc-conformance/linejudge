@@ -4,7 +4,6 @@ use std::path::Path;
 use linejudge::adapter::{Adapter, Invocation};
 use linejudge::answer::{Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
-use linejudge::known_failures::KnownFailures;
 use linejudge::recorded::RecordedAnswers;
 use linejudge::verdict::{
     Conformance, Drift, Judged, Measured, Outcome, find_what_breaks_the_run,
@@ -26,13 +25,12 @@ pub struct OneRun<'a> {
     pub drift_is_judged: bool,
 }
 
-// Returns whether what it found should break the run: with a known-failures list, any failure the
-// list does not name; without one, any failure the record does not already hold.
+// Returns whether what it found should break the run, which is any failure the record does not
+// already hold.
 pub fn report_the_verdicts_of_one_dialect(
     out: &mut dyn Write,
     run: &OneRun,
     judged: &[Judged],
-    known_failures: Option<&KnownFailures>,
 ) -> io::Result<bool> {
     let adapter = run.adapter;
     let dialect = run.dialect;
@@ -45,107 +43,50 @@ pub fn report_the_verdicts_of_one_dialect(
     writeln!(out, "  {} {}", style::LABEL.paint("run"), style::DETAIL.paint(
             &adapter.format_command(dialect, run.binary, Path::new(FILE_PLACEHOLDER))))?;
 
-    let Some(known_failures) = known_failures else {
-        for one in judged {
-            let measured = match &one.outcome {
-                Outcome::Broke(message) => {
-                    write_the_name_above_the_rows(out, &style::DIFFERS, "broke", &one.case.name)?;
-                    write_what_broke(out, message)?;
-                    continue;
-                }
-                Outcome::Measured(measured) => measured,
-            };
-            if measured.agrees_through_its_exception() {
-                write_the_name_of(out, &style::AGREES, "agrees through its exception", &one.case.name)?;
-                continue;
-            }
-            match (measured.conformance, measured.drift) {
-                (Conformance::Fails, Some(Drift::Same)) => {}
-                (Conformance::Fails, Some(Drift::Changed)) => {
-                    let what = match measured.record.is_some_and(|r| r.is_known_failure) {
-                        true => "known, and it now fails in a new way",
-                        false => "new failure",
-                    };
-                    write_the_name_above_the_rows(out, &style::DIFFERS, what, &one.case.name)?;
-                    describe(out, one.case, measured)?;
-                }
-                (Conformance::Fails, _) => {
-                    let what = if drift_is_judged { "new failure" } else { "fails" };
-                    write_the_name_above_the_rows(out, &style::DIFFERS, what, &one.case.name)?;
-                    describe(out, one.case, measured)?;
-                }
-                (_, Some(Drift::NoLongerClaimed)) => {
-                    write_the_name_above_the_rows(out, &style::RECORDED,
-                            "claims the file no longer", &one.case.name)?;
-                    describe(out, one.case, measured)?;
-                }
-                (_, Some(Drift::NowClaimed)) => {
-                    write_the_name_above_the_rows(out, &style::RECORDED,
-                            "claims a file the record says it does not", &one.case.name)?;
-                    describe(out, one.case, measured)?;
-                }
-                (Conformance::Agrees, Some(Drift::Changed)) => write_the_name_of(out, &style::AGREES,
-                        "now agrees, the record still holds a failure", &one.case.name)?,
-                _ => {}
-            }
-        }
-        return Ok(!find_what_breaks_the_run(judged, &dialect.name, None).is_empty());
-    };
-
-    let mut unnamed = 0;
     for one in judged {
-        let named = known_failures.names(&dialect.name, &one.case.name);
         let measured = match &one.outcome {
             Outcome::Broke(message) => {
-                if !named {
-                    unnamed += 1;
-                    write_the_name_above_the_rows(out, &style::DIFFERS,
-                            "broke, and is not a known failure", &one.case.name)?;
-                    write_what_broke(out, message)?;
-                }
+                write_the_name_above_the_rows(out, &style::DIFFERS, "broke", &one.case.name)?;
+                write_what_broke(out, message)?;
                 continue;
             }
             Outcome::Measured(measured) => measured,
         };
-        match (measured.is_a_failure(), named) {
-            (true, false) => {
-                unnamed += 1;
-                write_the_name_above_the_rows(out, &style::DIFFERS,
-                        "fails and is not a known failure", &one.case.name)?;
+        if measured.agrees_through_its_exception() && !measured.is_a_failure() {
+            write_the_name_of(out, &style::AGREES, "agrees through its exception", &one.case.name)?;
+            continue;
+        }
+        match (measured.conformance, measured.drift) {
+            (Conformance::Fails, Some(Drift::Same)) => {}
+            (Conformance::Fails, Some(Drift::Changed)) => {
+                let what = match measured.record.is_some_and(|r| r.is_known_failure) {
+                    true => "known, and it now fails in a new way",
+                    false => "new failure",
+                };
+                write_the_name_above_the_rows(out, &style::DIFFERS, what, &one.case.name)?;
                 describe(out, one.case, measured)?;
             }
-            (true, true) if measured.drift == Some(Drift::Changed) => {
-                write_the_name_above_the_rows(out, &style::DIFFERS,
-                        "known, and it now fails in a new way", &one.case.name)?;
+            (Conformance::Fails, _) => {
+                let what = if drift_is_judged { "new failure" } else { "fails" };
+                write_the_name_above_the_rows(out, &style::DIFFERS, what, &one.case.name)?;
                 describe(out, one.case, measured)?;
             }
-            (false, true) => write_the_name_of(out, &style::AGREES,
-                    "passes, take it off the list", &one.case.name)?,
+            (_, Some(Drift::NoLongerClaimed)) => {
+                write_the_name_above_the_rows(out, &style::RECORDED,
+                        "claims the file no longer", &one.case.name)?;
+                describe(out, one.case, measured)?;
+            }
+            (_, Some(Drift::NowClaimed)) => {
+                write_the_name_above_the_rows(out, &style::RECORDED,
+                        "claims a file the record says it does not", &one.case.name)?;
+                describe(out, one.case, measured)?;
+            }
+            (Conformance::Agrees, Some(Drift::Changed)) => write_the_name_of(out, &style::AGREES,
+                    "now agrees, the record still holds a failure", &one.case.name)?,
             _ => {}
         }
     }
-    Ok(unnamed > 0)
-}
-
-pub fn report_entries_that_name_nothing(
-    out: &mut dyn Write,
-    adapter: &Adapter,
-    corpus: &Corpus,
-    known_failures: &KnownFailures,
-) -> io::Result<()> {
-    for (dialect, case_name) in known_failures.entries() {
-        let dialect_is_real =
-            dialect.is_none_or(|d| adapter.invocations.iter().any(|one| one.name == d));
-        let case_is_real = corpus.cases.iter().any(|case| case.name == case_name);
-        if !dialect_is_real || !case_is_real {
-            let entry = match dialect {
-                Some(dialect) => format!("{dialect}:{case_name}"),
-                None => case_name.to_string(),
-            };
-            write_the_name_of(out, &style::RECORDED, "names nothing, take it off the list", &entry)?;
-        }
-    }
-    Ok(())
+    Ok(!find_what_breaks_the_run(judged).is_empty())
 }
 
 // An entry for a case that is neither judged nor disabled is left over from a rename or a removal,

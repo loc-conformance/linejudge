@@ -38,7 +38,9 @@ pub const VERSION_PLACEHOLDER: &str = "{version}";
 /// The directory the explain scripts are read from, one per counter that needs one.
 pub const EXPLAIN_SCRIPTS_DIR: &str = "explain-scripts";
 
-pub(crate) const UNKNOWN_VERSION: &str = "unknown version";
+/// What stands in the version's place for a counter that declares no version flag, and for one
+/// whose flag was asked and answered nothing.
+pub const UNKNOWN_VERSION: &str = "unknown version";
 
 const ADAPTER_EXTENSION: &str = "toml";
 const BINARY_PLACEHOLDER: &str = "{binary}";

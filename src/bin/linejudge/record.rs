@@ -4,6 +4,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
+use linejudge::adapter::UNKNOWN_VERSION;
 use linejudge::adapter::Adapter;
 use linejudge::answer::{Answer, Counts};
 use linejudge::corpus::Corpus;
@@ -77,9 +78,15 @@ pub fn record_one_counter(
         .map_err(|e| format!("{} could not be written: {e}", path.display()))?;
 
     writeln!(out, "\n{}", style::HEADING.paint(&format!("{} at [{version}]", path.display())))?;
+    // A counter that declares no flag is taken at its word and its record still judges its runs.
+    // One that declares a flag and answers nothing has left the stamp off by accident.
+    if version == UNKNOWN_VERSION && adapter.version_flag.is_some() {
+        writeln!(out, "  {}", style::DIFFERS.paint(
+                "it declares a version flag and answered nothing, so this record names no build"))?;
+    }
     writeln!(out, "  {} answers over {} cases", measured.len(), corpus.cases.len())?;
-    for name in name_what_the_corpus_no_longer_holds(corpus, held) {
-        writeln!(out, "  {}", style::RECORDED.paint(&format!("dropped, no such case   {name}")))?;
+    for (name, why) in name_what_the_corpus_no_longer_holds(corpus, held) {
+        writeln!(out, "  {}", style::RECORDED.paint(&format!("{why}   {name}")))?;
     }
     for name in &dropped {
         writeln!(out, "  {}", style::DIFFERS.paint(&format!("note dropped, it answers differently now   {name}")))?;
@@ -226,15 +233,23 @@ fn name_the_numbers_of(counts: &Counts, buckets: &[String]) -> Vec<String> {
     named
 }
 
+// Every case the old record spoke about that the new one will not. A disabled case is set aside
+// and can come back, and its answer has to be measured again when it does.
 fn name_what_the_corpus_no_longer_holds(
     corpus: &Corpus,
     held: Option<&RecordedAnswers>,
-) -> Vec<String> {
+) -> Vec<(String, &'static str)> {
     let Some(held) = held else { return Vec::new() };
-    let mut named: Vec<String> = held
+    let mut named: Vec<(String, &'static str)> = held
         .cases_spoken_about()
-        .filter(|(case, _)| !corpus.cases.iter().any(|held| held.name == *case))
-        .map(|(case, dialect)| format!("{case}.{dialect}"))
+        .filter(|(case, _)| !corpus.cases.iter().any(|one| one.name == *case))
+        .map(|(case, dialect)| {
+            let why = match corpus.disabled.iter().any(|one| one == case) {
+                true => "dropped, the case is disabled",
+                false => "dropped, no such case",
+            };
+            (format!("{case}.{dialect}"), why)
+        })
         .collect();
     named.dedup();
     named
