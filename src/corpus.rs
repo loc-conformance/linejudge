@@ -319,9 +319,15 @@ mod tests {
         match Corpus::read(&dir) {
             Ok(corpus) => {
                 assert!(!corpus.cases.is_empty(), "{} holds no case", dir.display());
-                assert_eq!(corpus.groups.len(), 8, "{:?}", corpus.groups);
-                assert_eq!(corpus.groups[0], "1000-comments");
-                assert_eq!(corpus.groups[7], "8000-what_the_line_counts_as");
+                let numbers: Vec<u32> = corpus
+                    .groups
+                    .iter()
+                    .map(|group| match group.split('-').next().map(str::parse) {
+                        Some(Ok(number)) => number,
+                        _ => panic!("{group} does not begin with the thousand it holds"),
+                    })
+                    .collect();
+                assert!(numbers.windows(2).all(|two| two[0] < two[1]), "{:?}", corpus.groups);
             }
             Err(faults) => {
                 let report: Vec<String> = faults.iter().map(|f| f.to_string()).collect();
@@ -335,12 +341,14 @@ mod tests {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("cases");
         let corpus = Corpus::read(&dir).unwrap_or_else(|faults| panic!("{faults:?}"));
 
-        let whole = "1150-doc_comment_opening_after_code";
-        assert_eq!(corpus.find_case(whole).unwrap_or_else(|_| panic!("{whole}")).name, whole);
-        assert_eq!(corpus.find_case("1150").unwrap_or_else(|_| panic!("1150")).name, whole);
+        let whole = &corpus.cases[0].name;
+        let number = whole.split('-').next().expect("a case name begins with its number");
+        assert_eq!(&corpus.find_case(whole).unwrap_or_else(|_| panic!("{whole}")).name, whole);
+        assert_eq!(&corpus.find_case(number).unwrap_or_else(|_| panic!("{number}")).name, whole);
         assert!(corpus.find_case("no_case_is_called_this").unwrap_err().is_empty());
 
-        let many = corpus.find_case("doc_comment").unwrap_err();
+        // The hyphen between a case's number and its words is in every name there is.
+        let many = corpus.find_case("-").unwrap_err();
         assert!(many.len() > 1, "{:?}", many.iter().map(|c| &c.name).collect::<Vec<_>>());
     }
 

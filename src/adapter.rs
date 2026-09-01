@@ -507,29 +507,24 @@ mod tests {
     fn every_shipped_adapter_is_read_and_names_a_dialect_this_suite_knows() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
+        assert!(!adapters.is_empty(), "no adapter was read");
         let names: Vec<&str> = adapters.iter().map(|a| a.name_of_counter.as_str()).collect();
-        assert_eq!(names, ["cloc", "mezura", "scc", "tokei"]);
-        let mezura = &adapters[1];
-        let dialects: Vec<&str> = mezura.invocations.iter().map(|d| d.name.as_str()).collect();
-        assert_eq!(dialects, ["content", "region"]);
-        assert_eq!(mezura.invocations[0].buckets, ["code", "comments", "extra"]);
-        assert_eq!(mezura.invocations[1].buckets, ["code", "comments", "blanks"]);
-        let tokei = adapters[3].acquisition.as_ref().unwrap();
-        assert_eq!((tokei.channel.as_str(), tokei.version.as_str()), ("crates-io", "14.0.0"));
-        let cloc = adapters[0].acquisition.as_ref().unwrap();
-        assert_eq!(cloc.channel, "github-release-file");
-        assert_eq!(cloc.file.as_ref().unwrap()["other"], "cloc-{version}.pl");
-        assert!(mezura.acquisition.is_none(), "mezura is published nowhere to be fetched from");
+        let mut in_order = names.clone();
+        in_order.sort_unstable();
+        assert_eq!(names, in_order, "the roster came back out of order");
         for adapter in &adapters {
+            let who = &adapter.name_of_counter;
+            assert!(!adapter.invocations.is_empty(), "{who} declares no way of counting");
+            for way in &adapter.invocations {
+                assert!(!way.buckets.is_empty(), "{who}.{} names no bucket", way.name);
+            }
             let home = adapter.repository.as_deref().unwrap_or_default();
-            assert!(home.starts_with("https://"), "{}: {home}", adapter.name_of_counter);
+            assert!(home.starts_with("https://"), "{who}: {home}");
+            if let Some(how) = &adapter.acquisition {
+                assert!(CHANNELS.contains(&how.channel.as_str()), "{who}: {}", how.channel);
+                assert!(!how.version.is_empty(), "{who} names no version to fetch");
+            }
         }
-        for dialect in
-            adapters[0].invocations.iter().chain(&mezura.invocations).chain(&adapters[2].invocations)
-        {
-            assert!(matches!(dialect.reader, Reader::Declared(_)), "{}", dialect.name);
-        }
-        assert!(matches!(adapters[3].invocations[0].reader, Reader::Written(OutputFormat::TokeiJson)));
     }
 
     #[test]

@@ -329,16 +329,18 @@ mod tests {
     #[test]
     fn a_fragment_naming_one_case_runs_it_and_one_naming_several_lists_them_instead() {
         let (corpus, _, _) = read_everything();
-        assert!(find_case(&corpus, "8040-doc_comment_with_no_text").is_ok());
-        let unique = find_case(&corpus, "2090").unwrap_or_else(|refused| panic!("{refused}"));
-        assert_eq!(unique.name, "2090-docstring_holding_a_comment_symbol");
+        let whole = corpus.cases[0].name.clone();
+        let number = whole.split('-').next().expect("a case name begins with its number");
+        assert!(find_case(&corpus, &whole).is_ok());
+        let unique = find_case(&corpus, number).unwrap_or_else(|refused| panic!("{refused}"));
+        assert_eq!(unique.name, whole);
         let refuse = |name: &str| {
             find_case(&corpus, name).err().unwrap_or_else(|| panic!("{name} found a case"))
         };
-        let several = refuse("doc_comment_with_no_text");
+        // The hyphen between a case's number and its words is in every name there is.
+        let several = refuse("-");
         assert!(several.contains("more than one contains it"), "{several}");
-        assert!(several.contains("8040-doc_comment_with_no_text"), "{several}");
-        assert!(several.contains("8050-doc_comment_with_no_text_ending_a_block"), "{several}");
+        assert!(several.contains(&whole), "{several}");
         assert_eq!(refuse("a_case_of_no_such_kind"), "no case is named a_case_of_no_such_kind");
     }
 

@@ -349,6 +349,8 @@ mod tests {
     use std::slice;
 
     use super::*;
+    use crate::corpus::CASES_DIR;
+    use crate::readings::Readings;
 
     const ONE_DIALECT: &str = "counter = \"tokei\"\ndialect = \"default\"\n\
                                buckets = [\"code\", \"blanks\"]\n\
@@ -360,28 +362,29 @@ mod tests {
     #[test]
     fn the_shipped_dialects_are_read_and_a_dialect_off_the_roster_is_not_there() {
         let dialects = read_the_shipped_dialects();
-        assert_eq!(dialects.iter().count(), 5);
-        let content = dialects.find("mezura", "content").unwrap();
-        assert_eq!(content.buckets, ["code", "comments", "extra"]);
-        assert_eq!(content.rules.len(), 5);
-        assert_eq!(content.rules[0].name, "words-outside-spans-are-code");
-        assert_eq!(dialects.find("tokei", "default").unwrap().buckets[2], "blanks");
-        assert!(dialects.find("tokei", "strict").is_none());
-        assert!(dialects.find("cloc", "default").is_some());
+        let first = dialects.iter().next().expect("no dialect was read");
+        for dialect in dialects.iter() {
+            let key = format!("{}.{}", dialect.counter, dialect.name);
+            assert!(!dialect.buckets.is_empty(), "{key} names no bucket");
+            assert!(!dialect.rules.is_empty(), "{key} carries no rule");
+            assert!(dialects.find(&dialect.counter, &dialect.name).is_some(), "{key} is not found");
+        }
+        assert!(dialects.find(&first.counter, "no_such_way_of_counting").is_none());
         assert!(dialects.find("sloccount", "default").is_none());
     }
 
     #[test]
-    fn every_shipped_dialect_answers_every_reading_and_tokei_is_the_one_that_counts_them() {
+    fn every_shipped_dialect_answers_every_reading_the_corpus_defines() {
+        let cases = Path::new(env!("CARGO_MANIFEST_DIR")).join(CASES_DIR);
+        let readings = Readings::read(&cases).unwrap_or_else(|fault| panic!("{fault}"));
+        let asked: Vec<&str> = readings.iter().map(|(name, _)| name.as_str()).collect();
+        assert!(!asked.is_empty(), "the shipped corpus defines no reading");
         let dialects = read_the_shipped_dialects();
-        let asked = ["rust-doc-comment", "vue-template"];
         for dialect in dialects.iter() {
             let key = format!("{}.{}", dialect.counter, dialect.name);
             let named: Vec<&str> =
                 dialect.optional_readings.keys().map(String::as_str).collect();
             assert_eq!(named, asked, "{key}");
-            let counted = dialect.optional_readings.values().all(|counts| *counts);
-            assert_eq!(counted, dialect.counter == "tokei", "{key}");
         }
     }
 

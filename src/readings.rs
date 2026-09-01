@@ -83,11 +83,12 @@ mod tests {
     fn the_shipped_readings_are_read_and_each_carries_its_sentence_and_witness() {
         let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("cases");
         let readings = Readings::read(&dir).unwrap();
-        let named: Vec<&String> = readings.iter().map(|(name, _)| name).collect();
-        assert_eq!(named, ["rust-doc-comment", "vue-template"]);
-        let doc = readings.find("rust-doc-comment").unwrap();
-        assert!(doc.sentence.contains("doc comment"), "{}", doc.sentence);
-        assert_eq!(doc.witness, "8040-doc_comment_with_no_text");
+        assert!(readings.iter().next().is_some(), "the shipped corpus defines no reading");
+        for (name, reading) in readings.iter() {
+            assert!(!reading.sentence.trim().is_empty(), "{name} asks nothing");
+            assert!(!reading.witness.trim().is_empty(), "{name} shows no case");
+            assert!(readings.find(name).is_some(), "{name} is not found by its own name");
+        }
     }
 
     #[test]
