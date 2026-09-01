@@ -1,0 +1,5 @@
+trap = """
+Disabled: the two counters that get this wrong get it wrong only because D's wysiwyg string is not
+in their tables, and cases 3030 and 3050 already hold the same rule in Rust and F#. It waits here
+for the completeness suite. A wysiwyg string whose last byte is a backslash. In D the body of r"..." is literal, so the
+closing quote closes it whatever precedes it, and the line ends where it looks like it ends"""

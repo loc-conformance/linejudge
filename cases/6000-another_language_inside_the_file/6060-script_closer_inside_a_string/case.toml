@@ -1,4 +1,4 @@
 trap = """
 a script element ends at the first closing tag whatever the JavaScript around it is doing, which
-is why one writes the closer with a backslash inside a string. So the block here is empty and
-everything under the closer is markup, including what looks like a comment"""
+is why one writes the closer with a backslash inside a string. So the block here holds no whole line,
+and everything under the closer is markup, including what looks like a comment"""

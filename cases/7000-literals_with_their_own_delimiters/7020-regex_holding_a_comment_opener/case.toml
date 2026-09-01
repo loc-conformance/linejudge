@@ -1,4 +1,4 @@
 trap = """
 a block comment opener inside a JavaScript regular expression. Knowing that the slash begins a
-pattern rather than a division takes reading what came before it, which is more than any counter
-here attempts, and all of them answer the same way"""
+pattern and not a division takes reading what came before it, which is more than any counter here
+attempts. What each of them does with the opener after that is its own"""

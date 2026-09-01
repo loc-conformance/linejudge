@@ -1,9 +1,23 @@
 # Contributing
 
-This file provides useful context and info for whoever wants to touch this repository. For what the pieces actually are, the dialects,
-the adapters, the recorded answers, read [docs/counter-authors.md](docs/counter-authors.md); the
-cases have their own page in [cases/README.md](cases/README.md), and the dialect file format in
-[dialects/README.md](dialects/README.md).
+This file provides useful context and info for whoever wants to touch this repository. For what the
+pieces actually are, the dialects, the adapters, the recorded answers, read
+[docs/counter-authors.md](docs/counter-authors.md) 
+the cases have their own page in [cases/README.md](cases/README.md), 
+and the dialect file format in [dialects/README.md](dialects/README.md).
+
+- [What CI runs](#what-ci-runs)
+- [The maintenance feature](#the-maintenance-feature)
+- [Releases and versioning](#releases-and-versioning)
+- [Adding a case](#adding-a-case)
+  - [What makes a case](#what-makes-a-case)
+  - [Writing the case](#writing-the-case)
+- [Adding or changing a dialect](#adding-or-changing-a-dialect)
+- [Adding first-class support for a new counter](#adding-first-class-support-for-a-new-counter)
+- [Re-measuring a counter](#re-measuring-a-counter)
+- [What a recorded file holds](#what-a-recorded-file-holds)
+- [Exceptions, and who may write one](#exceptions-and-who-may-write-one)
+- [The golden file of propose-markers](#the-golden-file-of-propose-markers)
 
 ## What CI runs
 
@@ -52,12 +66,36 @@ linejudge that wrote it.
 
 ## Adding a case
 
+### What makes a case
+
+Every case is a different way a counter can be confused into printing the wrong numbers.
+
+An obscure missing symbol from a language representation is not one of them. This corpus is not a
+coverage test, it does not test for completeness of language definitions in the counters. If the
+file only goes wrong because the counter never listed a symbol, leave it out. We take for granted
+that the counters have a reasonable representation of the language's symbols, but exhaustively
+testing if every obscure one exists is not the job of this corpus.
+
+Do not judge by whether any supported counter fails or passes the case. The right of a case to be
+in the corpus should be independent of how the currently natively supported counters answer it.
+
+It is important to also check that the right numbers cannot come out by accident. If a counter
+passes a case, it should be because it handles it correctly, and not because it made a series of
+errors that resulted in the correct answer, or because the error it made did not change the counts.
+Try to construct cases where it is very hard to pass by accident.
+
+Two files can combine to do one job. 2090 and 2100 are the same block, documentation in one and
+printed data in the other, and neither shows anything alone. When cases work that way, say so in
+the trap of both.
+
+### Writing the case
+
 First pick the directory, then the number.
 
 The directory: the tests under `cases/` are grouped semantically and the categories are listed in
 [cases/README.md](cases/README.md). Pick the one your case belongs to.
 
-The number: cases in a group are numbered 2010, 2020, 2030, and so on, so it can allow inserting 
+The number: cases in a group are numbered 2010, 2020, 2030, and so on, so it can allow inserting
 a case between two existing ones, depending on context. Find the existing case most
 similar to yours and take a free number next to it.
 
@@ -68,20 +106,20 @@ A case is a directory with three files:
   case's public page, so write it for someone who has never seen this repository.
 - `truth.txt`: the marked spans.
 
-`truth.txt` marks objectively, byte by byte, which parts of the input are string and which are comment. 
-The marker language is documented in [cases/README.md](cases/README.md). You can write the file by hand,
- but the recommended way is `propose-markers`: you write a small spec file saying where the spans are,
-and `propose-markers` counts the marker columns for you. The spec's notation is on the same page. From the repository root:
+`truth.txt` marks objectively, byte by byte, which parts of the input are string and which are
+comment. The marker language is documented in [cases/README.md](cases/README.md). You can write
+the file by hand, but the recommended way is `propose-markers`: you write a small spec file saying
+where the spans are, and `propose-markers` counts the marker columns for you. The spec's notation
+is on the same page. From the repository root:
 
 ```
 cargo run --features maintenance --bin propose-markers -- <spec>
 ```
 
-However the file was produced, check it yourself at the end. `propose-markers` does not verify your spec:
-if the spec marks the wrong bytes, the `truth.txt` comes out wrong.
- If the language has a lexer that can print its tokens (`python -m tokenize`, say), run it
-over the input to confirm where the strings and comments really are.
-
+However the file was produced, check it yourself at the end. `propose-markers` does not verify
+your spec: if the spec marks the wrong bytes, the `truth.txt` comes out wrong. If the language has
+a lexer that can print its tokens (`python -m tokenize`, say), run it over the input to confirm
+where the strings and comments really are.
 
 Two things that come up:
 
@@ -141,8 +179,8 @@ pull request.
 
 ## What a recorded file holds
 
-The version at the top is written exactly as the counter printed it, and never parsed. Under it comes
-one entry per case and per way of counting, saying what the counter printed for that case.
+The version at the top is written exactly as the counter printed it, and never parsed. Under it
+comes one entry per case and per way of counting, saying what the counter printed for that case.
 
 `is-known-failure = true` declares out loud that those numbers differ from what the rules ask. A
 `note` is allowed with or without the flag: under it the note is the reason for the failure, without
@@ -179,9 +217,9 @@ deliberate.
 
 ## The golden file of propose-markers
 
-The `propose-markers` tests compare its output against a stored file. Never edit that file by
-hand; every line of it is a column count, and counting columns by hand is what `propose-markers` exists to
-prevent. To regenerate it:
+The `propose-markers` tests compare its output against a stored file. Don't edit that file by
+hand since every line of it is a column count, and counting columns by hand is what `propose-markers`
+exists to prevent. To regenerate it:
 
 ```
 LINEJUDGE_UPDATE_GOLDEN=1 cargo test --features maintenance --bin propose-markers the_golden

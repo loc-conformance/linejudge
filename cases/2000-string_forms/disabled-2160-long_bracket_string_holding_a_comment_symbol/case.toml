@@ -1,0 +1,6 @@
+trap = """
+Disabled: every counter that gets this wrong gets it wrong only because its Lua has no long
+bracket string, so the file measures a language definition and not how anything counts. It waits
+here for the completeness suite. Lua writes a string with the same long brackets its comments use,
+so the -- inside one is text
+and the line holding the closing bracket is still the string"""

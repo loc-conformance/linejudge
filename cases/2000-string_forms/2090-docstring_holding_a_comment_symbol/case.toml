@@ -1,3 +1,5 @@
 trap = """
 the # inside the docstring is text and not a comment symbol, and the docstring around it is a
-triple quoted string like any other, opening a line on its own"""
+triple quoted string like any other, opening a line on its own. Case 2100 is the same shape where
+the block is data the program prints, and the two together separate a counter that decides by
+where the block sits from one that decides by what it is"""

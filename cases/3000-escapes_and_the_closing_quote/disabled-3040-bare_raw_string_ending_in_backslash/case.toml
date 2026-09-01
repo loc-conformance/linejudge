@@ -1,0 +1,7 @@
+trap = """
+Disabled: the counter that gets this wrong gets it wrong only because the hashless form is not in
+its list of Rust raw strings, and case 3030 already holds the same trap in the form that is. It
+waits here for the completeness suite. The same closing backslash as case 3030, in the raw form
+that carries no hashes. The two forms
+end the same way, so a reader that handles one and not the other is reading the hashes and not
+the rule"""

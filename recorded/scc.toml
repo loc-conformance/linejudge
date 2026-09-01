@@ -140,7 +140,9 @@ counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 is-known-failure = true
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 note = """
-the delimited form is not recognised, so the block opener inside the string opens a comment"""
+the delimited form is not recognised, so the two quotes on the opening line pair off as an
+ordinary string and the block opener under them, outside it, opens a comment. Without the lone
+quote the file comes out right"""
 
 [answer.2160-long_bracket_string_holding_a_comment_symbol.default]
 counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
@@ -155,7 +157,7 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 is-known-failure = true
 counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
 note = """
-the three apostrophes are read as short strings and not as one that runs on, so the // below
+an apostrophe does not open a string in Groovy, so the three apostrophes are code, the // below
 counts as a comment and the /* under it opens a block that nothing closes"""
 
 [answer.3010-escaped_quote_before_comment.default]
@@ -288,7 +290,8 @@ is-known-failure = true
 counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the tag is not recognised, so the block is not found and the comment inside it counts as markup"""
+no script block is separated out of any page, whatever case its tag is written in, so the comment
+inside it counts as markup"""
 
 [answer.6050-script_closer_written_with_a_space.default]
 is-known-failure = true
@@ -315,8 +318,9 @@ is-known-failure = true
 counted = { lines = 13, code = 13, comments = 0, blanks = 0 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end, so neither block is found and both
-their comments are code"""
+the file is counted as one language from beginning to end, so neither block is found. What makes
+every line code is the apostrophe in it's, which opens a string that never closes: with that word
+spelled without it, the same unsplit file comes out right"""
 
 [answer.6100-block_language_named_by_the_tag.default]
 is-known-failure = true

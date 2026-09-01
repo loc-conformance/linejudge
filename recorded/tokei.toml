@@ -27,8 +27,8 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 is-known-failure = true
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 note = """
-the line counts as code. The same line comment after a block that spans lines, after two blocks,
-or after nothing at all is counted correctly, so it is this shape alone"""
+the line counts as code, because it opens a block and does not end with that block's closer. Any
+number of blocks closed on one line ends the same way once a line comment follows them"""
 
 [answer.1080-block_close_touching_a_line_comment.default]
 is-known-failure = true
@@ -80,7 +80,8 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-the comment is ended at the bare ]], so the text beside it and the real end count as code"""
+CMake has no bracket comment here, so the # opens a line comment that ends with its own line and
+the three lines under it count as code. A file holding no bare ]] at all counts the same way"""
 
 [answer.1190-nested_block_comment_that_does_not.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -156,7 +157,9 @@ counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 is-known-failure = true
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 note = """
-the delimited form is not recognised, so the block opener inside the string opens a comment"""
+the delimited form is not recognised, so the two quotes on the opening line pair off as an
+ordinary string and the block opener under them, outside it, opens a comment. Without the lone
+quote the file comes out right"""
 
 [answer.2160-long_bracket_string_holding_a_comment_symbol.default]
 is-known-failure = true
@@ -169,19 +172,21 @@ opens a comment"""
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-the comment is ended at the bare ]], so the text beside it and the real end count as code"""
+its Lua carries only --[[ , so --[==[ reads as an ordinary -- line comment that ends with its own
+line and the three lines under it count as code. A file holding no bare ]] counts the same way"""
 
 [answer.2180-lua_short_closer_hiding_the_real_one.default]
 is-known-failure = true
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 note = """
-the bare ]] ends the comment, so the rest of that line counts as code"""
+its Lua carries only --[[ , so --[=[ reads as an ordinary -- line comment and the two lines under
+it count as code, whatever the closer is written like"""
 
 [answer.2190-triple_quote_read_as_three_short_ones.default]
 is-known-failure = true
 counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
 note = """
-the three apostrophes are read as short strings and not as one that runs on, so the // below
+an apostrophe does not open a string in Groovy, so the three apostrophes are code, the // below
 counts as a comment and the /* under it opens a block that nothing closes"""
 
 [answer.3010-escaped_quote_before_comment.default]

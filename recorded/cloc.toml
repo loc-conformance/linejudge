@@ -62,8 +62,8 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-only a line beginning with a hash is a comment in CMake here, so the bracket comment ends with
-its opening line and its body and closing bracket count as code"""
+CMake has no bracket comment here, only the hash, which is a comment wherever the line's first
+mark is one. So the opener's line is a comment and its body and closing bracket count as code"""
 
 [answer.1190-nested_block_comment_that_does_not.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -133,6 +133,9 @@ counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
 
 [answer.2100-triple_quoted_data_not_documentation.default]
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+a triple quoted string is documentation wherever it opens, so the three lines of this block are
+comments although the program prints their text"""
 
 [answer.2110-here_string_holding_an_apostrophe.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
@@ -227,8 +230,9 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-a // is stripped to the end of the line wherever it sits, inside an open string as readily as
-outside one, so the line of string text holding it counts as a comment"""
+a string that opened on an earlier line does not stop a // from being stripped, so the line of
+string text holding it counts as a comment. Inside a string that opens and closes on one line it
+is left alone"""
 
 [answer.5020-blank_line_inside_a_spliced_string.default]
 is-known-failure = true

@@ -1,4 +1,4 @@
 trap = """
 a double quote inside a JavaScript regular expression, where it is part of the pattern and opens
-no string. A JavaScript string cannot cross a line, so a counter fooled by it loses this one line
-and recovers on the next"""
+no string. A counter fooled by it is left inside a string that nothing closes, and every line
+under it goes the same way"""

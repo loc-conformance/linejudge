@@ -1,3 +1,0 @@
-trap = """
-a wysiwyg string whose last byte is a backslash. In D the body of r"..." is literal, so the
-closing quote closes it whatever precedes it, and the line ends where it looks like it ends"""

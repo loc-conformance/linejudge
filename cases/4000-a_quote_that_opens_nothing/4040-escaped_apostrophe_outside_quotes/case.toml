@@ -1,3 +1,4 @@
 trap = """
 a backslash before an apostrophe in unquoted shell text, which is how one writes an apostrophe
-without quoting it. Shell escapes with the backslash outside a string and not inside"""
+without quoting it. The backslash escapes here and inside double quotes, and is an ordinary
+character inside single ones"""

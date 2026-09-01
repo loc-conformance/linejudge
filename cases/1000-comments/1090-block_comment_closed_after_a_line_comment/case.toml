@@ -1,3 +1,4 @@
 trap = """
-'//*/' closes a block comment, because '//' means nothing inside one. It is the C idiom for
-switching a block off and on again by adding one character in front of its closer"""
+'//*/' closes a block comment, because '//' means nothing inside one. It is half of the C idiom
+for switching a block off and on: one character added in front of the opener makes that line a
+line comment, and this closer is then a line comment too instead of a stray symbol"""
