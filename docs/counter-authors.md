@@ -318,7 +318,7 @@ repository as a dev-dependency:
 
 ```toml
 [dev-dependencies]
-linejudge = { git = "https://github.com/loc-conformance/linejudge" }
+linejudge = { git = "https://github.com/loc-conformance/linejudge", default-features = false }
 ```
 
 The dependency brings the corpus with it. The test asks for the corpus, works out the right answer

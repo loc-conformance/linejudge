@@ -10,6 +10,7 @@ repository = "https://github.com/loc-conformance/linejudge"
 [[bin]]
 name = "linejudge"
 path = "src/bin/linejudge/main.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "propose-markers"
@@ -17,18 +18,22 @@ path = "src/bin/propose-markers/main.rs"
 required-features = ["maintenance"]
 
 [features]
+default = ["cli"]
+# Only the linejudge executable needs these three, so a project that brings the library as a
+# dependency turns the feature off and does not build them.
+cli = ["dep:colored", "dep:maud", "dep:sha2"]
 # What this suite runs on itself: propose-markers above, and the record and bump-versions commands.
-maintenance = []
+maintenance = ["cli"]
 
 [dependencies]
 # Exactly this version: 2.1 onwards throws away a colour given as three numbers unless the
 # environment declares COLORTERM, which Windows terminals do not, and the whole palette falls to
 # the nearest of sixteen. Raising it means writing the escape codes here instead.
-colored = "=2.0.0"
-maud = "0.27.0"
+colored = { version = "=2.0.0", optional = true }
+maud = { version = "0.27.0", optional = true }
+sha2 = { version = "0.11.0", optional = true }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.151", default-features = false, features = ["std"] }
-sha2 = "0.11.0"
 toml = { version = "1.1.4", default-features = false, features = ["parse", "serde", "std"] }
 
 [profile.release]
