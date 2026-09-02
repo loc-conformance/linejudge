@@ -141,6 +141,10 @@ linejudge fetch
 linejudge check
 ```
 
+Without cargo, take the binary for your platform from the
+[latest release](https://github.com/loc-conformance/linejudge/releases/latest) and put it on your
+path.
+
 `fetch` is optional, but downloads each counter that is natively supported at exactly the version named in its adapter file. Everything it downloads goes where
 this program keeps its own files. Nothing is written into your project.
 

@@ -1,7 +1,7 @@
 # For counter authors
 
 This is for whoever maintains a line-of-code counter and wants it measured: privately from its
-own repository, or supported natively here with a column on the public webpage.
+own repository, or supported natively here with a column on the results page.
 It covers the files a counter brings, the ways it hands over its numbers, what measuring privately needs,
 how to add native support, and how a Rust project can skip the linejudge executable entirely.
 

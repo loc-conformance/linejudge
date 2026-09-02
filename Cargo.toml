@@ -1,11 +1,16 @@
 [package]
 name = "linejudge"
 version = "0.1.0"
-authors = ["subamanis <petrospapa21@gmail.com>"]
+authors = ["Petros Papatheodorou <petrospapa21@gmail.com>"]
 edition = "2024"
+rust-version = "1.88"
 description = "The test corpus and engine that check line-of-code counters against their own declared rules"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/loc-conformance/linejudge"
+homepage = "https://loc-conformance.github.io/linejudge/"
+keywords = ["lines-of-code", "loc", "conformance", "test-corpus", "loc-testing"]
+categories = ["development-tools::testing", "development-tools"]
+exclude = [".github"]
 
 [[bin]]
 name = "linejudge"
