@@ -181,14 +181,24 @@ mod tests {
     const AMBIGUOUS: &str = include_str!("../../tests/fixtures/output/cloc-stages-ambiguous.txt");
     const BUCKETS: [&str; 3] = ["code", "comments", "blanks"];
 
+    // Git stores the fixture with LF and cloc on Windows prints CRLF, so both endings are judged
+    // from the one file whatever the checkout wrote
+    fn with_each_line_ending(text: &str) -> [String; 2] {
+        let lf = text.replace("\r\n", "\n");
+        let crlf = lf.replace('\n', "\r\n");
+        [lf, crlf]
+    }
+
     #[test]
     fn the_stages_become_one_verdict_per_original_line() {
-        let answer = read_per_line(&named(), 5, STAGES).unwrap();
-        assert_eq!(answer.buckets_of_lines, ["code", "blanks", "comments", "comments", "code"]);
-        assert_eq!(answer.counts.lines, 5);
-        assert_eq!(answer.counts.buckets["code"], 2);
-        assert_eq!(answer.counts.buckets["comments"], 2);
-        assert_eq!(answer.counts.buckets["blanks"], 1);
+        for stages in with_each_line_ending(STAGES) {
+            let answer = read_per_line(&named(), 5, &stages).unwrap();
+            assert_eq!(answer.buckets_of_lines, ["code", "blanks", "comments", "comments", "code"]);
+            assert_eq!(answer.counts.lines, 5);
+            assert_eq!(answer.counts.buckets["code"], 2);
+            assert_eq!(answer.counts.buckets["comments"], 2);
+            assert_eq!(answer.counts.buckets["blanks"], 1);
+        }
     }
 
     // A dropped comment-only line holding a later code line word for word: saying which of the
@@ -201,8 +211,9 @@ mod tests {
 
     #[test]
     fn a_survivor_no_line_could_have_produced_refuses_the_file() {
-        let vanished = STAGES.replace("    2 | int b; \r\n{", "    2 | vanished\r\n{");
-        assert_ne!(vanished, STAGES, "the survivor of the last stage was not found to replace");
+        let [stages, _] = with_each_line_ending(STAGES);
+        let vanished = stages.replace("    2 | int b; \n{", "    2 | vanished\n{");
+        assert_ne!(vanished, stages, "the survivor of the last stage was not found to replace");
         let refused = read_per_line(&named(), 5, &vanished).unwrap_err();
         assert!(refused.contains("cannot be lined up"), "{refused}");
     }
