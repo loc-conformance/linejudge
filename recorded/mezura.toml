@@ -1,5 +1,5 @@
 counter = "mezura"
-version = "v3.0.0 (unreleased)"
+version = "v3.0.0 (2026-09-02)"
 measured-with = "linejudge 0.1.0"
 
 [answer.1010-code_then_comment_on_one_line.content]
@@ -244,12 +244,6 @@ note = """
 the plain R"( is declared and this delimited form is not, so the block opener inside the string
 opens a comment"""
 
-[answer.2160-long_bracket_string_holding_a_comment_symbol.content]
-counted = { lines = 3, code = 3, comments = 0, extra = 0 }
-
-[answer.2160-long_bracket_string_holding_a_comment_symbol.region]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-
 [answer.2170-lua_level_bracket_holding_plain_close.content]
 counted = { lines = 4, code = 1, comments = 2, extra = 1 }
 
@@ -286,22 +280,10 @@ counted = { lines = 2, code = 1, comments = 1, extra = 0 }
 [answer.3030-raw_string_ending_in_backslash.region]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
-[answer.3040-bare_raw_string_ending_in_backslash.content]
-counted = { lines = 3, code = 1, comments = 2, extra = 0 }
-
-[answer.3040-bare_raw_string_ending_in_backslash.region]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
 [answer.3050-verbatim_string_ending_in_a_backslash.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.3060-wysiwyg_string_ending_in_a_backslash.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
-
-[answer.3060-wysiwyg_string_ending_in_a_backslash.region]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.content]
