@@ -1,0 +1,839 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  background: #eef6ff;
+  color: #1f2328;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 100rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+header h1 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: 1.6rem;
+  margin: 0 0 .25rem;
+}
+
+header h1 .mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  color: #303a4a;
+}
+
+.wrap > h1 {
+  font-size: 1.6rem;
+  margin: 0 0 .5rem;
+  overflow-wrap: anywhere;
+}
+
+.intro {
+  max-width: 54rem;
+  margin: 0 0 .35rem;
+  color: #57606a;
+  font-size: .9375rem;
+}
+
+a.why {
+  color: #0969da;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.why::after {
+  content: " \2192";
+}
+
+a.why:hover {
+  text-decoration: underline;
+}
+
+.meta {
+  margin: 0 0 1rem;
+  color: #6e7781;
+  font-size: .85rem;
+  font-style: italic;
+}
+
+.meta a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  margin: 0 0 1.25rem;
+  color: #57606a;
+  font-size: .85rem;
+}
+
+.legend .s {
+  font-weight: 700;
+}
+
+.picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem .9rem;
+  margin: 0 0 .9rem;
+  font-size: .85rem;
+  color: #57606a;
+}
+
+.picks label {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  cursor: pointer;
+}
+
+.pickslabel {
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-size: .78rem;
+}
+
+/* A tool the reader has unticked takes its whole column with it, width included. */
+[data-counter].hidden {
+  display: none;
+}
+
+.boardscroll {
+  overflow: auto;
+  scrollbar-gutter: stable;
+  max-height: 85vh;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #c4cdd8 transparent;
+}
+
+.boardscroll::-webkit-scrollbar {
+  width: .55rem;
+  height: .55rem;
+}
+
+.boardscroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.boardscroll::-webkit-scrollbar-thumb {
+  background: #c4cdd8;
+  border: 0.125rem solid #ffffff;
+  border-radius: .5rem;
+}
+
+.boardscroll::-webkit-scrollbar-thumb:hover {
+  background: #8c959f;
+}
+
+.boardscroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* A tool's column never narrows to fit the screen. The table keeps its full width and scrolls
+   sideways under the pinned first column, so twenty tools are twenty readable columns rather than
+   twenty slivers. `--shown` is set on the element and drops as the picker hides tools. */
+table {
+  --cases-col: 25rem;
+  --tool-col: 16rem;
+  width: 100%;
+  min-width: calc(var(--cases-col) + var(--tool-col) * var(--shown));
+  background: #ffffff;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+col.cases {
+  width: var(--cases-col);
+}
+
+th,
+td {
+  padding: .55rem .75rem;
+  text-align: left;
+  border-bottom: 0.0625rem solid #d8dee4;
+  overflow-wrap: break-word;
+}
+
+th + th,
+td + td {
+  border-left: 0.0625rem solid #d8dee4;
+}
+
+td {
+  vertical-align: middle;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #ffffff;
+  border-bottom: 0.125rem solid #d0d7de;
+  vertical-align: top;
+}
+
+th:first-child,
+td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #ffffff;
+}
+
+/* The row below would otherwise paint over a tooltip hanging out of this cell. */
+td:first-child:hover {
+  z-index: 5;
+}
+
+thead th:first-child {
+  z-index: 4;
+  vertical-align: middle;
+}
+
+.find {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .4rem .65rem;
+  background: #f6f8fa;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .4rem;
+  color: #8c959f;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.find:focus-within {
+  background: #ffffff;
+  border-color: #0969da;
+  box-shadow: 0 0 0 .1875rem rgba(9, 105, 218, .15);
+  color: #0969da;
+}
+
+.find svg {
+  flex: none;
+}
+
+.find input {
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: #1f2328;
+  font-family: inherit;
+  font-size: .875rem;
+  font-weight: 400;
+}
+
+.find input::placeholder {
+  color: #8c959f;
+  font-style: italic;
+}
+
+.find input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.found {
+  margin-bottom: .4rem;
+  color: #8c959f;
+  font-size: .78rem;
+  font-weight: 400;
+}
+
+.tname {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.tver {
+  overflow: hidden;
+  color: #6e7781;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .78rem;
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .4rem;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: .4em;
+  padding: .05rem .6rem;
+  background: #f6f8fa;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: 1rem;
+  color: #57606a;
+  font-size: .8rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.chip b {
+  font-weight: 700;
+}
+
+.chip b.ok,
+.chip b.bad,
+.chip b.open,
+.chip b.na {
+  font-size: 1.1em;
+}
+
+.chip.pick {
+  cursor: pointer;
+}
+
+.chip.pick:hover {
+  border-color: #0969da;
+}
+
+.chip.active {
+  background: #ddf4ff;
+  border-color: #0969da;
+  color: #0a3069;
+}
+
+.ok {
+  color: #1a7f37;
+}
+
+.bad {
+  color: #cf222e;
+}
+
+.open {
+  color: #c99a06;
+}
+
+.na {
+  color: #6e7781;
+}
+
+tr.group td {
+  padding: .4rem .8rem;
+  background: #dde4ec;
+  border-bottom: 0.0625rem solid #c4cdd8;
+  color: #2c3a4a;
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+
+/* The group's own title stays put while the table scrolls sideways under it. */
+tr.group td span {
+  position: sticky;
+  left: .8rem;
+  display: inline-block;
+}
+
+/* `break-word` only breaks after the number's hyphen, so the underscored tail runs past the cell. */
+td.case {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+td.case a {
+  color: #0969da;
+  cursor: pointer;
+  font-size: 1.05em;
+  text-decoration: none;
+}
+
+td.case a:hover {
+  text-decoration: underline;
+}
+
+tr.disabled td {
+  background: #fafbfc;
+  color: #8c959f;
+}
+
+.tag {
+  padding: .1rem .4rem;
+  margin-right: .45rem;
+  background: #eaeef2;
+  border-radius: .25rem;
+  color: #57606a;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: .7rem;
+  font-weight: 400;
+}
+
+.status {
+  font-size: .875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.s-pass {
+  color: #1a7f37;
+}
+
+.s-fail {
+  color: #cf222e;
+}
+
+.s-open {
+  color: #c99a06;
+}
+
+.s-exc {
+  color: #8250df;
+}
+
+.s-na {
+  color: #6e7781;
+  font-weight: 400;
+}
+
+.s-broke {
+  padding: .1rem .45rem;
+  background: #cf222e;
+  border-radius: .25rem;
+  color: #ffffff;
+}
+
+.idot {
+  color: #a1a1a1;
+  font-weight: 600;
+  font-size: .8rem;
+}
+
+.nums {
+  margin-top: .3rem;
+  color: #57606a;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  line-height: 1.4;
+}
+
+/* The padding is what separates a label longer than the width from the numbers after it. */
+.nums .lbl {
+  display: inline-block;
+  min-width: 4.4rem;
+  padding-right: .8rem;
+  color: #8c959f;
+}
+
+.answer .nums .lbl {
+  min-width: 7rem;
+}
+
+.nums .off {
+  color: #cf222e;
+  font-weight: 700;
+}
+
+.tip {
+  position: relative;
+  cursor: help;
+}
+
+/* `.open` is what a tap sets, since a touch screen never hovers. */
+.tip:hover::after,
+.tip.open::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 6;
+  width: 22rem;
+  max-width: 60vw;
+  margin-top: .45rem;
+  padding: .55rem .7rem;
+  background: #24292f;
+  border-radius: .4rem;
+  box-shadow: 0 .5rem 1rem rgba(31, 35, 40, .25);
+  color: #f6f8fa;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: .8rem;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+/* The last column's tooltip would otherwise hang past the right edge of the page. */
+td:last-child .tip:hover::after,
+td:last-child .tip.open::after,
+th:last-child .tip:hover::after,
+th:last-child .tip.open::after {
+  left: auto;
+  right: 0;
+}
+
+footer {
+  margin-top: 1.25rem;
+  color: #8c959f;
+  font-size: .8rem;
+}
+
+.crumb {
+  margin: 0 0 .5rem;
+  color: #6e7781;
+  font-size: .85rem;
+}
+
+.crumb a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.trap {
+  max-width: 54rem;
+  margin: 0 0 1.5rem;
+  color: #57606a;
+  font-size: .9375rem;
+}
+
+.chips.ways {
+  margin-bottom: .6rem;
+}
+
+.picked {
+  color: #8c959f;
+  font-size: .8rem;
+}
+
+/* The table is as wide as the widest line of the case, which is wider than a phone. It scrolls
+   inside this rather than pushing the whole page sideways. */
+.filescroll {
+  overflow-x: auto;
+  margin-bottom: .6rem;
+}
+
+table.file {
+  width: auto;
+  min-width: 0;
+}
+
+table.file td {
+  border: none;
+  border-bottom: 0.0625rem solid #eaeef2;
+  padding: .15rem .75rem;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  white-space: pre;
+}
+
+table.file tr:last-child td {
+  border-bottom: none;
+}
+
+/* The two columns in front of the file are one band, so the source stands on its own. */
+td.ln,
+td.gut {
+  background: #f6f8fa;
+}
+
+td.ln {
+  position: static;
+  color: #b1b8c0;
+  text-align: right;
+  user-select: none;
+}
+
+td.gut {
+  color: #6e7781;
+  font-size: .78rem;
+  border-right: 0.0625rem solid #d0d7de;
+}
+
+
+td.gut .bucket {
+  cursor: help;
+}
+
+td.src {
+  width: 100%;
+  padding-left: 1rem;
+}
+
+.covers-string {
+  color: #0a7b53;
+}
+
+.covers-comment {
+  color: #8c959f;
+  font-style: italic;
+}
+
+.covers-tag {
+  color: #0550ae;
+}
+
+.rgn {
+  color: #0550ae;
+}
+
+.file-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  margin: 0 0 2rem;
+  color: #8c959f;
+  font-size: .8rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0 0 .75rem;
+}
+
+.answer {
+  padding: .7rem .9rem;
+  margin-bottom: .6rem;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .5rem;
+}
+
+.answer .who {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+
+
+.answer .note {
+  max-width: 60rem;
+  margin: .4rem 0 0;
+  color: #57606a;
+  font-size: .85rem;
+}
+
+.answer .cmd {
+  margin: .5rem 0 0;
+  overflow-x: auto;
+}
+
+.answer .cmd code {
+  color: #6e7781;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .78rem;
+  white-space: pre;
+}
+
+.dialect,
+.worklist {
+  padding: .7rem .9rem;
+  margin-bottom: .6rem;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .5rem;
+}
+
+/* A way of counting is a name, not code, and it must not look like the buckets under it. */
+.way {
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .1rem .6rem;
+  margin: 0 0 .5rem;
+}
+
+.about {
+  color: #6e7781;
+  font-size: .85rem;
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .2rem 0;
+  border-top: 0.0625rem solid #eaeef2;
+}
+
+.item a {
+  color: #0969da;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  text-decoration: none;
+}
+
+.item a:hover {
+  text-decoration: underline;
+}
+
+.item .note {
+  margin: 0;
+  color: #6e7781;
+  font-size: .8rem;
+}
+
+table.rules {
+  width: auto;
+  min-width: 0;
+  margin-top: .6rem;
+  border: none;
+  background: none;
+}
+
+table.rules td {
+  padding: .3rem .75rem;
+  border: none;
+  border-top: 0.0625rem solid #eaeef2;
+  vertical-align: top;
+}
+
+td.bucket-of {
+  color: #1f2328;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rule-name {
+  color: #8250df;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: .8rem;
+}
+
+.asks {
+  color: #57606a;
+  font-size: .85rem;
+}
+
+.tname a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+.tname a:hover {
+  text-decoration: underline;
+}
+
+h1 a.home {
+  margin-left: .8rem;
+  font-weight: 400;
+  vertical-align: middle;
+}
+
+img.badge {
+  display: block;
+}
+
+tr.filename td {
+  padding: .35rem .75rem;
+  background: #eaeef2;
+  border-bottom: 0.0625rem solid #d0d7de;
+  color: #57606a;
+  font-weight: 700;
+}
+
+/* The flex sits inside the cell and not on it, since a cell that is a flex box stops spanning. */
+tr.filename .bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+button.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .1rem .5rem;
+  background: #ffffff;
+  border: 0.0625rem solid #d0d7de;
+  border-radius: .35rem;
+  color: #57606a;
+  font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  font-size: .78rem;
+  cursor: pointer;
+}
+
+button.copy:hover {
+  border-color: #0969da;
+  color: #0969da;
+}
+
+.under {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .3rem 1.5rem;
+  margin: 0 0 .75rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: #57606a;
+  font-size: 1.05rem;
+  font-style: italic;
+}
+
+a.home {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: #57606a;
+  font-size: .85rem;
+  text-decoration: none;
+}
+
+a.home:hover {
+  color: #0969da;
+  text-decoration: underline;
+}
+
+/* On a phone the pinned first column is wider than the whole screen, so nothing of any tool is
+   ever beside it however far you scroll. Narrowing it is the only thing that changes here: a
+   tool's column keeps its width, and the table still scrolls sideways. */
+@media (max-width: 40rem) {
+  .wrap {
+    padding: 1.25rem .75rem 3rem;
+  }
+
+  table {
+    --cases-col: 11rem;
+  }
+}
