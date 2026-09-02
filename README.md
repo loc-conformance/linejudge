@@ -5,6 +5,11 @@
 
 # LineJudge
 
+[![CI](https://github.com/loc-conformance/linejudge/actions/workflows/ci.yml/badge.svg)](https://github.com/loc-conformance/linejudge/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/linejudge.svg)](https://crates.io/crates/linejudge)
+[![docs.rs](https://docs.rs/linejudge/badge.svg)](https://docs.rs/linejudge)
+[![licence](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#licence)
+
 The test corpus and engine that check line-of-code counters against their own declared rules.
 
 Two counters can read the same file and print different numbers, and usually neither of them is
