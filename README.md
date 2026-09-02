@@ -136,7 +136,7 @@ Line 2 is plain code and mezura called it a comment.
 Install it, download the counters it knows about, and run them all:
 
 ```
-cargo install --git https://github.com/loc-conformance/linejudge
+cargo install linejudge
 linejudge fetch
 linejudge check
 ```

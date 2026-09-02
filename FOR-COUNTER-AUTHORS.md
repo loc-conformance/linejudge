@@ -1,7 +1,8 @@
 # For counter authors
 
 This is for whoever maintains a line-of-code counter and wants it measured: privately from its
-own repository, or supported natively here with a column on the results page.
+own repository, or supported natively here with a column on the
+[results page](https://loc-conformance.github.io/linejudge/).
 It covers the files a counter brings, the ways it hands over its numbers, what measuring privately needs,
 how to add native support, and how a Rust project can skip the linejudge executable entirely.
 
@@ -344,8 +345,11 @@ repository as a dev-dependency:
 
 ```toml
 [dev-dependencies]
-linejudge = { git = "https://github.com/loc-conformance/linejudge", default-features = false }
+linejudge = { version = "0.1", default-features = false }
 ```
+
+For the tip of the repository ahead of a release, the git form works too:
+`linejudge = { git = "https://github.com/loc-conformance/linejudge", default-features = false }`.
 
 The dependency brings the corpus with it. The test asks for the corpus, works out the right answer
 for each case from your rules, and holds your own in-process counting against it. No binaries and no
