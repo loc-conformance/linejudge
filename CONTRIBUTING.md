@@ -212,8 +212,10 @@ and it is counted separately in every report. So a counter cannot quietly declar
 report: twenty exceptions show up as twenty exceptions, on the page and in the numbers.
 
 **An exception is a claim about what the counter means to do, so only whoever carries responsibility
-for that counter writes one.** This repository ships none. tokei's and scc's divergences stay known
-failures with a note, because their intent is not ours to claim.
+for that counter writes one.** This repository ships none, because none has been needed. The rules
+have described every counter measured so far, and an exception that does get written is evidence
+that the dialect model fell short somewhere, which is the first thing to look at before accepting
+it.
 
 It is the right answer for one thing only: a consistent, deliberate reading that no rule over spans
 can express. It is the wrong answer for a bug, for a difference between versions, and for a case
