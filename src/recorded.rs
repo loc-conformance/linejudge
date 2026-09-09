@@ -396,7 +396,7 @@ the line comment is swallowed by the block above it"""
     }
 
     // The other direction of the test above. A case that was deleted or renamed leaves its answers
-    // behind in the recorded files, and nothing else in the suite reads them again to notice. A
+    // behind in the recorded files, and no other part of the suite reads them again to notice. A
     // disabled case is still a case and keeps its answers.
     #[test]
     fn a_recorded_answer_names_a_case_that_is_still_there() {

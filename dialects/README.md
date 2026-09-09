@@ -3,7 +3,7 @@
 A dialect file is one counter's declaration of how it sorts the lines of a file into its own
 buckets. It is the yardstick that counter is measured against: for every case, the right answer is
 worked out from the case's marked strings and comments by these rules, and the counter's own output
-is compared to it. Nothing else is ever used as the expectation, so writing this file is writing
+is compared to it. That is the only expectation ever used, so writing this file is writing
 down what your tool means to do.
 
 One folder per counter and one file per way it counts, `<counter>/<dialect>.toml`, and the file's
@@ -38,9 +38,9 @@ whatever the other rules say. Two rules matching the same line is legal exactly 
 same bucket, and that is how OR is written: two rules, same bucket, no operator. The list itself
 means AND, and `!` in front of a predicate means NOT.
 
-This costs words, "in a comment and nothing else" instead of "in a comment, if nothing above me
-fired", and it buys rules that can be read and agreed one at a time, and set side by side to show
-where two tools part on the same line.
+This costs words, "in a comment, with nothing beside it" where an ordered list could say "in a
+comment, if nothing above me fired", and it buys rules that can be read and agreed one at a time,
+and set side by side to show where two tools part on the same line.
 
 Three checks stand where ordering would have been, run over the actual lines of every case:
 

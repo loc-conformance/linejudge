@@ -1,6 +1,6 @@
 name: Publish
 
-# By hand and by nothing else. A push to main can land in the middle of a piece of work, a case
+# Run by hand only. A push to main can land in the middle of a piece of work, a case
 # added whose answers have not been recorded yet, and a page published from that state says
 # something untrue with nobody having asked for it.
 on:
@@ -53,8 +53,8 @@ jobs:
         run: ./target/release/linejudge render
 
       # A fresh repository inside the folder, one commit, forced over whatever was there before.
-      # The branch therefore holds the pages and nothing else, never the source, and it stays at a
-      # single commit however often this runs, so cloning the repository does not grow with it.
+      # The branch therefore holds only the pages, none of the source, and it stays at a single
+      # commit however often this runs, so cloning the repository does not grow with it.
       # .nojekyll turns off the site generator github would otherwise run over the folder.
       - name: Publish the pages
         working-directory: site

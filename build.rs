@@ -35,8 +35,8 @@ fn main() {
 }
 
 /// Every directory is named as well as every file, since adding a case changes the modification
-/// time of the group directory holding it and of nothing else, and a build that did not notice
-/// would carry the corpus as it stood at the last one.
+/// time of only the group directory holding it, and a build that did not notice would carry the
+/// corpus as it stood at the last one.
 fn collect_every_file_under(dir: &Path, root: &Path, found: &mut Vec<(String, PathBuf)>) {
     println!("cargo:rerun-if-changed={}", dir.display());
     let entries = fs::read_dir(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));

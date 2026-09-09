@@ -151,7 +151,7 @@ const BUMP_USAGE: &str = "
 linejudge bump-versions [<counter>] [--json] [--adapters <dir>]
 
     Asks every channel what it publishes newest and, where that differs from the version an
-    adapter declares, writes the new one into it and changes nothing else in the file. Named a
+    adapter declares, writes the new one into it and leaves the rest of the file as it is. Named a
     counter, it does that for that one. It maintains this suite's own declarations and no consumer
     of the corpus needs it, so it is built only with --features maintenance.
 
@@ -161,7 +161,7 @@ linejudge bump-versions [<counter>] [--json] [--adapters <dir>]
     A raised version is half a change. The recorded answers of that counter were measured against
     the old build, and moving them is the other half.
 
-    --json prints the counters that moved as one document and nothing else, with anything gone
+    --json prints only the counters that moved, as one document, with anything gone
     wrong on the error output, which is what a scheduled job builds its work list from.
 ";
 
@@ -708,9 +708,9 @@ impl Settings {
         if settings.badge.is_some() && !matches!(settings.command, Command::Check { .. }) {
             return Err("--badge belongs to check".to_string());
         }
-        // The badge says a number of cases and nothing else, so every flag that would change which
-        // cases those are takes the meaning out of the number. Whether the corpus itself is this
-        // suite's is not asked here, since that is answered by reading it and not by a flag.
+        // The badge says only a number of cases, so every flag that would change which cases those
+        // are takes the meaning out of the number. Whether the corpus itself is this suite's is not
+        // asked here, since reading it is what answers that.
         if let Command::Check { case } = &settings.command
             && settings.badge.is_some()
         {

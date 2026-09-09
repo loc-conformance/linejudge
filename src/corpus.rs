@@ -131,8 +131,7 @@ impl Corpus {
 #[derive(Debug)]
 pub struct Case {
     /// The directory name, number and words together, which is how the report and a recorded file
-    /// name it. The group is no part of it, so moving a case between groups is a renumbering and
-    /// nothing else.
+    /// name it. The group is no part of it, so moving a case between groups is only a renumbering.
     pub name: String,
     /// The one file a counter is ever pointed at, `input.<extension>` inside the case directory.
     pub input_file: PathBuf,
@@ -295,8 +294,8 @@ fn check_witnesses(readings: &Readings, cases: &[Case], faults: &mut Vec<String>
     }
 }
 
-// A case file holds the trap and nothing else. What a counter printed lives under `recorded/`, so
-// an answer block written here is refused rather than ignored.
+// A case file holds only the trap. What a counter printed lives under `recorded/`, so an answer
+// block written here is refused with an error.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawCase {

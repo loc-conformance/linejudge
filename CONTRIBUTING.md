@@ -176,8 +176,9 @@ printed it. A note in that file stays as long as the answer it describes: when a
 the run drops the note and tells you which one, so you can rewrite it if it still applies.
 
 Version bumps arrive as pull requests. A weekly job compares each pinned version against the newest
-available and opens a pull request where they differ; the new recorded answers go into that same
-pull request.
+available and, where they differ, fetches the new build, records its answers and opens a pull
+request carrying both. What is left for a person is a note on any case that started failing, and
+the pull request says which.
 
 ## What a recorded file holds
 

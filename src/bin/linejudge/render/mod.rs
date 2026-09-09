@@ -303,7 +303,7 @@ mod tests {
     }
 
     // The site's icon is generated and the file GitHub and the README are pointed at is committed,
-    // so the two are one drawing kept in two places and nothing else holds them together.
+    // so the two are one drawing kept in two places, and this test is all that holds them together.
     #[test]
     fn the_committed_mark_is_the_icon_the_site_is_given() {
         let kept = fs::read_to_string(
