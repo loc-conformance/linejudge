@@ -9,7 +9,7 @@ explain-output = "scc-trace"
 [acquisition]
 channel = "github-release-asset"
 name    = "boyter/scc"
-version = "4.0.0"
+version = "4.1.0"
 
 [dialect.default]
 args = []
