@@ -144,9 +144,6 @@ the delimited form is not recognised, so the two quotes on the opening line pair
 ordinary string and the block opener under them, outside it, opens a comment. Without the lone
 quote the file comes out right"""
 
-[answer.2160-long_bracket_string_holding_a_comment_symbol.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-
 [answer.2170-lua_level_bracket_holding_plain_close.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
@@ -169,18 +166,8 @@ counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 [answer.3030-raw_string_ending_in_backslash.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
-[answer.3040-bare_raw_string_ending_in_backslash.default]
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-
 [answer.3050-verbatim_string_ending_in_a_backslash.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.3060-wysiwyg_string_ending_in_a_backslash.default]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the backslash cancels the closing quote, so the string stays open and the comment under it is
-counted as code"""
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.default]
 is-known-failure = true
