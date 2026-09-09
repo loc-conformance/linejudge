@@ -255,6 +255,10 @@ the block is not found, so the comment inside it counts as markup"""
 is-known-failure = true
 counted = { lines = 13, code = 9, comments = 3, blanks = 1 }
 counted-regions = []
+note = """
+the file is counted as one language from beginning to end, so neither block is found. The totals
+come out right because Vue's own table carries all three comment symbols and only the double
+quote as a string"""
 
 [answer.6100-block_language_named_by_the_tag.default]
 is-known-failure = true
