@@ -1,9 +1,9 @@
 name: Version check
 
-# Once a week it reads the adapters, asks each channel what it publishes newest, and opens a pull
-# request for each counter whose declared version has moved. It measures nothing and publishes
-# nothing: its output is a pull request and never a page, so a version we measure changes only by
-# somebody merging one of these.
+# Once a week it reads the adapters, asks each channel what it publishes newest, and for each
+# counter whose declared version has moved it fetches the new build, records what that build
+# answers over every case, and opens a pull request carrying both. It publishes nothing: a version
+# we measure changes only by somebody merging one of these.
 on:
   schedule:
     - cron: '0 6 * * 1'
@@ -56,6 +56,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
 
     # One job and one pull request per counter, because each raise brings its own recorded answers
     # and its own reading. One failing leaves the others to finish.
@@ -101,11 +102,44 @@ jobs:
             --adapters adapters
           git diff --stat
 
-      # A pull request opened with the run's own token does not start CI, which github suppresses
-      # so that a workflow cannot set itself off. It matters here, because a raise on its own fails
-      # the test that holds an adapter's version to the one its answers were recorded from, and
-      # that failure is the instruction. Whoever reads the pull request starts CI from its own
-      # Run workflow button.
+      # The build just declared is downloaded, or compiled where the channel hands over source,
+      # and run over every case, so the pull request arrives with its answers already recorded.
+      # What that leaves for a person is the reading: a note on any case that started failing.
+      - name: Fetch the new build and record what it answers
+        if: steps.branch.outputs.already == 'no'
+        id: record
+        env:
+          COUNTER: ${{ matrix.bump.counter }}
+        run: |
+          ./target/release/linejudge fetch "$COUNTER"
+          answers() { awk '/^\[answer\./ { print substr($0, 9, length($0) - 9) }' "$1" | sort; }
+          known_failures() {
+            awk '/^\[answer\./ { name = substr($0, 9, length($0) - 9) }
+                 /^is-known-failure = true/ { print name }' "$1" | sort
+          }
+          known_failures "recorded/$COUNTER.toml" > "$RUNNER_TEMP/before"
+          ./target/release/linejudge record --counter "$COUNTER" | tee "$RUNNER_TEMP/record"
+          known_failures "recorded/$COUNTER.toml" > "$RUNNER_TEMP/after"
+          answers "recorded/$COUNTER.toml" > "$RUNNER_TEMP/still-recorded"
+          # A case the new record drops, because it was disabled or deleted meanwhile, is not a
+          # case the build fixed.
+          comm -23 "$RUNNER_TEMP/before" "$RUNNER_TEMP/after" \
+            | comm -12 - "$RUNNER_TEMP/still-recorded" > "$RUNNER_TEMP/fixed"
+          comm -13 "$RUNNER_TEMP/before" "$RUNNER_TEMP/after" > "$RUNNER_TEMP/started"
+          # A note dropped from a case that still fails means its answer moved without passing,
+          # so the old note no longer describes what the counter does.
+          { grep 'note dropped' "$RUNNER_TEMP/record" || true; } | awk '{ print $NF }' | sort \
+            | comm -12 - "$RUNNER_TEMP/after" > "$RUNNER_TEMP/unexplained"
+          if [ -s "$RUNNER_TEMP/started" ] || [ -s "$RUNNER_TEMP/unexplained" ]; then
+            echo "needs_reading=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_reading=no" >> "$GITHUB_OUTPUT"
+          fi
+          git diff --stat
+
+      # A pull request opened with the run's own token starts no CI, which github suppresses so
+      # that a workflow cannot set itself off. A workflow_dispatch is the one exception it allows,
+      # so the run asks for one on the branch and the checks arrive with the pull request.
       - name: Open the pull request
         if: steps.branch.outputs.already == 'no'
         env:
@@ -114,28 +148,38 @@ jobs:
           COUNTER: ${{ matrix.bump.counter }}
           FROM: ${{ matrix.bump.from }}
           TO: ${{ matrix.bump.to }}
+          NEEDS_READING: ${{ steps.record.outputs.needs_reading }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
           git commit -qam "declare $COUNTER $TO"
           git push -q origin "$BRANCH"
-          gh pr create --head "$BRANCH" --title "declare $COUNTER $TO" --body "$(cat <<BODY
-          \`$COUNTER\` declared **$FROM**, and its channel now publishes **$TO**.
-
-          This is half a change and cannot be merged as it stands. The recorded answers under
-          \`recorded/$COUNTER.toml\` were measured against the $FROM build, and a test refuses to
-          let the two drift, so it fails until they move together.
-
-          What is left, on this branch:
-
-          - fetch the new build: \`linejudge fetch $COUNTER\`
-          - run \`linejudge check\` and read what changed. A case this build now passes comes out
-            as having started agreeing; a case it has started failing is a finding of its own.
-          - re-record it: \`linejudge record --counter $COUNTER\`, which also moves the version
-            written at the top of that file.
-
-          Nothing here will ever be force pushed over: this branch carries the version in its
-          name, so the weekly run sees it and leaves it alone.
-          BODY
-          )"
+          list() { sed 's/^/- /' "$RUNNER_TEMP/$1"; echo; }
+          {
+            echo "\`$COUNTER\` declared **$FROM**, and its channel now publishes **$TO**. This branch"
+            echo "declares the new version and carries what that build answers over every case,"
+            echo "recorded by the run that opened it."
+            echo
+            if [ -s "$RUNNER_TEMP/fixed" ]; then
+              echo "Cases it now passes:"; echo; list fixed
+            fi
+            if [ -s "$RUNNER_TEMP/started" ]; then
+              echo "Cases it has started failing. Each needs a note beside its answer in"
+              echo "\`recorded/$COUNTER.toml\`, measured before it is written:"; echo; list started
+            fi
+            if [ -s "$RUNNER_TEMP/unexplained" ]; then
+              echo "Cases that still fail with a different answer. The old note was dropped and"
+              echo "each needs a new one:"; echo; list unexplained
+            fi
+            if [ "$NEEDS_READING" = no ] && [ ! -s "$RUNNER_TEMP/fixed" ]; then
+              echo "Every case answers as it did before."; echo
+            fi
+            echo "Nothing here will ever be force pushed over: this branch carries the version in its"
+            echo "name, so the weekly run sees it and leaves it alone."
+          } > "$RUNNER_TEMP/body.md"
+          draft=""
+          if [ "$NEEDS_READING" = yes ]; then draft="--draft"; fi
+          gh pr create --head "$BRANCH" --title "declare $COUNTER $TO" \
+            --body-file "$RUNNER_TEMP/body.md" $draft
+          gh workflow run ci.yml --ref "$BRANCH"
