@@ -1,6 +1,6 @@
 counter = "mezura"
-version = "v3.0.0 (2026-09-02)"
-measured-with = "linejudge 0.1.0"
+version = "v3.1.0 (2026-09-11)"
+measured-with = "linejudge 0.1.1"
 
 [answer.1010-code_then_comment_on_one_line.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
@@ -141,12 +141,10 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.1240-a_comment_opener_inside_a_vector_type.content]
-unclaimed = true
-note = """
-this version ships no C3 language file, so nothing here is counted at all"""
+counted = { lines = 8, code = 3, comments = 1, extra = 4 }
 
 [answer.1240-a_comment_opener_inside_a_vector_type.region]
-unclaimed = true
+counted = { lines = 8, code = 5, comments = 3, blanks = 0 }
 
 [answer.2010-comment_symbol_inside_string.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
