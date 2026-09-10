@@ -1,0 +1,16 @@
+<*
+CC
+ Rotate every lane of the vector.
+ccccccccccccccccccccccccccccccccc
+*>
+UU
+macro rotate(int[<*>] x, uint shift)
+..... ............... .. .... ......
+{
+.
+	uint lanes = shift;
+	.... ..... . ......
+	return $$fshl(x, x, lanes);
+	...... ......... .. .......
+}
+.

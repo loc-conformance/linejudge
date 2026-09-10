@@ -1,0 +1,5 @@
+trap = """
+C3 writes a vector of unknown length as int[<*>], and its compiler reads [< as one token, so the
+<* sitting inside that type never opens the documentation comment that <* opens everywhere else.
+The file carries a real one above the macro as well, so the numbers cannot come out right by
+ignoring <* altogether"""

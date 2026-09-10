@@ -96,6 +96,13 @@ note = """
 a line whose first word begins with REM is taken as a comment whatever letters follow, so the
 command counts as one"""
 
+[answer.1240-a_comment_opener_inside_a_vector_type.default]
+is-known-failure = true
+counted = { lines = 8, code = 1, comments = 7, blanks = 0 }
+note = """
+the <* of the vector type opens a documentation comment that nothing closes, so the four lines of
+the macro under it are counted as comment. The same file with int[<4>] comes out right"""
+
 [answer.2010-comment_symbol_inside_string.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 

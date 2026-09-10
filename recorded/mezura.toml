@@ -140,6 +140,14 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 [answer.1230-a_comment_word_at_the_head_of_a_longer_word.region]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
+[answer.1240-a_comment_opener_inside_a_vector_type.content]
+unclaimed = true
+note = """
+this version ships no C3 language file, so nothing here is counted at all"""
+
+[answer.1240-a_comment_opener_inside_a_vector_type.region]
+unclaimed = true
+
 [answer.2010-comment_symbol_inside_string.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
 
