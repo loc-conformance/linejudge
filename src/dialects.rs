@@ -460,10 +460,12 @@ mod tests {
         let _ = fs::remove_dir_all(&empty);
         fs::create_dir_all(&empty).unwrap();
         let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("dialects");
-        let read = Dialects::read(&[shipped, empty.clone()]);
+        let alone = Dialects::read(slice::from_ref(&shipped));
+        let layered = Dialects::read(&[shipped, empty.clone()]);
         fs::remove_dir_all(&empty).unwrap();
-        let dialects = read.unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
-        assert_eq!(dialects.iter().count(), 5);
+        let alone = alone.unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
+        let layered = layered.unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
+        assert_eq!(layered.iter().count(), alone.iter().count());
     }
 
     #[test]

@@ -76,7 +76,7 @@ pub struct Adapter {
     /// `None` is a counter that cannot be fetched: it is left out of any scheduled sweep, loudly,
     /// and still runs for anyone holding its binary.
     pub acquisition: Option<Acquisition>,
-    /// One per variation this counter declares, majors first and then by name.
+    /// One per variation this counter declares, grouped by dialect, the major of each first.
     pub variations: Vec<Variation>,
 }
 
@@ -287,8 +287,14 @@ impl Adapter {
                 path.display()
             ));
         }
-        // Majors first, so a minor that sorts early never becomes the one every page opens on.
-        variations.sort_by(|a, b| b.is_major.cmp(&a.is_major).then_with(|| a.name.cmp(&b.name)));
+        // Grouped by dialect, since two variations of one dialect shown apart read as a mistake,
+        // and the major of each first, so a minor never becomes the one every page opens on.
+        variations.sort_by(|a, b| {
+            a.name_of_dialect
+                .cmp(&b.name_of_dialect)
+                .then_with(|| b.is_major.cmp(&a.is_major))
+                .then_with(|| a.name.cmp(&b.name))
+        });
         Ok(Adapter {
             name_of_counter: raw.name,
             repository: raw.repository,
@@ -996,6 +1002,29 @@ mod tests {
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(refused.contains("the same command line"), "{refused}");
+    }
+
+    // Every page names a variation by its dialect, so two of one dialect with a third between them
+    // would show the same name twice with something else in the middle.
+    #[test]
+    fn the_variations_of_one_dialect_come_out_together_with_their_major_leading() {
+        let path = write_an_adapter_for(
+            "cloc",
+            "an_adapter_over_two_dialects",
+            "name = \"cloc\"\nargs = [\"{file}\"]\n\
+             [variation.loud]\ndialect = \"docstring-as-code\"\nmajor = true\nargs = [\"--d\"]\n\
+             [variation.loud.read]\nclaims = \"SUM\"\nlines = \"header.n_lines\"\n\
+             code = \"SUM.code\"\ncomments = \"SUM.comment\"\nblanks = \"SUM.blank\"\n\
+             [variation.aaa]\ndialect = \"default\"\nargs = [\"--a\"]\n\
+             [variation.plain]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+             [variation.plain.read]\nclaims = \"SUM\"\nlines = \"header.n_lines\"\n\
+             code = \"SUM.code\"\ncomments = \"SUM.comment\"\nblanks = \"SUM.blank\"\n",
+        );
+        let adapter = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        let order: Vec<&str> = adapter.variations.iter().map(|one| one.name.as_str()).collect();
+        assert_eq!(order, ["plain", "aaa", "loud"], "the dialects did not come out grouped");
+        assert!(adapter.variations[0].is_major, "a minor opens every page");
     }
 
     #[test]

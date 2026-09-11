@@ -1,0 +1,31 @@
+counter = "cloc"
+dialect = "docstring-as-code"
+buckets = ["code", "comments", "blanks"]
+
+[counts-as-its-own-language]
+rust-doc-comment = false
+vue-template = false
+
+# cloc puts blank lines aside before its comment filters run, so a line of nothing is blank to it
+# even inside a block comment or a multi-line string.
+[[rule]]
+name   = "blank-anywhere-is-blank"
+when   = ["blank"]
+bucket = "blanks"
+
+[[rule]]
+name   = "anything-outside-spans-is-code"
+when   = ["has-residue"]
+bucket = "code"
+
+# The one rule that parts from the default ruleset: no string is documentation here, whether or not
+# it opens a line, so the default's separate doc-string rule has nothing left to say.
+[[rule]]
+name   = "a-string-is-code"
+when   = ["in-string", "!blank"]
+bucket = "code"
+
+[[rule]]
+name   = "a-comment-alone-is-comments"
+when   = ["in-comment", "!has-residue", "!in-string", "!blank"]
+bucket = "comments"
