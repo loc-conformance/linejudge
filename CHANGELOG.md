@@ -23,6 +23,8 @@ Breaking:
   `Adapter::invocations` is `Adapter::variations`.
 - `RecordedAnswers::read` takes the adapter whose record it is reading, replacing the counter name
   and a `Dialects`, so a record can no longer be read against another counter's rules.
+- `shipped::replaces_nothing_carried_under` is `replaces_nothing_carried_of` and takes the counter
+  whose files it is asked about, since a layer is now judged one counter at a time.
 - `RecordedAnswers::cases_spoken_about` is replaced by `name_every_answer_block`,
   `name_every_exception_block` and `name_every_block_no_longer_declared`, which yield different
   things and used to be one stream. `find` takes a variation name and `find_exception` a dialect
@@ -51,6 +53,11 @@ Fixes:
 
 - `explain` gave up on any file where cloc rewrote every line and dropped none, which is what
   `--strip-str-comments` does to case 2190. It reads it again.
+- A badge is decided one counter at a time. Declaring a counter of your own used to take the badge
+  off every counter in that run, the ones measured exactly the way this suite measures them
+  included, and their pages then pointed at pictures nobody had drawn. A counter earns its badge
+  when its adapter, its dialects and its recorded answers are what this build carries, the run
+  names each counter that earns none and why, and a page draws no badge that was not written.
 - A variation name and a case name are written into a key of the recorded file, so both are now
   refused unless they hold letters, digits, `_` and `-`. A name holding a space or a dot made
   `record` write a file it could not read back and exit successfully.

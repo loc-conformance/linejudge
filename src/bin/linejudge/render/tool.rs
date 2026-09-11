@@ -10,7 +10,7 @@ use crate::render::{
 const UP: &str = "../";
 const GITHUB_HOST: &str = "github.com";
 
-pub fn render_one_tool(detail: &ToolDetail, sweep: &Sweep) -> String {
+pub fn render_one_tool(detail: &ToolDetail, sweep: &Sweep, earns_a_badge: bool) -> String {
     let body = html! {
         p .crumb { a href=(format!("{UP}{INDEX_FILE}")) { "← every case" } }
         h1 {
@@ -25,7 +25,7 @@ pub fn render_one_tool(detail: &ToolDetail, sweep: &Sweep) -> String {
             }
         }
         h2 { "What it fails" }
-        (render_the_worklist_of(detail, sweep))
+        (render_the_worklist_of(detail, sweep, earns_a_badge))
         h2 { "The rules it is judged by" }
         @for dialect in &detail.dialects { (render_one_dialect(dialect)) }
     };
@@ -53,7 +53,7 @@ fn render_the_link_to(home: &str) -> Markup {
 // Every case this counter does not simply agree on, which is the list its maintainer works
 // through. A case it broke on or does not claim is here too: neither is a failure, and somebody
 // would want to see both.
-fn render_the_worklist_of(detail: &ToolDetail, sweep: &Sweep) -> Markup {
+fn render_the_worklist_of(detail: &ToolDetail, sweep: &Sweep, earns_a_badge: bool) -> Markup {
     let Some(counter) = sweep.counters.iter().find(|one| one.name == detail.name) else {
         return html! {};
     };
@@ -69,7 +69,7 @@ fn render_the_worklist_of(detail: &ToolDetail, sweep: &Sweep) -> Markup {
                     @if counter.variations.len() > 1 {
                         span .variation { (variation.dialect) }
                     }
-                    @if variation.major {
+                    @if variation.major && earns_a_badge {
                         @let file = format!(
                             "{}.svg",
                             name_the_badge_of(&counter.name, &variation.dialect)
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn the_worklist_holds_every_case_it_does_not_simply_agree_on() {
         let detail = a_tool();
-        let shown = render_the_worklist_of(&detail, &a_sweep()).into_string();
+        let shown = render_the_worklist_of(&detail, &a_sweep(), true).into_string();
         assert!(shown.contains("1 of 3"), "one of three is not agreed\n{shown}");
         assert!(shown.contains("href=\"../cases/0500-a_failure.html\""), "{shown}");
         assert!(!shown.contains("0400-a_pass"), "an agreeing case earns no line\n{shown}");

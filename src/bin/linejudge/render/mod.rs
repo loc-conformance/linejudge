@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -37,12 +38,12 @@ pub fn write_the_site(
     recorded: &[PathBuf],
     find_binary: &dyn Fn(&str) -> Option<PathBuf>,
     out: &Path,
-    every_input_is_ours: bool,
+    earns_a_badge: &BTreeSet<String>,
 ) -> Result<usize, String> {
     let sweep = measure::measure_every_counter(adapters, corpus, dialects, recorded, find_binary)?;
     let cases = measure::read_every_case(&sweep, corpus, dialects)?;
     let tools = measure::read_every_tool(&sweep, adapters, dialects)?;
-    write_every_file(&sweep, &cases, &tools, out, every_input_is_ours)
+    write_every_file(&sweep, &cases, &tools, out, earns_a_badge)
 }
 
 // Kept apart from the measuring, so what the pages point at can be checked with no counter on the
@@ -52,7 +53,7 @@ fn write_every_file(
     cases: &[CaseDetail],
     tools: &[ToolDetail],
     out: &Path,
-    every_input_is_ours: bool,
+    earns_a_badge: &BTreeSet<String>,
 ) -> Result<usize, String> {
     fs::create_dir_all(out)
         .map_err(|error| format!("{} could not be created: {error}", out.display()))?;
@@ -68,31 +69,36 @@ fn write_every_file(
         (format!("{}.html", detail.name), case::render_one_case(detail, sweep))
     })?;
     write_a_page_each(&out.join(TOOLS_DIR), tools, |detail| {
-        (format!("{}.html", detail.name), tool::render_one_tool(detail, sweep))
+        (
+            format!("{}.html", detail.name),
+            tool::render_one_tool(detail, sweep, earns_a_badge.contains(&detail.name)),
+        )
     })?;
     // A badge is read as this suite's verdict wherever it is embedded, so over cases or rules of
     // somebody's own it would be a verdict nobody can check. The pages still go out, since looking
     // at your own corpus locally is what those flags are for.
-    let badges_dir = out.join(BADGES_DIR);
-    if every_input_is_ours {
-        let badges: Vec<(String, String)> = sweep
-            .counters
-            .iter()
-            .flat_map(|counter| {
-                counter.variations.iter().filter(|one| one.major).map(|variation| {
-                    (name_the_badge_of(&counter.name, &variation.dialect),
-                     badge::render_one_badge(&variation.answers))
-                })
+    let badges: Vec<(String, String)> = sweep
+        .counters
+        .iter()
+        .filter(|counter| earns_a_badge.contains(&counter.name))
+        .flat_map(|counter| {
+            counter.variations.iter().filter(|one| one.major).map(|variation| {
+                (name_the_badge_of(&counter.name, &variation.dialect),
+                 badge::render_one_badge(&variation.answers))
             })
-            .collect();
+        })
+        .collect();
+    // Emptied first, since nothing else does, and a badge an earlier run left here would go out
+    // beside a page that no longer claims it.
+    let badges_dir = out.join(BADGES_DIR);
+    if badges_dir.exists() {
+        fs::remove_dir_all(&badges_dir)
+            .map_err(|error| format!("{} could not be removed: {error}", badges_dir.display()))?;
+    }
+    if !badges.is_empty() {
         write_a_page_each(&badges_dir, &badges, |(name, svg)| {
             (format!("{name}.svg"), svg.clone())
         })?;
-    } else if badges_dir.exists() {
-        // Nothing empties this directory, so not writing a badge would leave the one an earlier
-        // run put here, and the site would go out with a verdict on cases it no longer holds.
-        fs::remove_dir_all(&badges_dir)
-            .map_err(|error| format!("{} could not be removed: {error}", badges_dir.display()))?;
     }
     let json = serde_json::to_string_pretty(sweep)
         .map_err(|error| format!("the measurement could not be written as JSON: {error}"))?;
@@ -254,7 +260,8 @@ mod tests {
         let cases = [a_case("1010-a_case", "1000-comments"), a_case("2010-another_case", "2000-strings")];
         let tools = [a_tool("mezura", &["content", "region"]), a_tool("tokei", &["default"])];
 
-        let written = write_every_file(&sweep, &cases, &tools, &out, true).unwrap();
+        let written =
+            write_every_file(&sweep, &cases, &tools, &out, &name_every_counter(&sweep)).unwrap();
 
         let mut missing = Vec::new();
         for page in find_every_page_under(&out) {
@@ -282,25 +289,36 @@ mod tests {
         assert!(!of_a_minor, "a minor is measured and never badged");
     }
 
-    // It writes twice on purpose: the first run is what leaves a badge for the second to find.
+    // It writes more than once on purpose, since a run is what leaves a badge for the next to find.
     #[test]
-    fn inputs_of_somebody_s_own_get_the_whole_site_and_leave_no_badge_behind() {
+    fn a_counter_of_somebody_s_own_leaves_every_other_counters_badge_standing() {
         let out = env::temp_dir().join("linejudge-a_foreign_input_earns_no_badge");
         let _ = fs::remove_dir_all(&out);
         let sweep = a_sweep();
         let cases = [a_case("1010-a_case", "1000-comments")];
-        let tools = [a_tool("mezura", &["content", "region"])];
+        let tools = [a_tool("mezura", &["content", "region"]), a_tool("tokei", &["default"])];
+        let of_mezura = out.join(BADGES_DIR).join("mezura.region.svg");
+        let of_tokei = out.join(BADGES_DIR).join("tokei.default.svg");
 
-        write_every_file(&sweep, &cases, &tools, &out, true).unwrap();
-        let badges_first = out.join(BADGES_DIR).join("mezura.region.svg").is_file();
-        write_every_file(&sweep, &cases, &tools, &out, false).unwrap();
+        write_every_file(&sweep, &cases, &tools, &out, &name_every_counter(&sweep)).unwrap();
+        let both = of_mezura.is_file() && of_tokei.is_file();
 
-        let badges = out.join(BADGES_DIR).exists();
+        let one = BTreeSet::from(["tokei".to_string()]);
+        write_every_file(&sweep, &cases, &tools, &out, &one).unwrap();
+        let kept = of_tokei.is_file();
+        let taken = of_mezura.is_file();
+        let page = fs::read_to_string(out.join(TOOLS_DIR).join("mezura.html")).unwrap();
+
+        write_every_file(&sweep, &cases, &tools, &out, &BTreeSet::new()).unwrap();
+        let nothing_left = out.join(BADGES_DIR).exists();
         let overview = out.join(INDEX_FILE).is_file();
         fs::remove_dir_all(&out).unwrap();
 
-        assert!(badges_first, "the run over our own inputs writes them");
-        assert!(!badges, "a badge nobody can check is taken away and not merely left unwritten");
+        assert!(both, "the run over our own inputs writes them");
+        assert!(kept, "a counter measured the way this suite measures it keeps its badge");
+        assert!(!taken, "a badge nobody can check is taken away, never merely left unwritten");
+        assert!(!page.contains("class=\"badge\""), "a page draws no badge nobody wrote\n{page}");
+        assert!(!nothing_left, "no badge at all leaves no directory behind");
         assert!(overview, "the pages are still written, which is what a local look at them is for");
     }
 
@@ -451,6 +469,10 @@ mod tests {
                     .collect(),
             }],
         }
+    }
+
+    fn name_every_counter(sweep: &Sweep) -> BTreeSet<String> {
+        sweep.counters.iter().map(|counter| counter.name.clone()).collect()
     }
 
     fn a_tool(name: &str, names_of_dialects: &[&str]) -> ToolDetail {

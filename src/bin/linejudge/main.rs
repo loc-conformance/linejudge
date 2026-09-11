@@ -12,6 +12,7 @@ mod render;
 mod report;
 mod style;
 
+use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::io::{self, ErrorKind, IsTerminal, Write};
@@ -26,7 +27,7 @@ use linejudge::dialects::{DIALECTS_DIR, Dialects};
 use linejudge::recorded::RECORDED_DIR;
 use linejudge::recorded::{RecordedAnswers, is_same_build};
 use linejudge::shipped::{
-    create_the_shipped_dir, holds_the_carried_cases, replaces_nothing_carried_under,
+    create_the_shipped_dir, holds_the_carried_cases, replaces_nothing_carried_of,
 };
 use linejudge::verdict::measure_and_judge_every_case;
 
@@ -393,16 +394,27 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             dirs.corpus.display()
         )));
     }
-    let mut foreign = find_the_layers_not_carried(&dirs, &shipped);
-    if !the_corpus_is_ours {
-        foreign.insert(0, "the cases");
-    }
     let mut corpus = read_the_corpus(&dirs.corpus)?;
     set_aside_what_was_disabled(&mut corpus, &settings.disabled)?;
     let adapters = match &settings.name_of_counter {
         Some(name) => vec![Adapter::read_one(&dirs.adapters, name, &dialects)?],
         None => Adapter::read_all(&dirs.adapters, &dialects)?,
     };
+    // A badge is this suite's verdict, so it is asked of one counter at a time. A counter of
+    // somebody's own in the same run leaves every other counter's badge standing.
+    let mut earns_a_badge = BTreeSet::new();
+    let mut earns_none = Vec::new();
+    for adapter in &adapters {
+        let changed = match the_corpus_is_ours {
+            true => find_the_layers_not_carried_of(&dirs, &shipped, &adapter.name_of_counter),
+            false => vec!["the cases"],
+        };
+        if changed.is_empty() {
+            earns_a_badge.insert(adapter.name_of_counter.clone());
+        } else {
+            earns_none.push((adapter.name_of_counter.clone(), changed.join(" and ")));
+        }
+    }
     // With --bin the binary is already named, so the counters file is not opened at all.
     let counters = match (&settings.name_of_counter, &settings.binary) {
         (Some(counter), Some(binary)) => {
@@ -451,7 +463,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             &dirs.recorded,
             &find_binary,
             &site,
-            foreign.is_empty(),
+            &earns_a_badge,
         )?;
         let index = site.join(render::INDEX_FILE);
         writeln!(
@@ -460,10 +472,10 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             index.display(),
             site.join(render::DATA_FILE).display()
         )?;
-        if !foreign.is_empty() {
+        for (name_of_counter, changed) in &earns_none {
             writeln!(out, "{}", style::RECORDED.paint(&format!(
-                    "no badges: a badge is this suite's verdict, and {} this run measured with \
-                     are not this suite's", foreign.join(" and "))))?;
+                    "no badge for {name_of_counter}: a badge is this suite's verdict, and \
+                     {changed} this run measured it with are not this suite's")))?;
         }
         if io::stdout().is_terminal() {
             open_the_page(&index);
@@ -846,20 +858,24 @@ fn resolve_dirs(settings: &Settings, folder: Option<&Folder>, shipped: &Path) ->
     })
 }
 
-// Which of the three replace any of what this build carries, named for a message. A verdict is
-// worked out from all of them and not from the cases alone: the dialect holds the rules, the
-// adapter the command that produced the answer, the record what the answer is held against.
-fn find_the_layers_not_carried(dirs: &Dirs, shipped: &Path) -> Vec<&'static str> {
+// Which of the three replace what this build carries about one counter, named for a message. All
+// three decide a verdict. The dialect holds the rules, the adapter the command that produced the
+// answer, the record what the answer is held against.
+fn find_the_layers_not_carried_of(
+    dirs: &Dirs,
+    shipped: &Path,
+    name_of_counter: &str,
+) -> Vec<&'static str> {
     [
-        (&dirs.adapters, ADAPTERS_DIR, "the adapters"),
+        (&dirs.adapters, ADAPTERS_DIR, "the adapter"),
         (&dirs.dialects, DIALECTS_DIR, "the dialects"),
         (&dirs.recorded, RECORDED_DIR, "the recorded answers"),
     ]
     .into_iter()
     .filter(|(layered, under, _)| {
-        !layered
-            .iter()
-            .all(|dir| dir.starts_with(shipped) || replaces_nothing_carried_under(dir, under))
+        !layered.iter().all(|dir| {
+            dir.starts_with(shipped) || replaces_nothing_carried_of(dir, under, name_of_counter)
+        })
     })
     .map(|(_, _, said)| said)
     .collect()

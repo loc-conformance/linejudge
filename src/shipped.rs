@@ -51,12 +51,16 @@ pub fn holds_the_carried_cases(dir: &Path) -> bool {
         && found.iter().all(|relative| is_what_was_carried(dir, relative, CASES_DIR))
 }
 
-/// Whether a directory given for the adapters, the dialects or the records changes any of what
-/// this build carries under `name_of_dir`. A file that is missing is no change, unlike in a
-/// corpus: these three replace only the counters they name.
-pub fn replaces_nothing_carried_under(dir: &Path, name_of_dir: &str) -> bool {
+/// Whether a directory given for the adapters, the dialects or the records changes what this build
+/// carries about one counter. A file that is missing is no change. Unlike a corpus, these three
+/// replace only the counters they name, so the question is asked one counter at a time, and a
+/// counter of somebody's own leaves what is said about every other one standing.
+pub fn replaces_nothing_carried_of(dir: &Path, name_of_dir: &str, name_of_counter: &str) -> bool {
     let Some(found) = collect_every_file_under(dir) else { return false };
-    found.iter().all(|relative| is_what_was_carried(dir, relative, name_of_dir))
+    found
+        .iter()
+        .filter(|relative| names_the_counter(relative, name_of_counter))
+        .all(|relative| is_what_was_carried(dir, relative, name_of_dir))
 }
 
 // Only a name shaped like one of ours is touched, since the downloaded binaries sit in the same
@@ -94,6 +98,15 @@ fn walk_every_file_under(dir: &Path, root: &Path, found: &mut Vec<PathBuf>) -> O
         }
     }
     Some(())
+}
+
+// The first part of the path names the counter under all three layers. Case is ignored because
+// the reader opens `<counter>.toml` and Windows hands it `Tokei.toml`.
+fn names_the_counter(relative: &Path, name_of_counter: &str) -> bool {
+    let Some(first) = relative.components().next() else { return false };
+    let first = first.as_os_str().to_string_lossy();
+    first.eq_ignore_ascii_case(name_of_counter)
+        || first.eq_ignore_ascii_case(&format!("{name_of_counter}.toml"))
 }
 
 fn is_what_was_carried(dir: &Path, relative: &Path, name_of_dir: &str) -> bool {
@@ -209,22 +222,47 @@ mod tests {
             .find(|(relative, _)| relative.starts_with(&format!("{DIALECTS_DIR}/")))
             .map(|(relative, _)| relative.trim_start_matches(&format!("{DIALECTS_DIR}/")))
             .unwrap();
+        let carried = named.split('/').next().unwrap();
         let copied = one.join(named);
         fs::create_dir_all(copied.parent().unwrap()).unwrap();
         fs::copy(root.join(DIALECTS_DIR).join(named), &copied).unwrap();
-        let a_part_of_it = replaces_nothing_carried_under(&one, DIALECTS_DIR);
+        let a_part_of_it = replaces_nothing_carried_of(&one, DIALECTS_DIR, carried);
 
         fs::write(&copied, "rules of my own\n").unwrap();
-        let edited = replaces_nothing_carried_under(&one, DIALECTS_DIR);
+        let edited = replaces_nothing_carried_of(&one, DIALECTS_DIR, carried);
 
         fs::copy(root.join(DIALECTS_DIR).join(named), &copied).unwrap();
-        fs::write(one.join("mycounter.toml"), "a counter nobody here carries").unwrap();
-        let added = replaces_nothing_carried_under(&one, DIALECTS_DIR);
+        fs::create_dir_all(one.join("mycounter")).unwrap();
+        fs::write(one.join("mycounter/default.toml"), "a counter nobody here carries").unwrap();
+        let beside_a_stranger = replaces_nothing_carried_of(&one, DIALECTS_DIR, carried);
+        let the_stranger = replaces_nothing_carried_of(&one, DIALECTS_DIR, "mycounter");
         fs::remove_dir_all(&root).unwrap();
 
-        assert!(a_part_of_it, "one counter's file, unchanged, leaves every other counter alone");
+        assert!(a_part_of_it, "one counter's file, unchanged, replaces nothing of it");
         assert!(!edited, "the same file with something else in it replaces what we carry");
-        assert!(!added, "a file under a name we carry nothing of adds a counter of its own");
+        assert!(beside_a_stranger, "a counter of somebody's own leaves ours alone");
+        assert!(!the_stranger, "a counter we carry nothing of is nothing we carry");
+    }
+
+    #[test]
+    fn a_file_spelt_in_another_case_is_still_that_counters_file() {
+        let root = env::temp_dir().join("linejudge-a_layer_spelt_in_another_case");
+        let _ = fs::remove_dir_all(&root);
+        write_the_shipped_files_into(&root).unwrap();
+
+        let one = root.join("shouting");
+        let named = FILES
+            .iter()
+            .find(|(relative, _)| relative.starts_with(&format!("{RECORDED_DIR}/")))
+            .map(|(relative, _)| relative.trim_start_matches(&format!("{RECORDED_DIR}/")))
+            .unwrap();
+        let carried = named.trim_end_matches(".toml");
+        fs::create_dir_all(&one).unwrap();
+        fs::write(one.join(named.to_uppercase()), "answers of my own\n").unwrap();
+        let shouted = replaces_nothing_carried_of(&one, RECORDED_DIR, carried);
+        fs::remove_dir_all(&root).unwrap();
+
+        assert!(!shouted, "{named} spelt in capitals is still {carried}'s file");
     }
 
     // The names live twice: once in build.rs, which cannot import them because it runs before the
