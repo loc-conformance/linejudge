@@ -56,8 +56,12 @@ A separate corpus crate was rejected:
 - The executable embeds everything at build time, so for its users a split changes nothing.
 - A different corpus can already be used with `--corpus`.
 
-Every release is tagged `vX.Y.Z`. Cargo does not move a `"0.x"` pin to the next minor on its own,
-so a consumer's CI only changes when they raise the pin themselves. A release whose corpus changed
+Every release is tagged `vX.Y.Z` and gains a section at the top of
+[CHANGELOG.md](CHANGELOG.md), written in the same commit as the version bump. What that section
+says is what the github release says, since the release workflow attaches the archives to a release
+made by hand and keeps whatever notes it already has. Anything a consumer has to edit on their side
+goes under **Breaking**, with the line they have to write. Cargo does not move a `"0.x"` pin to the
+next minor on its own, so a consumer's CI only changes when they raise the pin themselves. A release whose corpus changed
 re-measures every recorded counter first, as [Re-measuring a counter](#re-measuring-a-counter)
 describes, so the records it
 ships are answers over the cases it ships.
@@ -175,6 +179,18 @@ rewrites `recorded/<counter>.toml` from scratch, with the version at the top exa
 printed it. A note in that file stays as long as the answer it describes: when an answer changes,
 the run drops the note and tells you which one, so you can rewrite it if it still applies.
 
+One block per case and variation. A variation that answered a case exactly as its dialect's major
+did writes that down in one line, and the answer, its failure flag and its note are all read from
+the block it names:
+
+```toml
+[answer.1120-close_then_code_then_stray_and_reopen.stripstr]
+same-as = "default"
+```
+
+Correcting the note on the major corrects it for both. A variation that needs a sentence of its
+own writes a `note` beside the pointer, and that one wins.
+
 Version bumps arrive as pull requests. A weekly job compares each pinned version against the newest
 available and, where they differ, fetches the new build, records its answers and opens a pull
 request carrying both. What is left for a person is a note on any case that started failing, and
@@ -186,7 +202,7 @@ The version at the top is written exactly as the counter printed it, and compare
 with what the running binary prints. The recorded answers are held against a run only when the two
 match, so a difference that comes from running another build stays out of the verdict. A counter that declares `version-flag = ""` prints no version, says `unknown
 version` on both sides, and is judged against its own record all the same. Under it comes one entry
-per case and per way of counting, saying what the counter printed for that case.
+per case and per variation, saying what the counter printed for that case.
 
 `is-known-failure = true` declares out loud that those numbers differ from what the rules ask. A
 `note` is allowed with or without the flag: under it the note is the reason for the failure, without
@@ -198,7 +214,9 @@ version strings are free text that nobody can put in order.
 
 ## Exceptions, and who may write one
 
-The same file holds that counter's exceptions, in a section of their own:
+The same file holds that counter's exceptions, in a section of their own. An exception is keyed by
+dialect, since it stands in for what the rules would work out, so every variation judged by those
+rules is held to it:
 
 ```toml
 [exception.2090-docstring_holding_a_comment_symbol.default]

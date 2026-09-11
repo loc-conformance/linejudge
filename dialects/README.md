@@ -9,7 +9,8 @@ down what your tool means to do.
 One folder per counter and one file per set of rules, `<counter>/<dialect>.toml`, and the file's
 own `counter` and `dialect` keys must match the folder and the name. The folder is the unit a
 tool's maintainer owns, however many dialects it grows. A tool that counts one way calls it
-`default`; mezura counts two ways and its folder holds two files.
+`default`; mezura counts two ways and cloc has a flag that moves one of its rules, so both folders
+hold two files.
 
 A dialect is named by the adapter, which declares one variation per command line the counter is
 measured with. Several variations may name one dialect, which is how a flag that changes only how

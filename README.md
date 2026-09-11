@@ -54,27 +54,33 @@ Each column is a counter and each row is a test file.
 Here is the whole idea in one example. A case is three files: the input being counted, a
 `case.toml` with one sentence saying what trips counters up in it, and a `truth.txt` recording
 where each string and comment begins and ends. This is the input file of case
-`2160-long_bracket_string_holding_a_comment_symbol`:
+`2190-triple_quote_read_as_three_short_ones`:
 
-```lua
-local s = [[a string
--- not a comment, it is inside the string
-]]
+```groovy
+def a = '''
+// this is text inside the string
+/* and so is this
+'''
+def b = 1
 ```
 
-Lua writes a string that runs over several lines with `[[` and `]]`. The `--` on the second line
-looks like a comment opener, but it sits inside that string, so it is text.
+Groovy writes a string that runs over several lines with three apostrophes. The `//` and the `/*`
+on the lines inside look like comment openers, but they sit inside that string, so they are text.
 
 Beside the file sits `truth.txt`, which records where the string is. Under a copy of every line runs
 one marker per character:
 
 ```
-local s = [[a string
-..... . . SSssssssss
--- not a comment, it is inside the string
-sssssssssssssssssssssssssssssssssssssssss
-]]
-ZZ
+def a = '''
+... . . SSS
+// this is text inside the string
+sssssssssssssssssssssssssssssssss
+/* and so is this
+sssssssssssssssss
+'''
+ZZZ
+def b = 1
+... . . .
 ```
 
 `S` marks the characters that open the string, `s` its contents, `Z` the ones that close it, and `.`
@@ -83,34 +89,42 @@ anything outside (likewise, `C` opens a comment, `c` is its contents, and `U` cl
 Nothing here says how many lines of code or comments the file has. `truth.txt` just gives you the objective
 bounds of the token spans, like a lexer would. How these lines get counted is open to interpretation.
 
-Let's see an example. tokei's (14.0.0) rules say a line holding any part of a string counts as
-code. The string touches all three lines here, opened on the first, filling the second, closed on
-the third, so under tokei's own rules this file is three lines of code and no comments. Here is
-the `explain` command in action:
+Let's see an example. tokei's (15.0.0) rules say a line holding any part of a string counts as
+code. The string touches the first four lines here, opened on the first, filling the second and
+the third, closed on the fourth, and the fifth is plain code, so under tokei's own rules this file
+is five lines of code and no comments. Here is the `explain` command in action:
 
 ```
-$ linejudge explain 2160 --counter tokei
+$ linejudge explain 2190 --counter tokei
 
-tokei.default on 2160-long_bracket_string_holding_a_comment_symbol
-  by its rules    3 lines, 0 blanks, 3 code, 0 comments
-  tokei answers   3 lines, 0 blanks, 2 code, 1 comments   ✗ differs
+tokei.default on 2190-triple_quote_read_as_three_short_ones
+  by its rules    5 lines, 0 blanks, 5 code, 0 comments
+  tokei answers   5 lines, 0 blanks, 1 code, 4 comments   ✗ differs
   tokei declares no per-line command of its own
 
-  1  local s = [[a string
-     ..... . . SSssssssss
+  1  def a = '''
+     ... . . SSS
      code  by anything-outside-spans-is-code and by a-string-is-code   (has-residue, in-string, word-in-residue)
 
-  2  -- not a comment, it is inside the string
-     sssssssssssssssssssssssssssssssssssssssss
+  2  // this is text inside the string
+     sssssssssssssssssssssssssssssssss
      code  by a-string-is-code   (in-string)
 
-  3  ]]
-     ZZ
+  3  /* and so is this
+     sssssssssssssssss
      code  by a-string-is-code   (in-string)
+
+  4  '''
+     ZZZ
+     code  by a-string-is-code   (in-string)
+
+  5  def b = 1
+     ... . . .
+     code  by anything-outside-spans-is-code   (has-residue, word-in-residue)
 ```
 
-**tokei counted the second line as a comment. Its own rules say it is code.** That is the failure,
-and no opinion of ours went into it.
+**tokei counted four of the five lines as comments. Its own rules say all five are code.** That is
+the failure, and no opinion of ours went into it.
 
 In the output, you can see an analysis of every line of the test by linejudge. On the first row,
 it shows the real content of the line of the input file, on the second row it shows the corresponding
@@ -166,8 +180,8 @@ changed without calling it a regression, because a snapshot of one build says no
 Naming a case runs that one alone, which is what you want while you are fixing something:
 
 ```
-linejudge check 2160 --counter tokei
-linejudge explain 2160 --counter tokei
+linejudge check 2190 --counter tokei
+linejudge explain 2190 --counter tokei
 ```
 
 Any part of a name works as long as it fits exactly one case, and the run tells you which case it

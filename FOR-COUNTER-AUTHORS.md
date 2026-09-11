@@ -233,11 +233,12 @@ measured and shown beside it, so a flag that fixes a case is visible. A variatio
 block of its own is read like the major of its dialect.
 
 **A flag that changes what a rule says needs its own dialect file, and its variation is that
-dialect's major.** cloc's `--docstring-as-code` is the example: it overrides
-`a-doc-string-is-documentation`, so declaring it as a second variation of `default` would measure
-cloc against a rule it was told to break. Nothing in the format refuses that, because the two
-declare the same categories. What catches it is the note every failure needs. The only sentence
-that fits says the tool broke its own rule on purpose.
+dialect's major.** cloc's `--docstring-as-code` is the example, and this suite ships it:
+`dialects/cloc/docstring-as-code.toml` is `default.toml` with `a-doc-string-is-documentation` gone
+and the string rule widened to cover every string. Declaring the flag as a second variation of
+`default` would measure cloc against a rule it was told to break. Nothing in the format refuses
+that, because the two declare the same categories. What catches it is the note every failure needs.
+The only sentence that fits says the tool broke its own rule on purpose.
 
 `version-flag` names the flag that asks your counter for its version, and it is `--version` unless
 you say otherwise. What the counter prints is written at the top of your recorded file and compared
