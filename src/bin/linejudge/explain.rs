@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use linejudge::adapter::{Adapter, Invocation};
+use linejudge::adapter::{Adapter, Variation};
 use linejudge::answer::{Answer, Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::deriver::{ExplainedLine, derive_answer, explain_every_line};
@@ -29,9 +29,9 @@ pub fn find_case<'c>(corpus: &'c Corpus, name: &str) -> Result<&'c Case, String>
     })
 }
 
-// One block per way this counter counts: every line of the case beside its marked spans, the rule
-// that took it and the predicates that hold on it, and whatever the counter itself says about the
-// file line by line.
+// One block per variation this counter declares. Each holds every line of the case beside its
+// marked spans, the rule that took it and the predicates that hold on it, and whatever the counter
+// itself says about the file line by line.
 pub fn explain_one_counter(
     out: &mut dyn Write,
     adapter: &Adapter,
@@ -41,9 +41,11 @@ pub fn explain_one_counter(
     readings: &Readings,
     scripts: &[PathBuf],
 ) -> io::Result<()> {
-    for way in &adapter.invocations {
-        let block = OneWay { counter: &adapter.name_of_counter, way: &way.name, case };
-        let Some(dialect) = dialects.find(&adapter.name_of_counter, &way.name) else {
+    for variation in &adapter.variations {
+        let block =
+            OneVariation { counter: &adapter.name_of_counter, variation: &variation.name, case };
+        let Some(dialect) = dialects.find(&adapter.name_of_counter, &variation.name_of_dialect)
+        else {
             writeln!(out, "\n{} on {}: no dialect file, nothing to derive with",
                     block.key(), case.name)?;
             continue;
@@ -60,23 +62,23 @@ pub fn explain_one_counter(
                 continue;
             }
         };
-        let theirs = read_what_the_counter_says(adapter, way, binary, case, scripts);
-        let its = run_the_counter(adapter, way, binary, case);
+        let theirs = read_what_the_counter_says(adapter, variation, binary, case, scripts);
+        let its = run_the_counter(adapter, variation, binary, case);
         write_the_header(out, &block, &real, &its, &theirs, &explained)?;
         write_every_line(out, &block, &explained, &theirs)?;
     }
     Ok(())
 }
 
-struct OneWay<'a> {
+struct OneVariation<'a> {
     counter: &'a str,
-    way: &'a str,
+    variation: &'a str,
     case: &'a Case,
 }
 
-impl OneWay<'_> {
+impl OneVariation<'_> {
     fn key(&self) -> String {
-        format!("{}.{}", self.counter, self.way)
+        format!("{}.{}", self.counter, self.variation)
     }
 }
 
@@ -118,9 +120,14 @@ impl TheirAnswer {
     }
 }
 
-fn run_the_counter(adapter: &Adapter, way: &Invocation, binary: Option<&Path>, case: &Case) -> ItsAnswer {
+fn run_the_counter(
+    adapter: &Adapter,
+    variation: &Variation,
+    binary: Option<&Path>,
+    case: &Case,
+) -> ItsAnswer {
     let Some(binary) = binary else { return ItsAnswer::NotMeasured };
-    match adapter.measure(way, binary, &case.input_file) {
+    match adapter.measure(variation, binary, &case.input_file) {
         Ok(Some(answer)) => ItsAnswer::Counted(answer),
         Ok(None) => ItsAnswer::Unclaimed,
         Err(message) => ItsAnswer::Broke(message),
@@ -129,19 +136,19 @@ fn run_the_counter(adapter: &Adapter, way: &Invocation, binary: Option<&Path>, c
 
 fn read_what_the_counter_says(
     adapter: &Adapter,
-    way: &Invocation,
+    variation: &Variation,
     binary: Option<&Path>,
     case: &Case,
     scripts: &[PathBuf],
 ) -> TheirAnswer {
     let Some(format) = adapter.explain_output else { return TheirAnswer::NoCommand };
     let Some(binary) = binary else { return TheirAnswer::NoBinary };
-    let printed = match adapter.run_explain(way, binary, &case.input_file, scripts) {
+    let printed = match adapter.run_explain(variation, binary, &case.input_file, scripts) {
         Some(Ok(printed)) => printed,
         Some(Err(message)) => return TheirAnswer::Broken(message),
         None => return TheirAnswer::NoCommand,
     };
-    match per_line::read_output(format, &way.buckets, case.truth.lines.len(), &printed) {
+    match per_line::read_output(format, &variation.buckets, case.truth.lines.len(), &printed) {
         Ok(answer) => TheirAnswer::PerLine(answer),
         Err(message) => TheirAnswer::Unreadable(message),
     }
@@ -151,7 +158,7 @@ fn read_what_the_counter_says(
 // by line is still held to its own rules here instead of showing a derivation and no verdict.
 fn write_the_header(
     out: &mut dyn Write,
-    block: &OneWay,
+    block: &OneVariation,
     real: &Answer,
     its: &ItsAnswer,
     theirs: &TheirAnswer,
@@ -270,7 +277,7 @@ fn count_the_lines_of(region: &RegionCounts) -> Counts {
 // What the counter itself says is written under a line only where it differs from the rules.
 fn write_every_line(
     out: &mut dyn Write,
-    block: &OneWay,
+    block: &OneVariation,
     explained: &[ExplainedLine],
     theirs: &TheirAnswer,
 ) -> io::Result<()> {
@@ -481,8 +488,8 @@ mod tests {
         String::from_utf8(written).unwrap()
     }
 
-    fn a_block(case: &Case) -> OneWay<'_> {
-        OneWay { counter: "mezura", way: "content", case }
+    fn a_block(case: &Case) -> OneVariation<'_> {
+        OneVariation { counter: "mezura", variation: "content", case }
     }
 
     fn a_derivation(corpus: &Corpus, dialects: &Dialects, case: &Case) -> Answer {

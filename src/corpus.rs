@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 use crate::faults::Faults;
 use crate::readings::{READINGS_FILE, Readings};
+use crate::recorded::check_it_is_a_bare_key;
 use crate::truth::Truth;
 
 /// The directory the cases are read from, one directory per group inside it.
@@ -240,6 +241,7 @@ fn find_the_first_number_of(group: &str) -> Result<u32, String> {
 
 // A case filed under the wrong group would keep working and stop being findable by number.
 fn check_the_number_of(name_of_case: &str, first: u32, group: &str) -> Result<(), String> {
+    check_it_is_a_bare_key(name_of_case)?;
     match find_the_number_in(name_of_case) {
         Some(number) if (first..first.saturating_add(GROUP_SIZE)).contains(&number) => Ok(()),
         Some(_) => Err(format!(

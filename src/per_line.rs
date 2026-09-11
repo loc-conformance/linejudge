@@ -50,7 +50,7 @@ pub fn read_output(
     }
 }
 
-/// Reads the uniform document, given the buckets this way of counting has and how many lines the
+/// Reads the uniform document, given the buckets this dialect has and how many lines the
 /// file really holds. A counter that answers a seventeen line file with eighteen verdicts is told
 /// what is wrong with its document instead of being compared against the wrong lines.
 pub fn read_per_line(

@@ -122,7 +122,7 @@ struct RegionLocator {
 
 // The block as the adapter file writes it, with `lines` and the buckets sitting flat beside the
 // fields that have a meaning of their own.
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct RawLocator {
     each: Option<String>,
     claims: Option<String>,
@@ -131,7 +131,7 @@ pub struct RawLocator {
     counts: BTreeMap<String, String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct RawRegionLocator {
     each: String,
     language: String,

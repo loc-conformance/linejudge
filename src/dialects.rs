@@ -1,4 +1,4 @@
-//! The rules that say where each line of a file goes, one set per way of counting.
+//! The rules that say where each line of a file goes, one set per dialect.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -24,7 +24,7 @@ pub(crate) const PREDICATES: [(&str, Predicate); 7] = [
     ("word-in-residue", Predicate::WordInResidue),
 ];
 
-/// Every way of counting this run knows: one dialect per file in the directory it was read from.
+/// Every set of rules this run knows, one dialect per file in the directory it was read from.
 /// Case files, adapter files and what a counter prints are all checked against these.
 #[derive(Debug)]
 pub struct Dialects {
@@ -57,7 +57,7 @@ impl Dialects {
         if faults.is_empty() { Ok(Dialects { dialects }) } else { Err(faults.into()) }
     }
 
-    // One folder per counter, one file per way it counts: `<counter>/<dialect>.toml`.
+    // One folder per counter and one file per dialect, named `<counter>/<dialect>.toml`.
     fn read_one_directory(dir: &Path) -> Result<Vec<Dialect>, Vec<String>> {
         let entries = match fs::read_dir(dir) {
             Ok(entries) => entries,
@@ -105,7 +105,7 @@ impl Dialects {
         if faults.is_empty() { Ok(dialects) } else { Err(faults) }
     }
 
-    /// One counter's one way of counting, and `None` where no directory declared it.
+    /// One counter's one dialect, and `None` where no directory declared it.
     pub fn find(&self, name_of_counter: &str, name_of_dialect: &str) -> Option<&Dialect> {
         self.dialects
             .iter()
@@ -118,13 +118,13 @@ impl Dialects {
     }
 }
 
-/// One way of counting, as its file declares it: the names it gives its buckets, the rules that
+/// One dialect, as its file declares it. It holds the names it gives its buckets, the rules that
 /// put each line in one of them, and its answer to each reading a case can mark as optional.
 #[derive(Debug)]
 pub struct Dialect {
-    /// The counter that counts this way.
+    /// The counter these rules belong to.
     pub counter: String,
-    /// `default` for a counter that counts only the one way.
+    /// `default` for a counter that declares only the one dialect.
     pub name: String,
     /// The file this dialect was read from, so a refusal can say where the missing answer goes.
     pub file: PathBuf,

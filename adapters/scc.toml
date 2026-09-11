@@ -11,10 +11,12 @@ channel = "github-release-asset"
 name    = "boyter/scc"
 version = "4.1.0"
 
-[dialect.default]
-args = []
+[variation.default]
+dialect = "default"
+major   = true
+args    = []
 
-[dialect.default.read]
+[variation.default.read]
 each     = "[]"
 lines    = "Lines"
 code     = "Code"

@@ -37,13 +37,17 @@ pub struct Case {
 pub struct Counter {
     pub name: String,
     pub version: String,
-    pub dialects: Vec<Dialect>,
+    pub variations: Vec<Variation>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct Dialect {
+pub struct Variation {
     pub name: String,
+    // Several variations may name one dialect, which says they were judged by the same rules.
+    pub dialect: String,
+    pub major: bool,
+    pub flags: Vec<String>,
     pub answers: Vec<Answer>,
 }
 
@@ -83,7 +87,7 @@ pub enum Verdict {
 }
 
 // Everything a case's own page shows that the measurement does not carry: the file itself, the
-// spans marked in it, and how each way of counting reads every line. Deliberately outside the
+// spans marked in it, and how each dialect reads every line. Deliberately outside the
 // published JSON, which holds what the tools answered and not a copy of the corpus.
 #[derive(Debug, PartialEq)]
 pub struct CaseDetail {
@@ -91,9 +95,9 @@ pub struct CaseDetail {
     pub group: String,
     pub trap: String,
     pub file: String,
-    // Every way of counting the page speaks about, as `counter.dialect`, in the order the
-    // overview shows them, which is the order every line's readings are in.
-    pub ways: Vec<String>,
+    // Every dialect the page speaks about, as `counter.dialect`, in the order every line's
+    // readings are in.
+    pub dialects: Vec<String>,
     pub lines: Vec<Line>,
 }
 
@@ -129,10 +133,17 @@ pub struct ToolDetail {
 #[derive(Debug, PartialEq)]
 pub struct DialectDetail {
     pub name: String,
-    // What is put on the counter's command line to ask for this way of counting, which is the only
-    // thing that says what the name of it means. Empty for a counter that has just the one.
-    pub flags: Vec<String>,
+    pub variations: Vec<VariationDetail>,
     pub rules: Vec<RuleDetail>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct VariationDetail {
+    pub name: String,
+    pub major: bool,
+    // What is put on the counter's command line to ask for this, which is the only thing that says
+    // what the name of it means. Empty for a counter run plainly.
+    pub flags: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -204,8 +215,11 @@ mod tests {
             counters: vec![Counter {
                 name: "tokei".to_string(),
                 version: "tokei 14.0.0".to_string(),
-                dialects: vec![Dialect {
+                variations: vec![Variation {
                     name: "default".to_string(),
+                    dialect: "default".to_string(),
+                    major: true,
+                    flags: Vec::new(),
                     answers: vec![Answer {
                         case: "1010-a_case".to_string(),
                         verdict: Verdict::Fails,

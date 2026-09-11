@@ -9,10 +9,11 @@ use std::process::Command;
 use serde::Deserialize;
 
 use crate::answer::Answer;
-use crate::dialects::Dialects;
+use crate::dialects::{Dialect, Dialects};
 use crate::locator::{Locator, RawLocator};
 use crate::measurement::{OutputFormat, read_output};
 use crate::per_line::PerLineFormat;
+use crate::recorded::check_it_is_a_bare_key;
 
 /// The directory the adapters are read from, one `<counter>.toml` inside it per counter.
 pub const ADAPTERS_DIR: &str = "adapters";
@@ -58,7 +59,7 @@ pub struct Adapter {
     /// Where the counter itself lives, for a report that links to it. `None` is not linked.
     pub repository: Option<String>,
     /// The command line it is run with, `{file}` standing for the file, and the arguments of the
-    /// chosen way of counting appended after these.
+    /// chosen variation appended after these.
     pub args: Vec<String>,
     /// The command line that asks for a reading of a file line by line, used in place of `args`.
     /// `None` is a counter with no such command, which is not a failure.
@@ -75,8 +76,8 @@ pub struct Adapter {
     /// `None` is a counter that cannot be fetched: it is left out of any scheduled sweep, loudly,
     /// and still runs for anyone holding its binary.
     pub acquisition: Option<Acquisition>,
-    /// One per way this counter counts, each named after the dialect holding its rules.
-    pub invocations: Vec<Invocation>,
+    /// One per variation this counter declares, majors first and then by name.
+    pub variations: Vec<Variation>,
 }
 
 impl Adapter {
@@ -203,21 +204,50 @@ impl Adapter {
                 }
             }
         }
-        let mut ways = Vec::new();
+        if raw.dialect.is_some() {
+            return Err(format!(
+                "{}: a [dialect.<name>] block is now [variation.<name>] carrying a dialect = line \
+                 that names the rules file judging it, and major = true on the one variation each \
+                 dialect is scored by",
+                path.display()
+            ));
+        }
+        let read_of_the_major = find_the_read_of_every_major(&raw, path, dialects)?;
+        let mut variations = Vec::new();
         let mut output_is_read = false;
-        for (name, dialect) in raw.dialect {
-            let Some(found) = dialects.find(&raw.name, &name) else {
-                return Err(format!("{}: {} is a dialect this suite has no buckets for", path.display(), name));
-            };
-            if let Some(misplaced) = dialect.args.iter().find(|a| a.contains(FILE_PLACEHOLDER)) {
+        for (name, mut variation) in raw.variation {
+            let found = read_of_the_major[&variation.dialect].0;
+            check_it_is_a_bare_key(&name).map_err(|e| format!("{}: {e}", path.display()))?;
+            if let Some(twin) = variations.iter().find(|one: &&Variation| {
+                one.name_of_dialect == variation.dialect && one.args == variation.args
+            }) {
                 return Err(format!(
-                    "{}: {} names {misplaced} among its own arguments, and the file belongs in the \
-                     arguments every dialect shares",
+                    "{}: {name} and {} ask for the dialect {} with the same command line, so one \
+                     of them measures nothing the other does not",
                     path.display(),
-                    name
+                    twin.name,
+                    variation.dialect
                 ));
             }
-            let reader = match dialect.read {
+            if name != variation.dialect && dialects.find(&raw.name, &name).is_some() {
+                return Err(format!(
+                    "{}: the variation {name} is named after another dialect of {} and declares \
+                     the dialect {}, so its name says one thing and its rules another",
+                    path.display(),
+                    raw.name,
+                    variation.dialect
+                ));
+            }
+            if let Some(misplaced) = variation.args.iter().find(|a| a.contains(FILE_PLACEHOLDER)) {
+                return Err(format!(
+                    "{}: {name} names {misplaced} among its own arguments, and the file belongs in \
+                     the arguments every variation shares",
+                    path.display()
+                ));
+            }
+            let inherited =
+                || read_of_the_major.get(&variation.dialect).and_then(|found| found.1.clone());
+            let reader = match variation.read.take().or_else(inherited) {
                 Some(read) => Reader::Declared(Box::new(
                     Locator::of(read, &found.buckets).map_err(|e| {
                         format!("{}: the read block of {name} {e}", path.display())
@@ -230,31 +260,35 @@ impl Adapter {
                     }
                     None => {
                         return Err(format!(
-                            "{}: {name} has no read block and the adapter names no output, so \
-                             nothing says how what the counter prints is read",
+                            "{}: {name} has no read block, the major of its dialect declares none \
+                             to inherit, and the adapter names no output, so nothing says how what \
+                             the counter prints is read",
                             path.display()
                         ));
                     }
                 },
             };
-            ways.push(Invocation {
+            variations.push(Variation {
                 name,
-                args: dialect.args,
+                name_of_dialect: variation.dialect,
+                is_major: variation.major,
+                args: variation.args,
                 buckets: found.buckets.clone(),
                 reader,
             });
         }
-        if ways.is_empty() {
-            return Err(format!("{} names no way of counting to run", path.display()));
+        if variations.is_empty() {
+            return Err(format!("{} declares no variation to run", path.display()));
         }
         if raw.output.is_some() && !output_is_read {
             return Err(format!(
-                "{} names an output, and every dialect declares its own read block, so leave the \
-                 field out",
+                "{} names an output, and every variation is read by a block of its own, so leave \
+                 the field out",
                 path.display()
             ));
         }
-        ways.sort_by(|a, b| a.name.cmp(&b.name));
+        // Majors first, so a minor that sorts early never becomes the one every page opens on.
+        variations.sort_by(|a, b| b.is_major.cmp(&a.is_major).then_with(|| a.name.cmp(&b.name)));
         Ok(Adapter {
             name_of_counter: raw.name,
             repository: raw.repository,
@@ -268,7 +302,7 @@ impl Adapter {
                 None => Some(VERSION_FLAG.to_string()),
             },
             acquisition: raw.acquisition,
-            invocations: ways,
+            variations,
         })
     }
 
@@ -276,14 +310,14 @@ impl Adapter {
     /// no such file, which is an answer of its own and not a failure.
     pub fn measure(
         &self,
-        invocation: &Invocation,
+        variation: &Variation,
         binary: &Path,
         file: &Path,
     ) -> Result<Option<Answer>, String> {
-        let args = self.build_args(invocation, file);
+        let args = self.build_args(variation, file);
         let printed = run_counter(binary, &args)?;
-        match &invocation.reader {
-            Reader::Written(format) => read_output(*format, &invocation.buckets, &printed),
+        match &variation.reader {
+            Reader::Written(format) => read_output(*format, &variation.buckets, &printed),
             Reader::Declared(locator) => locator.read(&printed),
         }
         .map_err(|e| format!("{} on {}: {e}", self.name_of_counter, file.display()))
@@ -311,7 +345,7 @@ impl Adapter {
     /// adapter that declares no such command.
     pub fn run_explain(
         &self,
-        invocation: &Invocation,
+        variation: &Variation,
         binary: &Path,
         file: &Path,
         scripts: &[PathBuf],
@@ -322,33 +356,38 @@ impl Adapter {
         let (program, args) = match &self.explain_command {
             Some(program) => (
                 PathBuf::from(program),
-                build_wrapper_args(base, invocation, binary, file, scripts),
+                build_wrapper_args(base, variation, binary, file, scripts),
             ),
-            None => (binary.to_path_buf(), build_command_args(base, invocation, file)),
+            None => (binary.to_path_buf(), build_command_args(base, variation, file)),
         };
         Some(run_counter(&program, &args))
     }
 
     /// The command as a person would retype it, meant to be pasted into a shell. Paths under the
     /// directory the run works from are written relative to it and the rest are left whole.
-    pub fn format_command(&self, invocation: &Invocation, binary: &Path, file: &Path) -> String {
-        let args = self.build_args(invocation, &shorten_the_path(file));
+    pub fn format_command(&self, variation: &Variation, binary: &Path, file: &Path) -> String {
+        let args = self.build_args(variation, &shorten_the_path(file));
         format!("{} {}", shorten(binary), args.join(" "))
     }
 
-    fn build_args(&self, invocation: &Invocation, file: &Path) -> Vec<String> {
-        build_command_args(&self.args, invocation, file)
+    fn build_args(&self, variation: &Variation, file: &Path) -> Vec<String> {
+        build_command_args(&self.args, variation, file)
     }
 
 }
 
-/// How this counter is asked for one of its ways of counting, and how what it prints is read. The
-/// rules that way of counting is judged by are the [`crate::dialects::Dialect`] of the same name.
+/// How this counter is asked for one of its variations, and how what it prints is read. The rules
+/// a variation is judged by are the [`crate::dialects::Dialect`] it names, which its siblings may
+/// name too.
 #[derive(Debug)]
-pub struct Invocation {
-    /// `default` for a counter that counts only the one way.
+pub struct Variation {
+    /// `default` for a counter that is run only the one way.
     pub name: String,
-    /// What is added to the counter's command line to ask for this way of counting.
+    /// The dialect file whose rules judge it, which several variations may share.
+    pub name_of_dialect: String,
+    /// Whether this is the variation its dialect is scored and badged by. Exactly one per dialect.
+    pub is_major: bool,
+    /// What is added to the counter's command line to ask for this variation.
     pub args: Vec<String>,
     /// In the order its dialect file lists them.
     pub buckets: Vec<String>,
@@ -391,6 +430,49 @@ pub fn is_the_declared_version(declared: &str, printed: &str) -> bool {
     })
 }
 
+// Keyed by dialect, holding the rules themselves and whatever read block its major declared.
+fn find_the_read_of_every_major<'a>(
+    raw: &RawAdapter,
+    path: &Path,
+    dialects: &'a Dialects,
+) -> Result<BTreeMap<String, (&'a Dialect, Option<RawLocator>)>, String> {
+    let mut led_by: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut read_of_the_major = BTreeMap::new();
+    for (name, variation) in &raw.variation {
+        let Some(found) = dialects.find(&raw.name, &variation.dialect) else {
+            return Err(format!(
+                "{}: the variation {name} names the dialect {}, and this suite has no buckets for \
+                 it",
+                path.display(),
+                variation.dialect
+            ));
+        };
+        if !variation.major {
+            continue;
+        }
+        if let Some(other) = led_by.insert(&variation.dialect, name) {
+            return Err(format!(
+                "{}: {other} and {name} both say major = true for the dialect {}, and a dialect \
+                 has exactly one major",
+                path.display(),
+                variation.dialect
+            ));
+        }
+        read_of_the_major.insert(variation.dialect.clone(), (found, variation.read.clone()));
+    }
+    for variation in raw.variation.values() {
+        if !read_of_the_major.contains_key(&variation.dialect) {
+            return Err(format!(
+                "{}: no variation of the dialect {} says major = true, and every dialect is \
+                 scored and badged through exactly one",
+                path.display(),
+                variation.dialect
+            ));
+        }
+    }
+    Ok(read_of_the_major)
+}
+
 fn shorten(path: &Path) -> String {
     shorten_the_path(path).display().to_string()
 }
@@ -404,12 +486,12 @@ fn name_every_one_of(dirs: &[PathBuf]) -> String {
     dirs.iter().map(|dir| dir.display().to_string()).collect::<Vec<_>>().join(" or ")
 }
 
-fn build_command_args(base: &[String], invocation: &Invocation, file: &Path) -> Vec<String> {
+fn build_command_args(base: &[String], variation: &Variation, file: &Path) -> Vec<String> {
     let mut args: Vec<String> = base
         .iter()
         .map(|a| a.replace(FILE_PLACEHOLDER, &file.display().to_string()))
         .collect();
-    args.extend(invocation.args.iter().cloned());
+    args.extend(variation.args.iter().cloned());
     args
 }
 
@@ -419,12 +501,12 @@ fn build_command_args(base: &[String], invocation: &Invocation, file: &Path) -> 
 // the one this build carries where none does, which is what makes the refusal name a real path.
 fn build_wrapper_args(
     base: &[String],
-    invocation: &Invocation,
+    variation: &Variation,
     binary: &Path,
     file: &Path,
     scripts: &[PathBuf],
 ) -> Vec<String> {
-    build_command_args(base, invocation, file)
+    build_command_args(base, variation, file)
         .iter()
         .map(|a| a.replace(BINARY_PLACEHOLDER, &binary.display().to_string()))
         .map(|a| fill_in_the_scripts_dir(&a, scripts))
@@ -487,12 +569,18 @@ struct RawAdapter {
     #[serde(rename = "version-flag")]
     version_flag: Option<String>,
     acquisition: Option<Acquisition>,
-    dialect: std::collections::BTreeMap<String, RawDialect>,
+    #[serde(default)]
+    variation: BTreeMap<String, RawVariation>,
+    // Read only so that a file still written the old way is refused in words that name the fix.
+    dialect: Option<toml::Value>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RawDialect {
+struct RawVariation {
+    dialect: String,
+    #[serde(default)]
+    major: bool,
     args: Vec<String>,
     read: Option<RawLocator>,
 }
@@ -516,9 +604,9 @@ mod tests {
         assert_eq!(names, in_order, "the roster came back out of order");
         for adapter in &adapters {
             let who = &adapter.name_of_counter;
-            assert!(!adapter.invocations.is_empty(), "{who} declares no way of counting");
-            for way in &adapter.invocations {
-                assert!(!way.buckets.is_empty(), "{who}.{} names no bucket", way.name);
+            assert!(!adapter.variations.is_empty(), "{who} declares no variation");
+            for variation in &adapter.variations {
+                assert!(!variation.buckets.is_empty(), "{who}.{} names no bucket", variation.name);
             }
             let home = adapter.repository.as_deref().unwrap_or_default();
             assert!(home.starts_with("https://"), "{who}: {home}");
@@ -537,13 +625,13 @@ mod tests {
         let here = env::current_dir().unwrap();
 
         let under = here.join("cases").join("0400-a_case").join("input.c");
-        let printed = tokei.format_command(&tokei.invocations[0], Path::new("tokei"), &under);
+        let printed = tokei.format_command(&tokei.variations[0], Path::new("tokei"), &under);
         assert!(printed.contains(&format!("cases{}0400-a_case", std::path::MAIN_SEPARATOR)),
                 "{printed}");
         assert!(!printed.contains(&here.display().to_string()), "{printed}");
 
         let elsewhere = Path::new("/somewhere/of/its/own/input.c");
-        let whole = tokei.format_command(&tokei.invocations[0], Path::new("tokei"), elsewhere);
+        let whole = tokei.format_command(&tokei.variations[0], Path::new("tokei"), elsewhere);
         assert!(whole.contains("somewhere"), "{whole}");
     }
 
@@ -552,7 +640,7 @@ mod tests {
         let unread = write_an_adapter(
             "an_adapter_saying_nothing_about_reading",
             "name = \"tokei\"\nargs = [\"{file}\"]\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&unread, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(unread.parent().unwrap()).unwrap();
@@ -561,8 +649,8 @@ mod tests {
         let unused = write_an_adapter(
             "an_adapter_whose_output_nobody_reads",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [dialect.default]\nargs = []\n\
-             [dialect.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+             [variation.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
              comments = \"Comment\"\nblanks = \"Blank\"\n",
         );
         let refused = Adapter::read(&unused, &read_the_shipped_dialects()).unwrap_err();
@@ -575,8 +663,8 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_a_broken_read_block",
             "name = \"tokei\"\nargs = [\"{file}\"]\n\
-             [dialect.default]\nargs = []\n\
-             [dialect.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+             [variation.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
              comments = \"Comment\"\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
@@ -599,7 +687,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_under_the_wrong_name",
             "name = \"scc\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -616,7 +704,7 @@ mod tests {
              explain-command = \"perl\"\n\
              explain-args = [\"{explain-scripts}/probe.pl\", \"{binary}\", \"{file}\"]\n\
              explain-output = \"linejudge-per-line\"\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let adapter = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -628,7 +716,7 @@ mod tests {
         fs::write(theirs.join("probe.pl"), "not really a wrapper").unwrap();
 
         let asked = |scripts: &[PathBuf]| {
-            build_wrapper_args(adapter.explain_args.as_ref().unwrap(), &adapter.invocations[0],
+            build_wrapper_args(adapter.explain_args.as_ref().unwrap(), &adapter.variations[0],
                     Path::new("t.exe"), Path::new("a.py"), scripts)
         };
         let layered = asked(&[carried.clone(), theirs.clone()]);
@@ -669,7 +757,7 @@ mod tests {
     #[test]
     fn every_acquisition_mistake_is_refused_when_the_adapter_is_read() {
         let base = "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-                    [dialect.default]\nargs = []\n\
+                    [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
                     [acquisition]\nchannel = \"github-release-file\"\nname = \"a/b\"\n\
                     version = \"2.10\"\n";
         let read = |dir: &str, text: &str| {
@@ -716,7 +804,7 @@ mod tests {
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let mezura = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[1];
-        let args = mezura.build_args(&mezura.invocations[1], Path::new("a/case/input.rs"));
+        let args = mezura.build_args(&mezura.variations[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
     }
@@ -742,7 +830,7 @@ mod tests {
         assert!(tokei.explain_args.is_none());
         assert!(
             tokei
-                .run_explain(&tokei.invocations[0], Path::new("t.exe"), Path::new("a.py"), scripts)
+                .run_explain(&tokei.variations[0], Path::new("t.exe"), Path::new("a.py"), scripts)
                 .is_none()
         );
 
@@ -750,7 +838,7 @@ mod tests {
             "an_explain_command_with_no_file",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-args = [\"-t\"]\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -768,7 +856,7 @@ mod tests {
             "a_format_with_no_command",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-output = \"linejudge-per-line\"\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&alone, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(alone.parent().unwrap()).unwrap();
@@ -778,7 +866,7 @@ mod tests {
             "a_command_with_no_format",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
              explain-args = [\"-t\", \"{file}\"]\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&unreadable, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(unreadable.parent().unwrap()).unwrap();
@@ -795,7 +883,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_no_version_flag",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\nversion-flag = \"\"\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let unversioned = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -815,27 +903,137 @@ mod tests {
     }
 
     #[test]
-    fn an_adapter_that_names_no_way_of_counting_is_refused() {
+    fn an_adapter_that_declares_no_variation_is_refused() {
         let path = write_an_adapter(
-            "an_adapter_with_no_dialect",
-            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [dialect]\n",
+            "an_adapter_with_no_variation",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
-        assert!(refused.contains("no way of counting"), "{refused}");
+        assert!(refused.contains("no variation to run"), "{refused}");
     }
 
     #[test]
-    fn the_file_named_among_one_dialects_own_arguments_is_refused() {
+    fn an_adapter_still_written_with_dialect_blocks_is_told_what_to_write() {
         let path = write_an_adapter(
-            "an_adapter_naming_the_file_twice",
+            "an_adapter_of_the_older_shape",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [dialect.default]\nargs = [\"{file}\"]\n",
+             [dialect.default]\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
-        assert!(refused.contains("the arguments every dialect shares"), "{refused}");
+        assert!(refused.contains("[variation.<name>]"), "{refused}");
+        assert!(refused.contains("major = true"), "{refused}");
+    }
+
+    #[test]
+    fn a_dialect_with_no_major_and_one_with_two_are_both_refused() {
+        let none = write_an_adapter(
+            "an_adapter_whose_dialect_has_no_major",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             [variation.default]\ndialect = \"default\"\nargs = []\n",
+        );
+        let refused = Adapter::read(&none, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(none.parent().unwrap()).unwrap();
+        assert!(refused.contains("says major = true"), "{refused}");
+
+        let both = write_an_adapter(
+            "an_adapter_whose_dialect_has_two_majors",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+             [variation.loud]\ndialect = \"default\"\nmajor = true\nargs = [\"--loud\"]\n",
+        );
+        let refused = Adapter::read(&both, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(both.parent().unwrap()).unwrap();
+        assert!(refused.contains("both say major = true"), "{refused}");
+    }
+
+    // Answers are keyed by variation and exceptions by dialect, so a variation wearing another
+    // dialect's name would put two different things under one key in the record.
+    #[test]
+    fn a_variation_named_after_another_dialect_of_the_same_counter_is_refused() {
+        let path = write_an_adapter_for(
+            "mezura",
+            "an_adapter_whose_variation_wears_another_name",
+            "name = \"mezura\"\nargs = [\"{file}\"]\n\
+             [variation.content]\ndialect = \"content\"\nmajor = true\nargs = []\n\
+             [variation.content.read]\nclaims = \"languages[]\"\nlines = \"total.lines\"\n\
+             code = \"total.code\"\ncomments = \"total.comments\"\nextra = \"total.extra\"\n\
+             [variation.region]\ndialect = \"content\"\nargs = [\"--fast\"]\n",
+        );
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(refused.contains("named after another dialect"), "{refused}");
+    }
+
+    // A name becomes a key of `[answer.<case>.<variation>]`, and anything TOML reads as
+    // punctuation would make a record this program writes and then cannot read back.
+    #[test]
+    fn a_variation_named_with_anything_a_toml_key_refuses_is_refused() {
+        for wrong in ["strip str", "strip.str", "strip+str", "strip/str", ""] {
+            let path = write_an_adapter(
+                "an_adapter_with_an_unwritable_name",
+                &format!(
+                    "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{{file}}\"]\n\
+                     [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+                     [variation.\"{wrong}\"]\ndialect = \"default\"\nargs = [\"--x\"]\n"
+                ),
+            );
+            let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
+            fs::remove_dir_all(path.parent().unwrap()).unwrap();
+            assert!(refused.contains("letters, digits"), "{wrong}: {refused}");
+        }
+    }
+
+    #[test]
+    fn two_variations_of_one_dialect_asking_the_same_thing_are_refused() {
+        let path = write_an_adapter(
+            "an_adapter_with_a_twin",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+             [variation.twin]\ndialect = \"default\"\nargs = []\n",
+        );
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(refused.contains("the same command line"), "{refused}");
+    }
+
+    #[test]
+    fn a_variation_with_no_read_block_is_read_like_the_major_of_its_dialect() {
+        let path = write_an_adapter_for(
+            "scc",
+            "an_adapter_whose_minor_inherits_its_reading",
+            "name = \"scc\"\nargs = [\"{file}\"]\n\
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n\
+             [variation.default.read]\neach = \"[]\"\nlines = \"Lines\"\ncode = \"Code\"\n\
+             comments = \"Comment\"\nblanks = \"Blank\"\n\
+             [variation.counted]\ndialect = \"default\"\nargs = [\"--no-large\"]\n",
+        );
+        let adapter = Adapter::read(&path, &read_the_shipped_dialects()).unwrap();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        let printed = "[{\"Lines\":3,\"Code\":2,\"Comment\":1,\"Blank\":0}]";
+
+        let names: Vec<&str> = adapter.variations.iter().map(|one| one.name.as_str()).collect();
+        assert_eq!(names, ["default", "counted"], "the major leads whatever its name sorts as");
+        let minor = &adapter.variations[1];
+        assert_eq!(minor.name_of_dialect, "default");
+        assert!(!minor.is_major);
+        let Reader::Declared(locator) = &minor.reader else { panic!("it read nothing") };
+        let read = locator.read(printed).unwrap().unwrap();
+        assert_eq!(read.counts.lines, 3);
+        assert_eq!(read.counts.buckets["code"], 2);
+    }
+
+    #[test]
+    fn the_file_named_among_one_variations_own_arguments_is_refused() {
+        let path = write_an_adapter(
+            "an_adapter_naming_the_file_twice",
+            "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = [\"{file}\"]\n",
+        );
+        let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(refused.contains("the arguments every variation shares"), "{refused}");
     }
 
     #[test]
@@ -843,7 +1041,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_no_file",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"--output\", \"json\"]\n\
-             [dialect.default]\nargs = []\n",
+             [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -855,7 +1053,7 @@ mod tests {
         let path = write_an_adapter(
             "an_adapter_with_an_unknown_dialect",
             "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
-             [dialect.strict]\nargs = []\n",
+             [variation.strict]\ndialect = \"strict\"\nmajor = true\nargs = []\n",
         );
         let refused = Adapter::read(&path, &read_the_shipped_dialects()).unwrap_err();
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
@@ -863,10 +1061,14 @@ mod tests {
     }
 
     fn write_an_adapter(name: &str, text: &str) -> PathBuf {
+        write_an_adapter_for("tokei", name, text)
+    }
+
+    fn write_an_adapter_for(name_of_counter: &str, name: &str, text: &str) -> PathBuf {
         let dir = env::temp_dir().join(format!("linejudge-{name}"));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("tokei.toml");
+        let path = dir.join(format!("{name_of_counter}.toml"));
         fs::write(&path, text).unwrap();
         path
     }

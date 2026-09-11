@@ -18,13 +18,14 @@ pub fn create_the_shipped_dir() -> Result<PathBuf, String> {
     let mut refused = Vec::new();
     for root in find_the_app_dirs() {
         let dir = root.join(HASH);
-        if dir.is_dir() {
-            return Ok(dir);
+        if !dir.is_dir()
+            && let Err(message) = write_the_shipped_files_beside(&dir)
+        {
+            refused.push(message);
+            continue;
         }
-        match write_the_shipped_files_beside(&dir) {
-            Ok(()) => return Ok(dir),
-            Err(message) => refused.push(message),
-        }
+        remove_what_older_builds_wrote(&root);
+        return Ok(dir);
     }
     Err(format!("what this build carries could not be written out: {}", refused.join("; ")))
 }
@@ -56,6 +57,26 @@ pub fn holds_the_carried_cases(dir: &Path) -> bool {
 pub fn replaces_nothing_carried_under(dir: &Path, name_of_dir: &str) -> bool {
     let Some(found) = collect_every_file_under(dir) else { return false };
     found.iter().all(|relative| is_what_was_carried(dir, relative, name_of_dir))
+}
+
+// Only a name shaped like one of ours is touched, since the downloaded binaries sit in the same
+// folder. A failure here is nothing to stop over.
+fn remove_what_older_builds_wrote(root: &Path) {
+    let Ok(entries) = fs::read_dir(root) else { return };
+    let is_one_of_ours = |name: &std::ffi::OsStr| {
+        name.to_str().is_some_and(|name| {
+            name != HASH && name.len() == HASH.len() && name.chars().all(|c| c.is_ascii_hexdigit())
+        })
+    };
+    // Listed to the end first, since deleting while walking makes the walk skip what is ahead.
+    let older: Vec<PathBuf> = entries
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir() && path.file_name().is_some_and(is_one_of_ours))
+        .collect();
+    for path in older {
+        let _ = fs::remove_dir_all(path);
+    }
 }
 
 fn collect_every_file_under(dir: &Path) -> Option<Vec<PathBuf>> {

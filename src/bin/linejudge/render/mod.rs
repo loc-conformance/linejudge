@@ -79,9 +79,9 @@ fn write_every_file(
             .counters
             .iter()
             .flat_map(|counter| {
-                counter.dialects.iter().map(|dialect| {
-                    (name_the_badge_of(&counter.name, &dialect.name),
-                     badge::render_one_badge(&dialect.answers))
+                counter.variations.iter().filter(|one| one.major).map(|variation| {
+                    (name_the_badge_of(&counter.name, &variation.dialect),
+                     badge::render_one_badge(&variation.answers))
                 })
             })
             .collect();
@@ -117,7 +117,7 @@ fn write_a_page_each<T>(
     Ok(())
 }
 
-// A badge names the way of counting as well as the counter, since a counter with two of them has
+// A badge names the dialect as well as the counter, since a counter with two of them has
 // two answers and one file could only ever be one of them.
 pub fn name_the_badge_of(name_of_counter: &str, name_of_dialect: &str) -> String {
     format!("{name_of_counter}.{name_of_dialect}")
@@ -238,8 +238,8 @@ mod tests {
     use linejudge::truth::Covering;
 
     use crate::render::data::{
-        Answer, Case, Counted, Counter, Counts, Dialect, DialectDetail, Group, Line, Piece,
-        RuleDetail, Verdict,
+        Answer, Case, Counted, Counter, Counts, DialectDetail, Group, Line, Piece, RuleDetail,
+        Variation, VariationDetail, Verdict,
     };
 
     use super::*;
@@ -272,12 +272,14 @@ mod tests {
         let read_back: Sweep = serde_json::from_str(
             &fs::read_to_string(out.join(DATA_FILE)).unwrap()).unwrap();
         let badge = out.join(BADGES_DIR).join("mezura.region.svg").is_file();
+        let of_a_minor = out.join(BADGES_DIR).join("mezura.strict.svg").is_file();
         fs::remove_dir_all(&out).unwrap();
 
         assert!(missing.is_empty(), "{}", missing.join("\n"));
         assert_eq!(written, 2);
         assert_eq!(read_back, sweep, "what data.json holds is the measurement itself");
-        assert!(badge, "one badge per counter and way of counting");
+        assert!(badge, "one badge per counter and dialect");
+        assert!(!of_a_minor, "a minor is measured and never badged");
     }
 
     // It writes twice on purpose: the first run is what leaves a badge for the second to find.
@@ -364,8 +366,18 @@ mod tests {
                 command: format!("tokei cases/{name_of_case}/input.c"),
             }
         };
-        let way = |name: &str, first: Verdict, second: Verdict| Dialect {
+        let a_major = |name: &str, first: Verdict, second: Verdict| Variation {
             name: name.to_string(),
+            dialect: name.to_string(),
+            major: true,
+            flags: vec!["--counting".to_string(), name.to_string()],
+            answers: vec![answer("1010-a_case", first), answer("2010-another_case", second)],
+        };
+        let a_minor = |name: &str, of: &str, first: Verdict, second: Verdict| Variation {
+            name: name.to_string(),
+            dialect: of.to_string(),
+            major: false,
+            flags: vec![format!("--{name}")],
             answers: vec![answer("1010-a_case", first), answer("2010-another_case", second)],
         };
         Sweep {
@@ -400,15 +412,16 @@ mod tests {
                 Counter {
                     name: "mezura".to_string(),
                     version: "v3.0.0".to_string(),
-                    dialects: vec![
-                        way("content", Verdict::Agrees, Verdict::Fails),
-                        way("region", Verdict::Broke, Verdict::Agrees),
+                    variations: vec![
+                        a_major("content", Verdict::Agrees, Verdict::Fails),
+                        a_major("region", Verdict::Broke, Verdict::Agrees),
+                        a_minor("strict", "content", Verdict::Fails, Verdict::Fails),
                     ],
                 },
                 Counter {
                     name: "tokei".to_string(),
                     version: "tokei 14.0.0".to_string(),
-                    dialects: vec![way("default", Verdict::Unclaimed, Verdict::Fails)],
+                    variations: vec![a_major("default", Verdict::Unclaimed, Verdict::Fails)],
                 },
             ],
         }
@@ -420,7 +433,7 @@ mod tests {
             group: group.to_string(),
             trap: "a trap".to_string(),
             file: "input.c".to_string(),
-            ways: ["mezura.content", "mezura.region", "tokei.default"]
+            dialects: ["mezura.content", "mezura.region", "tokei.default"]
                 .map(str::to_string)
                 .to_vec(),
             lines: vec![Line {
@@ -440,17 +453,21 @@ mod tests {
         }
     }
 
-    fn a_tool(name: &str, ways: &[&str]) -> ToolDetail {
+    fn a_tool(name: &str, names_of_dialects: &[&str]) -> ToolDetail {
         ToolDetail {
             name: name.to_string(),
             version: format!("{name} 1.0.0"),
             repository: Some(format!("https://github.com/nobody/{name}")),
             channel: Some("crates-io".to_string()),
-            dialects: ways
+            dialects: names_of_dialects
                 .iter()
-                .map(|way| DialectDetail {
-                    name: way.to_string(),
-                    flags: vec!["--mode".to_string(), way.to_string()],
+                .map(|one| DialectDetail {
+                    name: one.to_string(),
+                    variations: vec![VariationDetail {
+                        name: one.to_string(),
+                        major: true,
+                        flags: vec!["--mode".to_string(), one.to_string()],
+                    }],
                     rules: vec![RuleDetail {
                         name: "a-comment-alone-is-comments".to_string(),
                         bucket: "comments".to_string(),

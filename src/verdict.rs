@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
-use crate::adapter::{Adapter, Invocation};
+use crate::adapter::{Adapter, Variation};
 use crate::answer::Answer;
 use crate::corpus::{Case, Corpus};
 use crate::deriver::derive_answer;
@@ -119,16 +119,16 @@ pub fn find_what_breaks_the_run<'a, 'c>(judged: &'a [Judged<'c>]) -> Vec<&'a Jud
 /// numbers contradict.
 pub fn measure_and_judge_every_case<'a>(
     adapter: &Adapter,
-    invocation: &Invocation,
+    variation: &Variation,
     dialects: &Dialects,
     binary: &Path,
     corpus: &'a Corpus,
     record: Option<&'a RecordedAnswers>,
     version_of_this_run: &str,
 ) -> Result<Vec<Judged<'a>>, Faults> {
-    let key = format!("{}.{}", adapter.name_of_counter, invocation.name);
-    let Some(rules) = dialects.find(&adapter.name_of_counter, &invocation.name) else {
-        return Err(format!("{key} is a way of counting no dialect file describes").into());
+    let key = format!("{}.{}", adapter.name_of_counter, variation.name);
+    let Some(rules) = dialects.find(&adapter.name_of_counter, &variation.name_of_dialect) else {
+        return Err(format!("{key} is a variation no dialect file describes").into());
     };
     let drift_is_judged =
         record.is_some_and(|record| is_same_build(&record.version, version_of_this_run));
@@ -136,7 +136,8 @@ pub fn measure_and_judge_every_case<'a>(
     let mut prepared = Vec::with_capacity(corpus.cases.len());
     let mut faults = Vec::new();
     for case in &corpus.cases {
-        let exception = record.and_then(|r| r.find_exception(&case.name, &invocation.name));
+        let exception =
+            record.and_then(|r| r.find_exception(&case.name, &variation.name_of_dialect));
         let real = match exception {
             Some(exception) => exception.expected.clone(),
             None => match derive_answer(&case.truth, rules, &corpus.readings) {
@@ -147,19 +148,19 @@ pub fn measure_and_judge_every_case<'a>(
                 }
             },
         };
-        let entry = record.and_then(|r| r.find(&case.name, &invocation.name));
+        let entry = record.and_then(|r| r.find(&case.name, &variation.name));
         if let Some(entry) = entry
             && let Some(counted) = &entry.counted
             && entry.is_known_failure == (*counted == real)
         {
             faults.push(match entry.is_known_failure {
                 true => format!(
-                    "{}: the record calls {key} a known failure, and its numbers agree with the \
-                     rules, so the flag is stale",
+                    "{}: the record calls {key} a known failure, and its numbers agree with what \
+                     it is held to, so the flag is stale",
                     case.name
                 ),
                 false => format!(
-                    "{}: the record's numbers for {key} differ from what the rules ask, and the \
+                    "{}: the record's numbers for {key} differ from what it is held to, and the \
                      block does not say is-known-failure",
                     case.name
                 ),
@@ -172,7 +173,7 @@ pub fn measure_and_judge_every_case<'a>(
     }
 
     let files: Vec<&Path> = prepared.iter().map(|(case, ..)| case.input_file.as_path()).collect();
-    let answers = measure_every_file(adapter, invocation, binary, &files);
+    let answers = measure_every_file(adapter, variation, binary, &files);
 
     let mut judged = Vec::with_capacity(prepared.len());
     for ((case, real, entry, exception), answer) in prepared.into_iter().zip(answers) {
@@ -207,7 +208,7 @@ pub fn measure_and_judge_every_case<'a>(
 // somebody else's program to start and finish, so more run at once than the machine has cores.
 fn measure_every_file(
     adapter: &Adapter,
-    invocation: &Invocation,
+    variation: &Variation,
     binary: &Path,
     files: &[&Path],
 ) -> Vec<Result<Option<Answer>, String>> {
@@ -220,7 +221,7 @@ fn measure_every_file(
                 loop {
                     let at = next.fetch_add(1, Ordering::Relaxed);
                     let Some(file) = files.get(at) else { return };
-                    let answered = adapter.measure(invocation, binary, file);
+                    let answered = adapter.measure(variation, binary, file);
                     answers.lock().unwrap_or_else(|held| held.into_inner()).push((at, answered));
                 }
             });
@@ -375,13 +376,13 @@ mod tests {
         fs::write(recorded_dir.join("tokei.toml"), record_text).unwrap();
 
         let corpus = Corpus::read(&cases).unwrap_or_else(|faults| panic!("{faults:?}"));
-        let record = RecordedAnswers::read(std::slice::from_ref(&recorded_dir), "tokei", dialects)
+        let adapter = a_tokei_adapter();
+        let record = RecordedAnswers::read(std::slice::from_ref(&recorded_dir), &adapter)
             .unwrap_or_else(|faults| panic!("{faults:?}"))
             .unwrap_or_else(|| panic!("no record was read"));
-        let adapter = a_tokei_adapter();
         let judged = measure_and_judge_every_case(
             &adapter,
-            &adapter.invocations[0],
+            &adapter.variations[0],
             dialects,
             Path::new("a-binary-that-is-never-run"),
             &corpus,
@@ -402,8 +403,10 @@ mod tests {
             explain_output: None,
             version_flag: None,
             acquisition: None,
-            invocations: vec![Invocation {
+            variations: vec![Variation {
                 name: "default".to_string(),
+                name_of_dialect: "default".to_string(),
+                is_major: true,
                 args: Vec::new(),
                 buckets: vec!["code".to_string(), "comments".to_string(), "blanks".to_string()],
                 reader: Reader::Written(OutputFormat::TokeiJson),
@@ -442,6 +445,7 @@ mod tests {
             counted: counted_code.map(a_measurement),
             is_known_failure,
             note: None,
+            note_is_inherited: false,
         }
     }
 

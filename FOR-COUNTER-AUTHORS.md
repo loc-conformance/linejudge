@@ -22,10 +22,11 @@ in its code to do so.
 
 Three things privately, four with native support.   
 A **dialect**, `dialects/<counter>/`, holds the
-counter's own rules: the categories it names, and what goes into each, one file per way it counts;
+counter's own rules: the categories it names, and what goes into each, one file per set of rules;
 the format has its own page in [dialects/README.md](dialects/README.md).  
 An **adapter**, `adapters/<counter>.toml`, says how to run the binary and how to read what it prints,
-and most of this page is about that.  
+and most of this page is about that. It declares one **variation** per command line the counter is
+measured with, each naming the dialect whose rules judge it.  
 And the **binary** itself. It can be named by a path or downloaded by the `fetch`
 command, if the counter has native support in the linejudge repo.  
 
@@ -44,7 +45,7 @@ dot-separated names, `[]` reads every element of a list, and a block naming `eac
 relative to every matched element and adds them up:
 
 ```toml
-[dialect.<name>.read]
+[variation.<name>.read]
 each     = "[]"
 lines    = "Lines"
 code     = "Code"
@@ -59,14 +60,14 @@ naming where the name of that language sits. mezura's `content` dialect shows al
 `extra` being a category of mezura's own naming:
 
 ```toml
-[dialect.<name>.read]
+[variation.<name>.read]
 claims   = "languages[]"
 lines    = "total.lines"
 code     = "total.code"
 comments = "total.comments"
 extra    = "total.extra"
 
-[dialect.<name>.read.regions]
+[variation.<name>.read.regions]
 each     = "languages[].nested_languages[]"
 language = "name"
 lines    = "lines"
@@ -198,14 +199,45 @@ name   = "mycounter"
 output = "linejudge-json"
 args   = ["{file}"]
 
-[dialect.default]
-args = []
+[variation.default]
+dialect = "default"
+major   = true
+args    = []
 ```
 
-`args` is the command line, with `{file}` standing for the case being counted, and one
-`[dialect.<name>]` block exists per way the counter counts, each adding its own arguments. The
-rules themselves go in `dialects/mycounter/default.toml`, as the tree above shows. `output` here
-names the second of the three ways above; a `read` block takes its place when the first fits.
+`args` at the top is the command line, with `{file}` standing for the case being counted. One
+`[variation.<name>]` block exists per command line the counter is measured with, each adding its
+own arguments. `dialect` names the rules file that judges it, and the rules themselves go in
+`dialects/mycounter/default.toml`, as the tree above shows. `output` here names the second of the
+three ways above, and a `read` block takes its place when the first fits.
+
+### When one set of rules is reached two ways
+
+Some flags change what a counter counts. Others change only how it gets there. A flag of the second
+kind is a second variation naming the **same** dialect:
+
+```toml
+[variation.default]
+dialect = "default"
+major   = true
+args    = []
+
+[variation.stripstr]
+dialect = "default"
+args    = ["--strip-str-comments"]
+```
+
+Exactly one variation of each dialect writes `major = true`. That one is the counter's score, the
+one its badge is drawn from, and the one its column on the overview opens on. The others are
+measured and shown beside it, so a flag that fixes a case is visible. A variation with no `read`
+block of its own is read like the major of its dialect.
+
+**A flag that changes what a rule says needs its own dialect file, and its variation is that
+dialect's major.** cloc's `--docstring-as-code` is the example: it overrides
+`a-doc-string-is-documentation`, so declaring it as a second variation of `default` would measure
+cloc against a rule it was told to break. Nothing in the format refuses that, because the two
+declare the same categories. What catches it is the note every failure needs. The only sentence
+that fits says the tool broke its own rule on purpose.
 
 `version-flag` names the flag that asks your counter for its version, and it is `--version` unless
 you say otherwise. What the counter prints is written at the top of your recorded file and compared
@@ -267,7 +299,7 @@ printed for every case at the version written at the top, and every failure in i
 saying what the counter did, written from runs of the counter itself. The commands for that live
 in [CONTRIBUTING.md](CONTRIBUTING.md#re-measuring-a-counter), under *Re-measuring a counter*.
 A counter on the results
-page also gets a badge per way it counts, showing how the cases went.
+page also gets a badge per major variation, showing how the cases went.
 
 ## Being read line by line
 
@@ -345,7 +377,7 @@ repository as a dev-dependency:
 
 ```toml
 [dev-dependencies]
-linejudge = { version = "0.1", default-features = false }
+linejudge = { version = "0.2", default-features = false }
 ```
 
 For the tip of the repository ahead of a release, the git form works too:
@@ -375,6 +407,10 @@ fn every_case_is_counted_the_way_our_rules_say() {
     }
 }
 ```
+
+The second argument to `dialects.find` is a **dialect**, which is the name in the `dialect =` line
+of the variation you mean. For a counter whose variations are `default` and `stripstr` over one
+dialect, both are `"default"` here.
 
 `count_the_way_the_library_does` is your own code handing back an `Answer`, which is the same
 mapping your adapter would otherwise declare. A counter we do not ship a declaration for reads its own

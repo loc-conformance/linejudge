@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::Path;
 
 use linejudge::adapter::UNKNOWN_VERSION;
-use linejudge::adapter::Adapter;
+use linejudge::adapter::{Adapter, Variation};
 use linejudge::answer::{Answer, Counts};
 use linejudge::corpus::Corpus;
 use linejudge::dialects::Dialects;
@@ -31,39 +31,64 @@ pub fn record_one_counter(
     let mut measured = BTreeMap::new();
     let mut broke = Vec::new();
     let mut dropped = Vec::new();
+    let mut started = Vec::new();
+    let mut stopped = Vec::new();
 
-    for way in &adapter.invocations {
-        let judged =
-            measure_and_judge_every_case(adapter, way, dialects, binary, corpus, None, &version)
-                .map_err(|faults| faults.join("\n"))?;
+    for variation in &adapter.variations {
+        let judged = measure_and_judge_every_case(
+            adapter, variation, dialects, binary, corpus, None, &version,
+        )
+        .map_err(|faults| faults.join("\n"))?;
         for one in judged {
             let outcome = match one.outcome {
                 Outcome::Broke(message) => {
-                    broke.push(format!("{}.{}: {message}", one.case.name, way.name));
+                    broke.push(format!("{}.{}: {message}", one.case.name, variation.name));
                     continue;
                 }
                 Outcome::Measured(outcome) => outcome,
             };
-            let held_entry = held.and_then(|held| held.find(&one.case.name, &way.name));
+            let held_entry = held.and_then(|held| held.find(&one.case.name, &variation.name));
             let expected = held
-                .and_then(|held| held.find_exception(&one.case.name, &way.name))
+                .and_then(|held| held.find_exception(&one.case.name, &variation.name_of_dialect))
                 .map(|exception| &exception.expected)
                 .unwrap_or(&outcome.real);
             let (note, was_dropped) = decide_the_note(held_entry, &outcome.live);
+            let key = || format!("{}.{}", one.case.name, variation.name);
             if was_dropped {
-                dropped.push(format!("{}.{}", one.case.name, way.name));
+                dropped.push(key());
             }
+            let fails = outcome.live.as_ref().is_some_and(|live| live != expected);
+            // Only where an answer was held, since a case with none has no state to have moved.
+            if let Some(held_entry) = held_entry {
+                match (held_entry.is_known_failure, fails) {
+                    (false, true) => started.push(key()),
+                    (true, false) => stopped.push(key()),
+                    _ => {}
+                }
+            }
+            let inherited = held_entry.is_some_and(|held| held.note_is_inherited);
             measured.insert(
-                (one.case.name.clone(), way.name.clone()),
+                (one.case.name.clone(), variation.name.clone()),
                 Recorded {
-                    is_known_failure: outcome.live.as_ref().is_some_and(|live| live != expected),
+                    is_known_failure: fails,
                     wants_regions: !expected.regions.is_empty(),
                     counted: outcome.live,
                     note,
                 },
             );
+            // Majors are measured first, so the major's answer is in hand. A minor that parts
+            // from it loses the sentence it read through it and has none of its own.
+            if inherited {
+                let mine = &measured[&(one.case.name.clone(), variation.name.clone())];
+                let alike =
+                    find_the_major_answering_alike(adapter, &measured, &one.case.name, variation, mine);
+                if alike.is_none() {
+                    dropped.push(key());
+                }
+            }
         }
     }
+    dropped.sort();
     if !broke.is_empty() {
         return Err(Trouble::Said(format!(
             "{counter} broke on {} of the cases, and a photograph with a hole in it is not one:\n  {}",
@@ -88,8 +113,36 @@ pub fn record_one_counter(
     for (name, why) in name_what_the_corpus_no_longer_holds(corpus, held) {
         writeln!(out, "  {}", style::RECORDED.paint(&format!("{why}   {name}")))?;
     }
-    for name in &dropped {
+    // This run is what erases them, so this is the last moment anybody sees that they were there.
+    for (case, named) in held.iter().flat_map(|held| held.name_every_block_no_longer_declared()) {
+        writeln!(out, "  {}", style::DIFFERS.paint(
+                &format!("dropped, the adapter no longer declares it   {case}.{named}")))?;
+    }
+    for (case, named, target) in
+        held.iter().flat_map(|held| held.name_every_block_pointing_at_nothing())
+    {
+        writeln!(out, "  {}", style::DIFFERS.paint(
+                &format!("measured anew, it read its answer through {target}   {case}.{named}")))?;
+    }
+    write_what_moved(out, &dropped, &started, &stopped)?;
+    Ok(())
+}
+
+// Read by the version-check workflow, which can tell none of this from the file it just wrote.
+fn write_what_moved(
+    out: &mut dyn Write,
+    dropped: &[String],
+    started: &[String],
+    stopped: &[String],
+) -> io::Result<()> {
+    for name in dropped {
         writeln!(out, "  {}", style::DIFFERS.paint(&format!("note dropped, it answers differently now   {name}")))?;
+    }
+    for name in started {
+        writeln!(out, "  {}", style::DIFFERS.paint(&format!("started failing   {name}")))?;
+    }
+    for name in stopped {
+        writeln!(out, "  {}", style::RECORDED.paint(&format!("stopped failing   {name}")))?;
     }
     Ok(())
 }
@@ -107,6 +160,10 @@ struct Recorded {
 // sentence the new answer needs.
 fn decide_the_note(held: Option<&RecordedAnswer>, live: &Option<Answer>) -> (Option<String>, bool) {
     let Some(held) = held else { return (None, false) };
+    // Kept, a note read through a pointer would move onto a run nobody measured it on.
+    if held.note_is_inherited {
+        return (None, false);
+    }
     match held.counted == *live {
         true => (held.note.clone(), false),
         false => (None, held.note.is_some()),
@@ -128,17 +185,34 @@ fn format_the_file(
         quote(version),
         quote(&format!("linejudge {}", crate::VERSION))
     );
+    let mut per_dialect: Vec<(&str, &[String])> = Vec::new();
+    let mut per_variation: Vec<(&Variation, &[String])> = Vec::new();
+    for variation in &adapter.variations {
+        let Some(rules) = dialects.find(name_of_counter, &variation.name_of_dialect) else {
+            return Err(format!(
+                "{name_of_counter}.{} was measured and its dialect is gone",
+                variation.name
+            ));
+        };
+        per_variation.push((variation, &rules.buckets));
+        if !per_dialect.iter().any(|(named, _)| *named == variation.name_of_dialect) {
+            per_dialect.push((variation.name_of_dialect.as_str(), &rules.buckets));
+        }
+    }
     for case in &corpus.cases {
-        for way in &adapter.invocations {
-            let buckets = match dialects.find(name_of_counter, &way.name) {
-                Some(rules) => &rules.buckets,
-                None => continue,
-            };
-            let key = (case.name.clone(), way.name.clone());
+        for (variation, buckets) in &per_variation {
+            let key = (case.name.clone(), variation.name.clone());
             if let Some(recorded) = measured.get(&key) {
                 text.push('\n');
-                write_the_answer(&mut text, &key, recorded, buckets)?;
+                let same = find_the_major_answering_alike(
+                    adapter, measured, &case.name, variation, recorded,
+                );
+                write_the_answer(&mut text, &key, recorded, buckets, same)?;
             }
+        }
+        // Once per dialect, since two variations sharing one would write the same header twice.
+        for (name_of_dialect, buckets) in &per_dialect {
+            let key = (case.name.clone(), (*name_of_dialect).to_string());
             if let Some(exception) = held.and_then(|held| held.find_exception(&key.0, &key.1)) {
                 text.push('\n');
                 write_the_exception(&mut text, &key, exception, buckets)?;
@@ -148,13 +222,39 @@ fn format_the_file(
     Ok(text)
 }
 
+// Its name, and the note standing beside its answer, which is never written down twice.
+fn find_the_major_answering_alike<'a>(
+    adapter: &'a Adapter,
+    measured: &'a BTreeMap<(String, String), Recorded>,
+    name_of_case: &str,
+    variation: &Variation,
+    mine: &Recorded,
+) -> Option<(&'a str, Option<&'a str>)> {
+    if variation.is_major {
+        return None;
+    }
+    let major = adapter
+        .variations
+        .iter()
+        .find(|one| one.is_major && one.name_of_dialect == variation.name_of_dialect)?;
+    let theirs = measured.get(&(name_of_case.to_string(), major.name.clone()))?;
+    let alike = theirs.counted == mine.counted && theirs.is_known_failure == mine.is_known_failure;
+    alike.then_some((major.name.as_str(), theirs.note.as_deref()))
+}
+
 fn write_the_answer(
     text: &mut String,
     key: &(String, String),
     recorded: &Recorded,
     buckets: &[String],
+    same_as: Option<(&str, Option<&str>)>,
 ) -> Result<(), String> {
     let _ = writeln!(text, "[answer.{}.{}]", key.0, key.1);
+    if let Some((major, their_note)) = same_as {
+        let _ = writeln!(text, "same-as = {}", quote(major));
+        let own = recorded.note.as_deref().filter(|note| Some(*note) != their_note);
+        return write_the_note(text, key, own);
+    }
     let Some(counted) = &recorded.counted else {
         let _ = writeln!(text, "unclaimed = true");
         return write_the_note(text, key, recorded.note.as_deref());
@@ -241,16 +341,18 @@ fn name_what_the_corpus_no_longer_holds(
 ) -> Vec<(String, &'static str)> {
     let Some(held) = held else { return Vec::new() };
     let mut named: Vec<(String, &'static str)> = held
-        .cases_spoken_about()
+        .name_every_answer_block()
+        .chain(held.name_every_exception_block())
         .filter(|(case, _)| !corpus.cases.iter().any(|one| one.name == *case))
-        .map(|(case, dialect)| {
+        .map(|(case, second)| {
             let why = match corpus.disabled.iter().any(|one| one == case) {
                 true => "dropped, the case is disabled",
                 false => "dropped, no such case",
             };
-            (format!("{case}.{dialect}"), why)
+            (format!("{case}.{second}"), why)
         })
         .collect();
+    named.sort();
     named.dedup();
     named
 }
@@ -285,6 +387,7 @@ mod tests {
             counted,
             is_known_failure: false,
             note: note.map(|note| note.to_string()),
+            note_is_inherited: false,
         }
     }
 
@@ -317,7 +420,7 @@ mod tests {
         };
         let key = ("1010-a_case".to_string(), "default".to_string());
         let mut text = String::new();
-        write_the_answer(&mut text, &key, &recorded, &buckets).unwrap();
+        write_the_answer(&mut text, &key, &recorded, &buckets, None).unwrap();
 
         let read: toml::Value = toml::from_str(&text)
             .unwrap_or_else(|e| panic!("what was written does not parse: {e}\n{text}"));
@@ -326,6 +429,28 @@ mod tests {
         assert_eq!(block["counted-regions"].as_array().map(Vec::len), Some(2));
         assert_eq!(block["is-known-failure"].as_bool(), Some(true));
         assert!(block["note"].as_str().unwrap().starts_with("the second"));
+    }
+
+    // The version-check workflow greps these phrases and takes the last field of each line.
+    #[test]
+    fn the_lines_the_version_check_reads_are_the_lines_this_writes() {
+        let mut printed = Vec::new();
+        write_what_moved(
+            &mut printed,
+            &["1010-a_case.default".to_string()],
+            &["2010-another.stripstr".to_string()],
+            &["3010-a_third.default".to_string()],
+        )
+        .unwrap();
+        let printed = String::from_utf8(printed).unwrap();
+        for wanted in ["note dropped", "started failing", "stopped failing"] {
+            let line = printed
+                .lines()
+                .find(|line| line.contains(wanted))
+                .unwrap_or_else(|| panic!("{wanted} is not printed\n{printed}"));
+            let last = line.split_whitespace().next_back().unwrap();
+            assert!(last.contains('.'), "{wanted} must end in <case>.<variation>, got {last}");
+        }
     }
 
     #[test]
@@ -338,7 +463,7 @@ mod tests {
         };
         let key = ("1010-a_case".to_string(), "default".to_string());
         let mut text = String::new();
-        write_the_answer(&mut text, &key, &recorded, &["code".to_string()]).unwrap();
+        write_the_answer(&mut text, &key, &recorded, &["code".to_string()], None).unwrap();
         assert_eq!(text, "[answer.1010-a_case.default]\nunclaimed = true\n");
     }
 

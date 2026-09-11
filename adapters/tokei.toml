@@ -8,5 +8,7 @@ channel = "crates-io"
 name    = "tokei"
 version = "15.0.0"
 
-[dialect.default]
-args = []
+[variation.default]
+dialect = "default"
+major   = true
+args    = []

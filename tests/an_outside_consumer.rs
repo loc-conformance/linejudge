@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use linejudge::adapter::Adapter;
 use linejudge::corpus::Corpus;
 use linejudge::deriver::derive_answer;
 use linejudge::dialects::Dialects;
@@ -36,25 +37,28 @@ fn a_consumer_reads_what_was_recorded_about_a_counter_of_the_roster() {
     let checkout = Path::new(env!("CARGO_MANIFEST_DIR"));
     let dialects = Dialects::read(&[checkout.join("dialects")])
         .unwrap_or_else(|faults| panic!("{}", faults.join("\n")));
-    let record = RecordedAnswers::read(&[checkout.join("recorded")], "tokei", &dialects)
+    let adapter = Adapter::read_one(&[checkout.join("adapters")], "tokei", &dialects)
+        .unwrap_or_else(|message| panic!("{message}"));
+    let record = RecordedAnswers::read(&[checkout.join("recorded")], &adapter)
         .unwrap_or_else(|faults| panic!("{}", faults.join("\n")))
         .unwrap_or_else(|| panic!("tokei has no recorded answers"));
     assert_eq!(record.counter, "tokei");
     assert!(is_same_build(&record.version, &record.version));
 
     let spoken: Vec<(String, String)> = record
-        .cases_spoken_about()
-        .map(|(case, dialect)| (case.to_string(), dialect.to_string()))
+        .name_every_answer_block()
+        .map(|(case, variation)| (case.to_string(), variation.to_string()))
         .collect();
     assert!(!spoken.is_empty(), "the record speaks about no case");
-    for (name_of_case, name_of_dialect) in &spoken {
+    for (name_of_case, name_of_variation) in &spoken {
         let entry = record
-            .find(name_of_case, name_of_dialect)
+            .find(name_of_case, name_of_variation)
             .unwrap_or_else(|| panic!("{name_of_case} is not recorded"));
         if let Some(counted) = &entry.counted {
             assert!(counted.counts.buckets.contains_key("code"), "{name_of_case}");
         }
-        // Nothing here declares one, which is what CONTRIBUTING says of this repository.
-        assert!(record.find_exception(name_of_case, name_of_dialect).is_none(), "{name_of_case}");
     }
+    // Nothing here declares one, which is what CONTRIBUTING says of this repository.
+    assert_eq!(record.name_every_exception_block().count(), 0);
+    assert_eq!(record.name_every_block_no_longer_declared().count(), 0);
 }

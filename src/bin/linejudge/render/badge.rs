@@ -15,7 +15,7 @@ const NARROW_BLOCK: usize = 34;
 const PER_CHARACTER: usize = 7;
 const AROUND_THE_WORDS: usize = 14;
 
-// One badge for one way of counting: the label, then a block per state, each carrying its count. A
+// One badge for one variation, the label followed by a block per state carrying its count. A
 // block of nought is left out, apart from the green one, which is what the badge is for and stays.
 pub fn render_one_badge(answers: &[Answer]) -> String {
     let counted = StateCounts::of(answers);

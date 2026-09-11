@@ -117,7 +117,12 @@ fn find_source_of(before: &[String], at: usize, survivor: &str) -> Option<usize>
 
 // Which lines a stage dropped. Where a survivor cannot be placed, the file is one whose lines
 // cloc joined together, and no line can honestly be pointed at.
+// Equal length means nothing was dropped, since a filter removes a line or rewrites what is left
+// of one and never adds one, so a line it rewrote beyond recognition is not looked for at all.
 fn find_removed_lines(before: &[String], after: &[String]) -> Option<Vec<usize>> {
+    if before.len() == after.len() {
+        return Some(Vec::new());
+    }
     let mut gone = Vec::new();
     let mut at = 0;
     for line in after {
@@ -179,6 +184,7 @@ mod tests {
 
     const STAGES: &str = include_str!("../../tests/fixtures/output/cloc-stages.txt");
     const AMBIGUOUS: &str = include_str!("../../tests/fixtures/output/cloc-stages-ambiguous.txt");
+    const REWRITTEN: &str = include_str!("../../tests/fixtures/output/cloc-stages-rewritten.txt");
     const BUCKETS: [&str; 3] = ["code", "comments", "blanks"];
 
     // Git stores the fixture with LF and cloc on Windows prints CRLF, so both endings are judged
@@ -207,6 +213,17 @@ mod tests {
     fn a_survivor_two_lines_could_have_produced_refuses_the_file() {
         let refused = read_per_line(&named(), 2, AMBIGUOUS).unwrap_err();
         assert!(refused.contains("cannot be lined up"), "{refused}");
+    }
+
+    #[test]
+    fn a_stage_that_rewrote_every_line_and_dropped_none_is_read() {
+        for stages in with_each_line_ending(REWRITTEN) {
+            let answer = read_per_line(&named(), 5, &stages).unwrap();
+            assert_eq!(answer.buckets_of_lines, ["code"; 5]);
+            assert_eq!(answer.counts.buckets["code"], 5);
+            assert_eq!(answer.counts.buckets["comments"], 0);
+            assert_eq!(answer.counts.buckets["blanks"], 0);
+        }
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use linejudge::adapter::{Adapter, Invocation};
+use linejudge::adapter::{Adapter, Variation};
 use linejudge::answer::{Counts, RegionCounts};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::recorded::RecordedAnswers;
@@ -15,11 +15,11 @@ const FILE_PLACEHOLDER: &str = "{file}";
 const ROW_WIDTH: usize = "recorded note".len() + 1;
 const REGION_ROW_WIDTH: usize = "recorded regions".len() + 1;
 
-// One counter's one way of counting, as the report speaks about it: what ran, at which version,
-// and whether a record of this build exists to hold the run against.
+// One counter's one variation, as the report speaks about it. What ran, at which version, and
+// whether a record of this build exists to hold the run against.
 pub struct OneRun<'a> {
     pub adapter: &'a Adapter,
-    pub dialect: &'a Invocation,
+    pub variation: &'a Variation,
     pub binary: &'a Path,
     pub version: &'a str,
     pub drift_is_judged: bool,
@@ -27,21 +27,21 @@ pub struct OneRun<'a> {
 
 // Returns whether what it found should break the run, which is any failure the record does not
 // already hold.
-pub fn report_the_verdicts_of_one_dialect(
+pub fn report_the_verdicts_of_one_variation(
     out: &mut dyn Write,
     run: &OneRun,
     judged: &[Judged],
 ) -> io::Result<bool> {
     let adapter = run.adapter;
-    let dialect = run.dialect;
+    let variation = run.variation;
     let drift_is_judged = run.drift_is_judged;
     writeln!(out, "\n{}  {}",
-            style::HEADING.paint(&format!("{}.{}", adapter.name_of_counter, dialect.name)),
+            style::HEADING.paint(&format!("{}.{}", adapter.name_of_counter, variation.name)),
             style::DETAIL.paint(&format!("[{}]", run.version)))?;
     writeln!(out, "  {}", format_summary(judged, drift_is_judged))?;
-    // Once, and never per finding: the command is the same for every case but the file.
+    // Once, and never per finding, since the command is the same for every case but the file.
     writeln!(out, "  {} {}", style::LABEL.paint("run"), style::DETAIL.paint(
-            &adapter.format_command(dialect, run.binary, Path::new(FILE_PLACEHOLDER))))?;
+            &adapter.format_command(variation, run.binary, Path::new(FILE_PLACEHOLDER))))?;
 
     for one in judged {
         let measured = match &one.outcome {
@@ -96,13 +96,24 @@ pub fn report_recorded_answers_that_name_nothing(
     record: &RecordedAnswers,
     corpus: &Corpus,
 ) -> io::Result<()> {
-    for (case_name, dialect) in record.cases_spoken_about() {
+    let spoken_about =
+        record.name_every_answer_block().chain(record.name_every_exception_block());
+    for (case_name, named) in spoken_about {
         let known = corpus.cases.iter().any(|case| case.name == case_name)
             || corpus.disabled.iter().any(|name| name == case_name);
         if !known {
             write_the_name_of(out, &style::RECORDED, "recorded for a case that is not here",
-                    &format!("{dialect}:{case_name}"))?;
+                    &format!("{named}:{case_name}"))?;
         }
+    }
+    for (case_name, named) in record.name_every_block_no_longer_declared() {
+        write_the_name_of(out, &style::RECORDED, "recorded under a name the adapter dropped",
+                &format!("{named}:{case_name}"))?;
+    }
+    for (case_name, named, target) in record.name_every_block_pointing_at_nothing() {
+        write_the_name_of(out, &style::RECORDED,
+                &format!("recorded as answering like {target}, which the adapter dropped"),
+                &format!("{named}:{case_name}"))?;
     }
     Ok(())
 }
@@ -149,8 +160,15 @@ fn write_row(out: &mut dyn Write, width: usize, name: &str, text: &str) -> io::R
 fn describe(out: &mut dyn Write, case: &Case, measured: &Measured) -> io::Result<()> {
     let real = &measured.real;
     let recorded = measured.record.and_then(|record| record.counted.as_ref());
-    match measured.record.and_then(|record| record.note.as_ref()) {
-        Some(note) => write_row(out, ROW_WIDTH, "recorded note", &format_as_one_line(note))?,
+    // A sentence read through a pointer was measured on another run, so it is labelled as that.
+    let noted = measured.record.and_then(|record| {
+        record.note.as_ref().map(|note| match record.note_is_inherited {
+            true => ("major's note", note),
+            false => ("recorded note", note),
+        })
+    });
+    match noted {
+        Some((label, note)) => write_row(out, ROW_WIDTH, label, &format_as_one_line(note))?,
         None => write_row(out, ROW_WIDTH, "trap", &format_as_one_line(&case.trap))?,
     }
     if let Some(exception) = measured.exception {

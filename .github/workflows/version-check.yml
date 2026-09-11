@@ -112,24 +112,18 @@ jobs:
           COUNTER: ${{ matrix.bump.counter }}
         run: |
           ./target/release/linejudge fetch "$COUNTER"
-          answers() { awk '/^\[answer\./ { print substr($0, 9, length($0) - 9) }' "$1" | sort; }
-          known_failures() {
-            awk '/^\[answer\./ { name = substr($0, 9, length($0) - 9) }
-                 /^is-known-failure = true/ { print name }' "$1" | sort
-          }
-          known_failures "recorded/$COUNTER.toml" > "$RUNNER_TEMP/before"
           ./target/release/linejudge record --counter "$COUNTER" | tee "$RUNNER_TEMP/record"
-          known_failures "recorded/$COUNTER.toml" > "$RUNNER_TEMP/after"
-          answers "recorded/$COUNTER.toml" > "$RUNNER_TEMP/still-recorded"
-          # A case the new record drops, because it was disabled or deleted meanwhile, is not a
-          # case the build fixed.
-          comm -23 "$RUNNER_TEMP/before" "$RUNNER_TEMP/after" \
-            | comm -12 - "$RUNNER_TEMP/still-recorded" > "$RUNNER_TEMP/fixed"
-          comm -13 "$RUNNER_TEMP/before" "$RUNNER_TEMP/after" > "$RUNNER_TEMP/started"
+          # record holds the answers it measured beside the record it replaced, so it says what
+          # moved. Reading the file back cannot, since a variation written as a pointer at another
+          # carries no flag of its own.
+          keys_saying() {
+            { grep "$1" "$RUNNER_TEMP/record" || true; } | awk '{ print $NF }' | sort
+          }
+          keys_saying 'stopped failing' > "$RUNNER_TEMP/fixed"
+          keys_saying 'started failing' > "$RUNNER_TEMP/started"
           # A note dropped from a case that still fails means its answer moved without passing,
           # so the old note no longer describes what the counter does.
-          { grep 'note dropped' "$RUNNER_TEMP/record" || true; } | awk '{ print $NF }' | sort \
-            | comm -12 - "$RUNNER_TEMP/after" > "$RUNNER_TEMP/unexplained"
+          keys_saying 'note dropped' | comm -23 - "$RUNNER_TEMP/fixed" > "$RUNNER_TEMP/unexplained"
           if [ -s "$RUNNER_TEMP/started" ] || [ -s "$RUNNER_TEMP/unexplained" ]; then
             echo "needs_reading=yes" >> "$GITHUB_OUTPUT"
           else

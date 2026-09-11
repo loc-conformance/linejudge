@@ -212,19 +212,21 @@ mod tests {
                               name    = \"boyter/scc\"\n\
                               version = \"3.7.0\"\n\
                               \n\
-                              [dialect.default]\n\
-                              args = []\n";
+                              [variation.default]\n\
+                              dialect = \"default\"\n\
+                              major   = true\n\
+                              args    = []\n";
 
     #[test]
     fn only_the_version_between_the_quotes_moves() {
         let raised = raise_the_version_line(AN_ADAPTER, "3.8.0").unwrap();
         assert_eq!(raised, AN_ADAPTER.replace("\"3.7.0\"", "\"3.8.0\""));
-        assert!(raised.ends_with("args = []\n"), "{raised}");
+        assert!(raised.ends_with("args    = []\n"), "{raised}");
     }
 
     #[test]
     fn a_version_outside_the_acquisition_block_is_left_alone() {
-        let elsewhere = AN_ADAPTER.replace("args = []", "version = \"1.0.0\"");
+        let elsewhere = AN_ADAPTER.replace("args    = []", "version = \"1.0.0\"");
         let raised = raise_the_version_line(&elsewhere, "3.8.0").unwrap();
         assert!(raised.contains("version = \"3.8.0\""), "{raised}");
         assert!(raised.contains("version = \"1.0.0\""), "{raised}");
@@ -232,7 +234,7 @@ mod tests {
 
     #[test]
     fn an_adapter_with_no_acquisition_block_is_refused_rather_than_written() {
-        let none = "name = \"mezura\"\n\n[dialect.default]\nargs = []\n";
+        let none = "name = \"mezura\"\n\n[variation.default]\ndialect = \"default\"\nargs = []\n";
         let refused = raise_the_version_line(none, "3.8.0").unwrap_err();
         assert!(refused.contains("[acquisition]"), "{refused}");
     }

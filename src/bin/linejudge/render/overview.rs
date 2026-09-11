@@ -1,7 +1,7 @@
 use maud::{Markup, html};
 
 use crate::render::StateCounts;
-use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Verdict};
+use crate::render::data::{Answer, Counter, Counts, Region, Sweep, Variation, Verdict};
 use crate::render::{
     CASES_DIR, DATA_FILE, TOOLS_DIR, format_as_one_line, format_the_group_title,
     render_the_mark_of_github, render_the_mark_of_linejudge, wrap_the_page,
@@ -146,7 +146,7 @@ fn render_the_search(counted: usize) -> Markup {
 }
 
 fn render_one_column_head(counter: &Counter) -> Markup {
-    let multi = counter.dialects.len() > 1;
+    let multi = counter.variations.len() > 1;
     html! {
         th data-counter=(counter.name) {
             div .tname {
@@ -154,16 +154,27 @@ fn render_one_column_head(counter: &Counter) -> Markup {
             }
             div .tver title=(counter.version) { (format_the_version_of(counter)) }
             div .chips {
-                @for (at, dialect) in counter.dialects.iter().enumerate() {
+                @for (at, variation) in counter.variations.iter().enumerate() {
                     span .chip .pick[multi] .active[multi && at == 0]
                             data-group=[multi.then_some(&counter.name)]
-                            data-value=[multi.then_some(&dialect.name)] {
-                        (dialect.name) " · " (render_the_state_counts(&dialect.answers))
+                            data-value=[multi.then_some(&variation.name)] {
+                        span .named {
+                            (variation.dialect) " · " (render_the_state_counts(&variation.answers))
+                        }
+                        @if !variation.flags.is_empty() && shares_its_dialect(counter, variation) {
+                            span .flags { (variation.flags.join(" ")) }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+// Where one dialect is reached two ways, the chips wear its name twice and the flags are what
+// tells them apart. A counter whose dialects are one to one needs no flags to be read.
+fn shares_its_dialect(counter: &Counter, variation: &Variation) -> bool {
+    counter.variations.iter().filter(|one| one.dialect == variation.dialect).count() > 1
 }
 
 fn render_the_state_counts(answers: &[Answer]) -> Markup {
@@ -178,13 +189,13 @@ fn render_the_state_counts(answers: &[Answer]) -> Markup {
 }
 
 fn render_one_cell(counter: &Counter, name_of_case: &str) -> Markup {
-    let multi = counter.dialects.len() > 1;
+    let multi = counter.variations.len() > 1;
     html! {
         td data-counter=(counter.name) {
-            @for (at, dialect) in counter.dialects.iter().enumerate() {
-                @let answer = dialect.answers.iter().find(|one| one.case == name_of_case);
+            @for (at, variation) in counter.variations.iter().enumerate() {
+                @let answer = variation.answers.iter().find(|one| one.case == name_of_case);
                 @if multi {
-                    div .dv data-group=(counter.name) data-value=(dialect.name) hidden[at > 0] {
+                    div .dv data-group=(counter.name) data-value=(variation.name) hidden[at > 0] {
                         @if let Some(answer) = answer { (render_one_answer(answer)) }
                     }
                 } @else {

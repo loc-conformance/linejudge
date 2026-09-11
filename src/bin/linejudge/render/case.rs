@@ -25,7 +25,7 @@ pub fn render_one_case(detail: &CaseDetail, sweep: &Sweep) -> String {
         p .trap { (format_as_one_line(&detail.trap)) }
         (render_the_file(detail))
         h2 { "What each tool answered" }
-        @for (way, answer) in &answers { (render_one_answer(way, answer)) }
+        @for (named, flags, answer) in &answers { (render_one_answer(named, flags, answer)) }
     };
     wrap_the_page(&format!("{} · LineJudge", detail.name), body, UP)
 }
@@ -33,10 +33,12 @@ pub fn render_one_case(detail: &CaseDetail, sweep: &Sweep) -> String {
 fn render_the_file(detail: &CaseDetail) -> Markup {
     let width = detail.lines.len().to_string().len();
     html! {
-        div .chips .ways {
+        div .chips .dialects {
             span .picked { "read as" }
-            @for (at, way) in detail.ways.iter().enumerate() {
-                span .chip .pick .active[at == 0] data-group="way" data-value=(way) { (way) }
+            @for (at, name_of_dialect) in detail.dialects.iter().enumerate() {
+                span .chip .pick .active[at == 0] data-group="dialect" data-value=(name_of_dialect) {
+                    (name_of_dialect)
+                }
             }
         }
         div .filescroll { table .file {
@@ -57,7 +59,7 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
                     td .ln { (format!("{:>width$}", at + 1)) }
                     td .gut {
                         @for (which, counted) in line.counted.iter().enumerate() {
-                            span .dv data-group="way" data-value=(detail.ways[which])
+                            span .dv data-group="dialect" data-value=(detail.dialects[which])
                                     hidden[which > 0] {
                                 span .bucket.tip data-tip=(name_the_rules_of(counted)) {
                                     (counted.bucket)
@@ -84,11 +86,14 @@ fn render_the_file(detail: &CaseDetail) -> Markup {
     }
 }
 
-fn render_one_answer(way: &str, answer: &Answer) -> Markup {
+fn render_one_answer(named: &str, flags: &[String], answer: &Answer) -> Markup {
     html! {
         div .answer {
             div .who {
-                span .way { (way) } " " (render_the_verdict_of(answer))
+                span .variation { (named) } " " (render_the_verdict_of(answer))
+            }
+            @if !flags.is_empty() {
+                p .flags { (flags.join(" ")) }
             }
             @if let Some(note) = &answer.note {
                 p .note { (format_as_one_line(note)) }
@@ -160,13 +165,24 @@ fn format_the_regions(regions: &[Region]) -> Markup {
     }
 }
 
-fn find_the_answers_to<'a>(detail: &CaseDetail, sweep: &'a Sweep) -> Vec<(String, &'a Answer)> {
+// Named by the rules that judged it, since a variation's own name is a key of the recorded file.
+// Where two of them share those rules, the flags are what tells the two apart.
+fn find_the_answers_to<'a>(
+    detail: &CaseDetail,
+    sweep: &'a Sweep,
+) -> Vec<(String, &'a [String], &'a Answer)> {
     let mut found = Vec::new();
     for counter in &sweep.counters {
-        for dialect in &counter.dialects {
-            let way = format!("{}.{}", counter.name, dialect.name);
-            if let Some(answer) = dialect.answers.iter().find(|one| one.case == detail.name) {
-                found.push((way, answer));
+        for variation in &counter.variations {
+            let named = format!("{}.{}", counter.name, variation.dialect);
+            let shared =
+                counter.variations.iter().filter(|one| one.dialect == variation.dialect).count();
+            let flags = match shared > 1 {
+                true => variation.flags.as_slice(),
+                false => &[],
+            };
+            if let Some(answer) = variation.answers.iter().find(|one| one.case == detail.name) {
+                found.push((named, flags, answer));
             }
         }
     }
@@ -207,13 +223,63 @@ mod tests {
         assert!(shown.contains("Markdown"), "the region of a line is named\n{shown}");
     }
 
+    // One chip per dialect, so a shared dialect earns one and a second variation of it earns none.
     #[test]
-    fn only_the_first_way_of_counting_is_shown_and_the_rest_wait_behind_it() {
+    fn only_the_first_dialect_is_shown_and_the_rest_wait_behind_it() {
         let detail = a_case();
         let shown = render_the_file(&detail).into_string();
         assert!(shown.contains("data-value=\"mezura.content\">"), "{shown}");
         assert!(shown.contains("data-value=\"tokei.default\" hidden>"), "{shown}");
         assert_eq!(shown.matches("chip pick").count(), 2);
+    }
+
+    #[test]
+    fn a_minor_answers_beside_its_major_and_is_marked_apart_from_it() {
+        let counts = || Counts { lines: 1, buckets: BTreeMap::new() };
+        let answer = |case: &str| Answer {
+            case: case.to_string(),
+            verdict: Verdict::Agrees,
+            wants: Some(counts()),
+            answered: Some(counts()),
+            wants_regions: Vec::new(),
+            answered_regions: Vec::new(),
+            note: None,
+            exception: None,
+            broke: None,
+            command: "cloc input.c".to_string(),
+        };
+        let variation = |name: &str, major: bool| crate::render::data::Variation {
+            name: name.to_string(),
+            dialect: "default".to_string(),
+            major,
+            flags: match major {
+                true => Vec::new(),
+                false => vec!["--strip-str-comments".to_string()],
+            },
+            answers: vec![answer("0400-a_case")],
+        };
+        let sweep = Sweep {
+            linejudge: "0.2.0".to_string(),
+            measured_on: "2026-09-11".to_string(),
+            groups: Vec::new(),
+            counters: vec![crate::render::data::Counter {
+                name: "cloc".to_string(),
+                version: "2.10".to_string(),
+                variations: vec![variation("default", true), variation("stripstr", false)],
+            }],
+        };
+        let found = find_the_answers_to(&a_case(), &sweep);
+        assert_eq!(
+            found.iter().map(|(named, flags, _)| (named.as_str(), *flags)).collect::<Vec<_>>(),
+            [
+                ("cloc.default", [].as_slice()),
+                ("cloc.default", ["--strip-str-comments".to_string()].as_slice()),
+            ],
+            "both wear the rules that judged them, and the flags tell them apart"
+        );
+        let shown = render_one_answer(found[1].0.as_str(), found[1].1, found[1].2).into_string();
+        assert!(shown.contains("<span class=\"variation\">cloc.default</span>"), "{shown}");
+        assert!(shown.contains("<p class=\"flags\">--strip-str-comments</p>"), "{shown}");
     }
 
     fn a_case() -> CaseDetail {
@@ -222,7 +288,7 @@ mod tests {
             group: "0000-a_group".to_string(),
             trap: "a trap".to_string(),
             file: "input.c".to_string(),
-            ways: vec!["mezura.content".to_string(), "tokei.default".to_string()],
+            dialects: vec!["mezura.content".to_string(), "tokei.default".to_string()],
             lines: vec![Line {
                 pieces: vec![
                     Piece { covering: Covering::Residue, text: "a = ".to_string() },
@@ -267,7 +333,7 @@ mod tests {
             broke: None,
             command: "tokei cases/0000-a_group/0400-a_case/input.c".to_string(),
         };
-        let shown = render_one_answer("tokei.default", &answer).into_string();
+        let shown = render_one_answer("tokei.default", &[], &answer).into_string();
         assert!(shown.contains("✗ fails"), "{shown}");
         assert!(shown.contains("3 lines"), "the lines are shown even where they agree\n{shown}");
         assert!(shown.contains("<span class=\"off\">1 code</span>"), "{shown}");

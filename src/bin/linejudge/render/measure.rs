@@ -1,7 +1,8 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use linejudge::adapter::{Adapter, Invocation};
+use linejudge::adapter::{Adapter, Variation};
 use linejudge::corpus::{Case, Corpus};
 use linejudge::deriver::explain_every_line;
 use linejudge::dialects::{Condition, Dialects, Predicate};
@@ -33,13 +34,15 @@ pub fn measure_every_counter(
             continue;
         };
         let version = adapter.read_version_or_unknown(&binary);
-        let record = RecordedAnswers::read(recorded, name, dialects)
-            .map_err(|faults| faults.join("\n"))?;
+        let record =
+            RecordedAnswers::read(recorded, adapter).map_err(|faults| faults.join("\n"))?;
         let mut measured = Vec::new();
-        for dialect in &adapter.invocations {
+        // A minor's note is its major's, and majors sort first, so this is filled before it is read.
+        let mut the_major_still_answers: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for variation in &adapter.variations {
             let judged = measure_and_judge_every_case(
                 adapter,
-                dialect,
+                variation,
                 dialects,
                 &binary,
                 corpus,
@@ -47,15 +50,33 @@ pub fn measure_every_counter(
                 &version,
             )
             .map_err(|faults| faults.join("\n"))?;
-            let answers = judged
-                .iter()
-                .map(|one| {
-                    build_one_answer(one, format_the_command_for(adapter, dialect, corpus, one.case))
-                })
-                .collect();
-            measured.push(data::Dialect { name: dialect.name.clone(), answers });
+            let answers = {
+                let held = the_major_still_answers.get(&variation.name_of_dialect);
+                judged
+                    .iter()
+                    .map(|one| {
+                        let command = format_the_command_for(adapter, variation, corpus, one.case);
+                        let inherited_note_holds = variation.is_major
+                            || held.is_some_and(|cases| cases.contains(&one.case.name));
+                        build_one_answer(one, command, inherited_note_holds)
+                    })
+                    .collect()
+            };
+            if variation.is_major {
+                the_major_still_answers.insert(
+                    variation.name_of_dialect.clone(),
+                    collect_the_cases_it_still_answers_alike(&judged),
+                );
+            }
+            measured.push(data::Variation {
+                name: variation.name.clone(),
+                dialect: variation.name_of_dialect.clone(),
+                major: variation.is_major,
+                flags: variation.args.clone(),
+                answers,
+            });
         }
-        counters.push(data::Counter { name: name.clone(), version, dialects: measured });
+        counters.push(data::Counter { name: name.clone(), version, variations: measured });
     }
     if counters.is_empty() {
         return Err("no counter was run, so there is nothing to publish: name binaries in \
@@ -70,31 +91,37 @@ pub fn measure_every_counter(
     })
 }
 
-// Needs no binary: the file, its marked spans, and how each way of counting reads every line. The
-// ways are the ones the sweep measured, so a counter left out for want of a binary is left out
-// here too.
+// Needs no binary. It builds the file, its marked spans, and how each dialect reads every line.
+// The dialects are the ones the sweep measured, so a counter left out for want of a binary is left
+// out here too.
 pub fn read_every_case(
     sweep: &data::Sweep,
     corpus: &Corpus,
     dialects: &Dialects,
 ) -> Result<Vec<data::CaseDetail>, String> {
-    let mut ways = Vec::new();
+    // One entry per dialect, since the reading below is its rules and two variations sharing them
+    // would put the same gutter on the page twice.
+    let mut per_dialect = Vec::new();
     for counter in &sweep.counters {
-        for dialect in &counter.dialects {
-            let Some(rules) = dialects.find(&counter.name, &dialect.name) else {
-                return Err(format!("{}.{} names no dialect file", counter.name, dialect.name));
+        for variation in &counter.variations {
+            let key = format!("{}.{}", counter.name, variation.dialect);
+            if per_dialect.iter().any(|(seen, _)| *seen == key) {
+                continue;
+            }
+            let Some(rules) = dialects.find(&counter.name, &variation.dialect) else {
+                return Err(format!("{}.{} names no dialect file", counter.name, variation.dialect));
             };
-            ways.push((format!("{}.{}", counter.name, dialect.name), rules));
+            per_dialect.push((key, rules));
         }
     }
 
     let mut detailed = Vec::with_capacity(corpus.cases.len());
     for case in &corpus.cases {
-        let mut read_by_way = Vec::with_capacity(ways.len());
-        for (way, rules) in &ways {
+        let mut read_by_dialect = Vec::with_capacity(per_dialect.len());
+        for (key, rules) in &per_dialect {
             let explained = explain_every_line(&case.truth, rules, &corpus.readings)
-                .map_err(|faults| format!("{}, {way}: {}", case.name, faults.join("; ")))?;
-            read_by_way.push(explained);
+                .map_err(|faults| format!("{}, {key}: {}", case.name, faults.join("; ")))?;
+            read_by_dialect.push(explained);
         }
         let lines = case
             .truth
@@ -107,7 +134,7 @@ pub fn read_every_case(
                     .into_iter()
                     .map(|(covering, text)| data::Piece { covering, text })
                     .collect(),
-                counted: read_by_way
+                counted: read_by_dialect
                     .iter()
                     .map(|explained| data::Counted {
                         bucket: explained[at].bucket.clone(),
@@ -126,7 +153,7 @@ pub fn read_every_case(
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned())
                 .unwrap_or_default(),
-            ways: ways.iter().map(|(way, _)| way.clone()).collect(),
+            dialects: per_dialect.iter().map(|(key, _)| key.clone()).collect(),
             lines,
         });
     }
@@ -141,17 +168,24 @@ pub fn read_every_tool(
     let mut detailed = Vec::with_capacity(sweep.counters.len());
     for counter in &sweep.counters {
         let adapter = adapters.iter().find(|one| one.name_of_counter == counter.name);
-        let mut ways = Vec::with_capacity(counter.dialects.len());
-        for dialect in &counter.dialects {
-            let Some(rules) = dialects.find(&counter.name, &dialect.name) else {
-                return Err(format!("{}.{} names no dialect file", counter.name, dialect.name));
+        let mut detailed_dialects: Vec<data::DialectDetail> = Vec::new();
+        for variation in &counter.variations {
+            let asked = data::VariationDetail {
+                name: variation.name.clone(),
+                major: variation.major,
+                flags: variation.flags.clone(),
             };
-            ways.push(data::DialectDetail {
-                name: dialect.name.clone(),
-                flags: adapter
-                    .and_then(|one| one.invocations.iter().find(|way| way.name == dialect.name))
-                    .map(|way| way.args.clone())
-                    .unwrap_or_default(),
+            if let Some(held) = detailed_dialects.iter_mut().find(|one| one.name == variation.dialect)
+            {
+                held.variations.push(asked);
+                continue;
+            }
+            let Some(rules) = dialects.find(&counter.name, &variation.dialect) else {
+                return Err(format!("{}.{} names no dialect file", counter.name, variation.dialect));
+            };
+            detailed_dialects.push(data::DialectDetail {
+                name: variation.dialect.clone(),
+                variations: vec![asked],
                 rules: rules
                     .rules
                     .iter()
@@ -170,7 +204,7 @@ pub fn read_every_tool(
             channel: adapter
                 .and_then(|one| one.acquisition.as_ref())
                 .map(|how| format!("{} as {}", how.channel, how.name)),
-            dialects: ways,
+            dialects: detailed_dialects,
         });
     }
     Ok(detailed)
@@ -221,7 +255,24 @@ fn say_what_a_condition_asks(condition: &Condition) -> String {
     }
 }
 
-fn build_one_answer(judged: &Judged, command: String) -> data::Answer {
+fn collect_the_cases_it_still_answers_alike(judged: &[Judged]) -> BTreeSet<String> {
+    judged
+        .iter()
+        .filter_map(|one| match &one.outcome {
+            Outcome::Measured(measured) => {
+                let held = measured.record.is_some_and(|entry| entry.counted == measured.live);
+                held.then(|| one.case.name.clone())
+            }
+            Outcome::Broke(_) => None,
+        })
+        .collect()
+}
+
+fn build_one_answer(
+    judged: &Judged,
+    command: String,
+    inherited_note_holds: bool,
+) -> data::Answer {
     let case = judged.case.name.clone();
     let measured = match &judged.outcome {
         Outcome::Broke(message) => {
@@ -245,9 +296,10 @@ fn build_one_answer(judged: &Judged, command: String) -> data::Answer {
         Conformance::Fails => Verdict::Fails,
         Conformance::Unclaimed => Verdict::Unclaimed,
     };
-    let note = measured.record.and_then(|entry| match entry.counted == measured.live {
-        true => entry.note.clone(),
-        false => None,
+    let note = measured.record.and_then(|entry| {
+        let describes_this_run = entry.counted == measured.live
+            && (!entry.note_is_inherited || inherited_note_holds);
+        describes_this_run.then(|| entry.note.clone()).flatten()
     });
     data::Answer {
         case,
@@ -271,7 +323,7 @@ fn build_one_answer(judged: &Judged, command: String) -> data::Answer {
 // inside the corpus, never the local paths this run happened to resolve.
 fn format_the_command_for(
     adapter: &Adapter,
-    dialect: &Invocation,
+    variation: &Variation,
     corpus: &Corpus,
     case: &Case,
 ) -> String {
@@ -284,7 +336,7 @@ fn format_the_command_for(
         Some(group) => format!("cases/{group}/{}/{input}", case.name),
         None => format!("cases/{}/{input}", case.name),
     };
-    adapter.format_command(dialect, Path::new(&adapter.name_of_counter), Path::new(&file))
+    adapter.format_command(variation, Path::new(&adapter.name_of_counter), Path::new(&file))
 }
 
 fn collect_the_groups_of(corpus: &Corpus) -> Vec<data::Group> {
@@ -370,24 +422,40 @@ mod tests {
 
     #[test]
     fn the_note_is_carried_exactly_while_the_answer_it_was_written_about_is_the_answer_given() {
-        let same = build_one_answer(&judged(5, Some(5)), String::new());
+        let same = build_one_answer(&judged(5, Some(5)), String::new(), true);
         assert_eq!(same.note.as_deref(), Some("a note"));
         assert_eq!(same.verdict, Verdict::Fails);
 
-        let moved = build_one_answer(&judged(5, Some(4)), String::new());
+        let moved = build_one_answer(&judged(5, Some(4)), String::new(), true);
         assert_eq!(moved.note, None, "the answer moved, so the note describes nothing");
 
-        let gone = build_one_answer(&judged(5, None), String::new());
+        let gone = build_one_answer(&judged(5, None), String::new(), true);
         assert_eq!(gone.note, None);
         assert_eq!(gone.verdict, Verdict::Unclaimed);
         assert_eq!(gone.answered, None);
     }
 
     #[test]
+    fn a_note_read_through_a_pointer_goes_when_the_block_it_came_from_moves() {
+        let mut borrowed = judged(5, Some(5));
+        let Outcome::Measured(measured) = &mut borrowed.outcome else { panic!("not measured") };
+        let mut entry = measured.record.unwrap().clone();
+        entry.note_is_inherited = true;
+        let held = Box::leak(Box::new(entry));
+        measured.record = Some(held);
+
+        let still = build_one_answer(&borrowed, String::new(), true);
+        assert_eq!(still.note.as_deref(), Some("a note"), "the major answers as it did");
+
+        let moved = build_one_answer(&borrowed, String::new(), false);
+        assert_eq!(moved.note, None, "the major moved, so its sentence explains nothing here");
+    }
+
+    #[test]
     fn a_case_the_counter_broke_on_carries_the_message_and_no_numbers() {
         let case = a_case("0400-a_case_built_by_a_test");
         let broke = Judged { case: &case, outcome: Outcome::Broke("exit status 101".to_string()) };
-        let answer = build_one_answer(&broke, "tokei cases/x".to_string());
+        let answer = build_one_answer(&broke, "tokei cases/x".to_string(), true);
         assert_eq!(answer.verdict, Verdict::Broke);
         assert_eq!(answer.broke.as_deref(), Some("exit status 101"));
         assert_eq!(answer.wants, None);
@@ -436,6 +504,7 @@ mod tests {
             counted: Some(answer_of(recorded_code)),
             is_known_failure: true,
             note: Some("a note".to_string()),
+            note_is_inherited: false,
         };
         let real = answer_of(3);
         let conformance = match &live {

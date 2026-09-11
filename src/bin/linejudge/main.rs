@@ -35,7 +35,9 @@ use crate::explain::{explain_one_counter, find_case};
 use crate::linejudge_folder::Folder;
 use crate::linejudge_folder::{COUNTERS_FILE, FOLDER_NAME};
 use crate::report::OneRun;
-use crate::report::{report_recorded_answers_that_name_nothing, report_the_verdicts_of_one_dialect};
+use crate::report::{
+    report_recorded_answers_that_name_nothing, report_the_verdicts_of_one_variation,
+};
 
 const COMMAND_OPENS: &str = "linejudge ";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -493,7 +495,7 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             }
             None => create_the_recorded_dir(&mut out, folder.as_ref())?,
         };
-        let held = RecordedAnswers::read(&dirs.recorded, name, &dialects)
+        let held = RecordedAnswers::read(&dirs.recorded, &adapters[0])
             .map_err(|faults| faults.join("\n"))?;
         record::record_one_counter(
             &mut out,
@@ -519,8 +521,8 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
         };
         ran += 1;
         let version = adapter.read_version_or_unknown(&binary);
-        let record = RecordedAnswers::read(&dirs.recorded, name, &dialects)
-            .map_err(|faults| faults.join("\n"))?;
+        let record =
+            RecordedAnswers::read(&dirs.recorded, adapter).map_err(|faults| faults.join("\n"))?;
         let drift_is_judged =
             record.as_ref().is_some_and(|record| is_same_build(&record.version, &version));
         if let Some(record) = &record
@@ -530,10 +532,10 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
                     "recorded at [{}] and running [{version}], so what changed since the record \
                      is not judged", record.version)))?;
         }
-        for dialect in &adapter.invocations {
+        for variation in &adapter.variations {
             let judged = measure_and_judge_every_case(
                 adapter,
-                dialect,
+                variation,
                 &dialects,
                 &binary,
                 &corpus,
@@ -541,8 +543,9 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
                 &version,
             )
             .map_err(|faults| faults.join("\n"))?;
-            let run = OneRun { adapter, dialect, binary: &binary, version: &version, drift_is_judged };
-            broken |= report_the_verdicts_of_one_dialect(&mut out, &run, &judged)?;
+            let run =
+                OneRun { adapter, variation, binary: &binary, version: &version, drift_is_judged };
+            broken |= report_the_verdicts_of_one_variation(&mut out, &run, &judged)?;
         }
         // The record is held against the whole corpus, and the corpus is one case here, so asking
         // would report every other case it speaks about as missing.

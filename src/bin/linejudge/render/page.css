@@ -294,8 +294,8 @@ thead th:first-child {
 
 .chip {
   display: flex;
-  align-items: center;
-  gap: .4em;
+  flex-direction: column;
+  align-items: flex-start;
   padding: .05rem .6rem;
   background: #f6f8fa;
   border: 0.0625rem solid #d0d7de;
@@ -304,6 +304,20 @@ thead th:first-child {
   font-size: .8rem;
   font-weight: 400;
   white-space: nowrap;
+}
+
+.chip > .named {
+  display: flex;
+  align-items: center;
+  gap: .4em;
+}
+
+/* Under the name it qualifies, so two chips over one dialect read as one thing asked for two
+   ways. */
+.chip > .flags {
+  margin-top: -.15rem;
+  color: #6e7781;
+  font-size: .95em;
 }
 
 .chip b {
@@ -525,7 +539,7 @@ footer {
   font-size: .9375rem;
 }
 
-.chips.ways {
+.chips.dialects {
   margin-bottom: .6rem;
 }
 
@@ -662,17 +676,42 @@ h2 {
   border-radius: .5rem;
 }
 
-/* A way of counting is a name, not code, and it must not look like the buckets under it. */
-.way {
+/* These are names, and they must not look like the buckets under them. */
+.variation,
+.dialect-name {
   font-size: .95rem;
   font-weight: 700;
 }
 
-.heading {
+.asked-for {
+  list-style: none;
+  margin: 0 0 .6rem;
+  padding: 0;
+}
+
+.asked {
+  padding: .15rem 0;
+}
+
+.flags {
+  font-size: .8rem;
+}
+
+p.flags {
+  margin: .1rem 0 0;
+  color: #57606a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.heading,
+.asked {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: .1rem .6rem;
+}
+
+.heading {
   margin: 0 0 .5rem;
 }
 

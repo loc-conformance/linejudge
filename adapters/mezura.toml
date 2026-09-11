@@ -9,17 +9,19 @@ channel = "crates-io"
 name    = "mezura"
 version = "3.1.0"
 
-[dialect.content]
-args = ["--counting", "content"]
+[variation.content]
+dialect = "content"
+major   = true
+args    = ["--counting", "content"]
 
-[dialect.content.read]
+[variation.content.read]
 claims   = "languages[]"
 lines    = "total.lines"
 code     = "total.code"
 comments = "total.comments"
 extra    = "total.extra"
 
-[dialect.content.read.regions]
+[variation.content.read.regions]
 each     = "languages[].nested_languages[]"
 language = "name"
 lines    = "lines"
@@ -27,17 +29,19 @@ code     = "code"
 comments = "comments"
 extra    = "extra"
 
-[dialect.region]
-args = ["--counting", "region"]
+[variation.region]
+dialect = "region"
+major   = true
+args    = ["--counting", "region"]
 
-[dialect.region.read]
+[variation.region.read]
 claims   = "languages[]"
 lines    = "total.lines"
 code     = "total.code"
 comments = "total.comments"
 blanks   = "total.blanks"
 
-[dialect.region.read.regions]
+[variation.region.read.regions]
 each     = "languages[].nested_languages[]"
 language = "name"
 lines    = "lines"

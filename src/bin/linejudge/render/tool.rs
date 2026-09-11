@@ -58,22 +58,30 @@ fn render_the_worklist_of(detail: &ToolDetail, sweep: &Sweep) -> Markup {
         return html! {};
     };
     html! {
-        @for dialect in &counter.dialects {
-            @let named: Vec<&Answer> = dialect
+        @for variation in &counter.variations {
+            @let named: Vec<&Answer> = variation
                 .answers
                 .iter()
                 .filter(|answer| answer.verdict != Verdict::Agrees)
                 .collect();
             div .worklist {
                 p .heading {
-                    @if counter.dialects.len() > 1 {
-                        span .way { (dialect.name) }
+                    @if counter.variations.len() > 1 {
+                        span .variation { (variation.dialect) }
                     }
-                    @let file = format!("{}.svg", name_the_badge_of(&counter.name, &dialect.name));
-                    img .badge src=(format!("{UP}{BADGES_DIR}/{file}")) alt=(file);
+                    @if variation.major {
+                        @let file = format!(
+                            "{}.svg",
+                            name_the_badge_of(&counter.name, &variation.dialect)
+                        );
+                        img .badge src=(format!("{UP}{BADGES_DIR}/{file}")) alt=(file);
+                    }
+                    @if !variation.flags.is_empty() {
+                        code .flags { (variation.flags.join(" ")) }
+                    }
                     span .about {
                         "does not agree on " (named.len())
-                        " of " (dialect.answers.len()) " cases"
+                        " of " (variation.answers.len()) " cases"
                     }
                 }
                 @if named.is_empty() {
@@ -107,13 +115,7 @@ fn render_one_dialect(dialect: &DialectDetail) -> Markup {
     html! {
         div .dialect {
             p .heading {
-                span .way { (dialect.name) }
-                @match dialect.flags.is_empty() {
-                    true => span .about { "how it counts when it is run with no extra flags" },
-                    false => span .about {
-                        "how it counts when it is run with " code { (dialect.flags.join(" ")) }
-                    },
-                }
+                span .dialect-name { (dialect.name) " ruleset" }
             }
             table .rules {
                 @for rule in &dialect.rules {
@@ -136,7 +138,7 @@ fn render_one_dialect(dialect: &DialectDetail) -> Markup {
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::render::data::{Counter, Counts, Dialect, RuleDetail};
+    use crate::render::data::{Counter, Counts, RuleDetail, Variation, VariationDetail};
 
     use super::*;
 
@@ -150,18 +152,16 @@ mod tests {
         assert!(shown.contains("the /* opens a comment"), "{shown}");
     }
 
+    // This section shows the rules and nothing else, so it names the set and leaves the runs held
+    // to it to the worklist above, where their scores are.
     #[test]
-    fn a_way_of_counting_is_named_beside_its_rules_in_words_and_the_flags_that_ask_for_it() {
+    fn a_ruleset_names_itself_and_prints_its_rules_once() {
         let named = render_one_dialect(&a_tool().dialects[0]).into_string();
-        assert!(named.contains("part of the line is inside a comment"), "{named}");
-        assert!(named.contains(">default<"), "{named}");
-        assert!(named.contains("run with <code>--mode default</code>"), "{named}");
-
-        let mut plain = a_tool();
-        plain.dialects[0].flags.clear();
-        let shown = render_one_dialect(&plain.dialects[0]).into_string();
-        assert!(shown.contains(">default<"), "{shown}");
-        assert!(shown.contains("run with no extra flags"), "{shown}");
+        assert_eq!(named.matches("part of the line is inside a comment").count(), 1, "{named}");
+        assert!(named.contains(">default ruleset<"), "{named}");
+        assert!(!named.contains("strict"), "a record key is no label\n{named}");
+        assert!(!named.contains("--"), "the flags belong where the score is\n{named}");
+        assert!(!named.contains("class=\"\""), "no empty class attribute\n{named}");
     }
 
     fn a_tool() -> ToolDetail {
@@ -172,7 +172,18 @@ mod tests {
             channel: Some("crates-io as tokei".to_string()),
             dialects: vec![DialectDetail {
                 name: "default".to_string(),
-                flags: vec!["--mode".to_string(), "default".to_string()],
+                variations: vec![
+                    VariationDetail {
+                        name: "default".to_string(),
+                        major: true,
+                        flags: Vec::new(),
+                    },
+                    VariationDetail {
+                        name: "strict".to_string(),
+                        major: false,
+                        flags: vec!["--strict".to_string()],
+                    },
+                ],
                 rules: vec![RuleDetail {
                     name: "a-comment-alone-is-comments".to_string(),
                     bucket: "comments".to_string(),
@@ -205,8 +216,11 @@ mod tests {
             counters: vec![Counter {
                 name: "tokei".to_string(),
                 version: "tokei 14.0.0".to_string(),
-                dialects: vec![Dialect {
+                variations: vec![Variation {
                     name: "default".to_string(),
+                    dialect: "default".to_string(),
+                    major: true,
+                    flags: Vec::new(),
                     answers: vec![
                         answer("0400-a_pass", Verdict::Agrees, None),
                         answer("0500-a_failure", Verdict::Fails, Some("the /* opens a comment")),

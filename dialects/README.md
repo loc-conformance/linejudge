@@ -6,10 +6,16 @@ worked out from the case's marked strings and comments by these rules, and the c
 is compared to it. That is the only expectation ever used, so writing this file is writing
 down what your tool means to do.
 
-One folder per counter and one file per way it counts, `<counter>/<dialect>.toml`, and the file's
+One folder per counter and one file per set of rules, `<counter>/<dialect>.toml`, and the file's
 own `counter` and `dialect` keys must match the folder and the name. The folder is the unit a
-tool's maintainer owns, however many dialects it grows. A tool with one way of counting calls it
+tool's maintainer owns, however many dialects it grows. A tool that counts one way calls it
 `default`; mezura counts two ways and its folder holds two files.
+
+A dialect is named by the adapter, which declares one variation per command line the counter is
+measured with. Several variations may name one dialect, which is how a flag that changes only how
+the tool reaches these rules is measured without a second copy of them. The format for that is in
+[FOR-COUNTER-AUTHORS.md](../FOR-COUNTER-AUTHORS.md). A flag that changes what a rule below says
+belongs in a file of its own here instead.
 
 A dialect file carries no case names. It declares how the tool counts, knows nothing about any
 corpus, and stays portable into the tool's own repository; what a tool answers on a particular
