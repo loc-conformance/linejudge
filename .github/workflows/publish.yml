@@ -48,7 +48,10 @@ jobs:
       # published. The pages that are live then stay exactly as they were, which is one whole
       # measurement with its own date on it, rather than one column from today beside one from a
       # week ago and holes where the cases added since would be.
+      # The token is for the rate limit alone: sixty requests an hour per address without one.
       - name: Download the counters
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: ./target/release/linejudge fetch
 
       - name: Measure the roster and write the pages

@@ -35,6 +35,8 @@ jobs:
       # week. The document is the whole of stdout, so nothing has to be parsed out of a report.
       - name: Ask every channel what it publishes newest
         id: ask
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set +e
           moved=$(./target/release/linejudge bump-versions --json --adapters adapters)
@@ -97,6 +99,8 @@ jobs:
 
       - name: Raise the version this counter declares
         if: steps.branch.outputs.already == 'no'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./target/release/linejudge bump-versions "${{ matrix.bump.counter }}" \
             --adapters adapters
@@ -110,6 +114,7 @@ jobs:
         id: record
         env:
           COUNTER: ${{ matrix.bump.counter }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./target/release/linejudge fetch "$COUNTER"
           ./target/release/linejudge record --counter "$COUNTER" | tee "$RUNNER_TEMP/record"

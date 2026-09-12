@@ -1,3 +1,4 @@
+use std::env;
 use std::env::consts::{ARCH, EXE_SUFFIX, OS};
 use std::fs;
 use std::io::{self, Write};
@@ -276,9 +277,15 @@ fn find_the_release_of(repository: &str, version: &str) -> Result<Release, Strin
     // Both tag shapes fail the same way when the version is not there, and one 404 said twice
     // reads as two faults.
     refused.dedup();
+    let said = refused.join("; ");
+    // A 404 is the only answer that means the version is not there.
+    if said.contains("404") {
+        return Err(format!("{repository} has no release tagged v{version} or {version}: {said}"));
+    }
     Err(format!(
-        "{repository} has no release tagged v{version} or {version}: {}",
-        refused.join("; ")
+        "github would not say what {repository} released as v{version} or {version}: {said}. \
+         Unauthenticated it answers sixty requests an hour per address; GITHUB_TOKEN in the \
+         environment raises that"
     ))
 }
 
@@ -368,7 +375,26 @@ fn find_the_file_named(named: &str, under: &Path) -> Option<PathBuf> {
 }
 
 pub(crate) fn read_a_url(url: &str) -> Result<String, String> {
-    download_with_curl_or_wget(&["-sSfL", url], &["-qO-", url])
+    match find_the_header_for(url) {
+        Some(header) => download_with_curl_or_wget(
+            &["-sSfL", "-H", &header, url],
+            &["-qO-", "--header", &header, url],
+        ),
+        None => download_with_curl_or_wget(&["-sSfL", url], &["-qO-", url]),
+    }
+}
+
+// Only the api host is given the token, so it never travels to the file a release points at,
+// which is served elsewhere and needs none.
+fn find_the_header_for(url: &str) -> Option<String> {
+    if !url.starts_with(GITHUB_API) {
+        return None;
+    }
+    let token = ["GITHUB_TOKEN", "GH_TOKEN"]
+        .iter()
+        .find_map(|named| env::var(named).ok())
+        .filter(|token| !token.trim().is_empty())?;
+    Some(format!("Authorization: Bearer {token}"))
 }
 
 fn save_a_url(url: &str, into: &Path) -> Result<(), String> {
