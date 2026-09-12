@@ -147,7 +147,6 @@ jobs:
       # crates.io is told which workflow of which repository may publish this crate, and hands
       # this run a token that dies with it. Nothing long lived is kept anywhere.
       - name: Ask crates.io for a token
-        if: steps.asked.outputs.held == 'no'
         id: auth
         uses: rust-lang/crates-io-auth-action@v1
 
