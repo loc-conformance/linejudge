@@ -11,8 +11,27 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # crates.io keeps for ever what it is given, and the tag is what names the version everywhere
+  # else, so a tag that disagrees with the manifest stops the run before anything is built.
+  version:
+    name: the tag and the manifest agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare them
+        run: |
+          manifest=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          tag=${GITHUB_REF_NAME#v}
+          if [ "$manifest" != "$tag" ]; then
+            echo "the tag says $tag and Cargo.toml says $manifest"
+            exit 1
+          fi
+          echo "both say $tag"
+
   build:
     name: build (${{ matrix.os }})
+    needs: version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -93,3 +112,46 @@ jobs:
         with:
           files: artifacts/*
           fail_on_unmatched_files: true
+
+  # Last, because everything above can be run again and this cannot: a version handed to crates.io
+  # is there for good, and only a yank ever takes it back.
+  crates:
+    name: publish to crates.io
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # A tag re-pushed over itself runs this again, where the version is already up and cargo
+      # would stop the run over something nobody has to act on.
+      - name: Ask crates.io whether it has this version
+        id: asked
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          body=$(curl -sS --max-time 30 -H "User-Agent: linejudge release workflow" \
+            "https://crates.io/api/v1/crates/linejudge/$version")
+          if echo "$body" | grep -q "\"num\":\"$version\""; then
+            echo "held=yes" >> "$GITHUB_OUTPUT"
+            echo "crates.io already holds $version, nothing to publish"
+          else
+            echo "held=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        if: steps.asked.outputs.held == 'no'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish
+
+  # After the crate, since this one downloads every counter and measures them, and a download that
+  # fails says nothing about the release. Run it again by hand when that happens.
+  pages:
+    name: publish the pages
+    needs: crates
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish.yml

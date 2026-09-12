@@ -1,10 +1,12 @@
 name: Publish
 
-# Run by hand only. A push to main can land in the middle of a piece of work, a case
+# By hand, or from a release. A push to main can land in the middle of a piece of work, a case
 # added whose answers have not been recorded yet, and a page published from that state says
-# something untrue with nobody having asked for it.
+# something untrue with nobody having asked for it. A tag is nobody's middle of anything, so the
+# release workflow calls this one at the end of its run.
 on:
   workflow_dispatch:
+  workflow_call:
 
 env:
   CARGO_TERM_COLOR: always
