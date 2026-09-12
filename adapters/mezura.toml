@@ -1,7 +1,7 @@
 name       = "mezura"
 repository = "https://github.com/subamanis/mezura"
-args       = ["{file}", "--output", "json", "--hide", "timing"]
-explain-args   = ["{file}", "--explain", "--output", "json"]
+args       = ["{file}", "--output", "json", "--hide", "timing", "--no-default-config", "--no-local"]
+explain-args   = ["{file}", "--explain", "--output", "json", "--no-default-config", "--no-local"]
 explain-output = "linejudge-per-line"
 
 [acquisition]
