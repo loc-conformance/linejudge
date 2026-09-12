@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0, 2026-09-11
+## 0.2.0, 2026-09-12
 
 A counter can now be measured more than one way against a single set of rules. cloc has
 `--strip-str-comments`, which changes no rule cloc declares and changes how cloc reaches them.
