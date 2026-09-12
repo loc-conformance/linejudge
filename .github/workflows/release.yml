@@ -119,6 +119,9 @@ jobs:
     name: publish to crates.io
     needs: publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v7
@@ -141,10 +144,17 @@ jobs:
             echo "held=no" >> "$GITHUB_OUTPUT"
           fi
 
+      # crates.io is told which workflow of which repository may publish this crate, and hands
+      # this run a token that dies with it. Nothing long lived is kept anywhere.
+      - name: Ask crates.io for a token
+        if: steps.asked.outputs.held == 'no'
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+
       - name: Publish
         if: steps.asked.outputs.held == 'no'
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish
 
   # After the crate, since this one downloads every counter and measures them, and a download that
