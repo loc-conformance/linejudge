@@ -1,0 +1,5 @@
+trap = """
+a Rust raw string opener written inside a block comment. Its closing symbol is "#, so a counter
+that pairs it with the next quote it meets loses the real string later on the same line, and the
+/* inside that string then opens a comment of its own. The raw string on the line below holds one
+quote, so a counter with no raw string form cannot pass this file either"""

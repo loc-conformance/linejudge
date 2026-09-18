@@ -1,0 +1,14 @@
+// don't change the quote below
+CCccccccccccccccccccccccccccccc
+// the line under this one is code
+CCcccccccccccccccccccccccccccccccc
+let c = '"';
+... . . SsZ.
+/* it's fine as it is */ let d = 'x';
+CCccccccccccccccccccccUU ... . . SsZ.
+let y = 1;
+... . . ..
+// a real comment
+CCccccccccccccccc
+// a second real comment
+CCcccccccccccccccccccccc

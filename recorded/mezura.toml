@@ -158,6 +158,22 @@ counted = { lines = 2, code = 1, comments = 1, extra = 0 }
 [answer.2020-string_symbol_inside_comment.region]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
+[answer.2025-raw_opener_inside_a_comment.content]
+is-known-failure = true
+counted = { lines = 5, code = 1, comments = 4, extra = 0 }
+note = """
+the r#" inside the comment is taken for a string opener, and every quote after it on that line is
+then dropped for being unable to close it, so the real string is lost and the /* it holds opens a
+comment that runs to the end of the file"""
+
+[answer.2025-raw_opener_inside_a_comment.region]
+is-known-failure = true
+counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+note = """
+the r#" inside the comment is taken for a string opener, and every quote after it on that line is
+then dropped for being unable to close it, so the real string is lost and the /* it holds opens a
+comment that runs to the end of the file"""
+
 [answer.2030-string_symbol_of_another_kind_inside.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
 
@@ -339,6 +355,12 @@ counted = { lines = 3, code = 1, comments = 2, extra = 0 }
 
 [answer.4050-lifetime_and_apostrophe_in_string.region]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.4055-apostrophe_inside_a_comment.content]
+counted = { lines = 7, code = 3, comments = 4, extra = 0 }
+
+[answer.4055-apostrophe_inside_a_comment.region]
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
 
 [answer.4060-primed_identifier_haskell.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }

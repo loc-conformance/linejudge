@@ -84,6 +84,9 @@ counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 [answer.2020-string_symbol_inside_comment.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
+[answer.2025-raw_opener_inside_a_comment.default]
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+
 [answer.2030-string_symbol_of_another_kind_inside.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 
@@ -182,6 +185,14 @@ counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
 
 [answer.4050-lifetime_and_apostrophe_in_string.default]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.4055-apostrophe_inside_a_comment.default]
+is-known-failure = true
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+note = """
+the apostrophe written inside a comment is paired with the quote of a real character literal
+further down, and the lines swallowed on the way count as code, so two of the four comment lines
+are lost"""
 
 [answer.4060-primed_identifier_haskell.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }

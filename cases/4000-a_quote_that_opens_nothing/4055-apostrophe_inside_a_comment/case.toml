@@ -1,0 +1,5 @@
+trap = """
+an apostrophe inside a comment, in the word don't, with a real character literal on the line below
+it. The apostrophe is text there and pairs with nothing, so a counter pairing it with the literal's
+own quote swallows every line between them. The block comment further down holds it's and carries
+code after it closes, which is the same trap on one line"""
