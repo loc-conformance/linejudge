@@ -172,7 +172,7 @@ record its answers as described below.
 ## Re-measuring a counter
 
 ```
-cargo run -- record --counter <name>
+cargo run --bin linejudge -- record --counter <name>
 ```
 
 rewrites `recorded/<counter>.toml` from scratch, with the version at the top exactly as the counter
