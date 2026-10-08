@@ -1,0 +1,5 @@
+trap = """
+an interpolated C# string runs code between { and }, and that code may hold the string's own
+closing quote, here inside the character '"'. The quote belongs to the code and ends nothing, so
+the string still runs across the lines below the hole. A counter that reads the string as text from
+end to end closes it at that quote, and the two lines below come out as comments"""

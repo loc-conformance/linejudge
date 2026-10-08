@@ -1,0 +1,12 @@
+var row = $@"Name: {(quoted ? '"' : ' ')}
+... ... . SSSssssssZ....... . SsZ . SsZ.S
+// still inside the string
+ssssssssssssssssssssssssss
+// and so is this line
+ssssssssssssssssssssss
+";
+Z.
+// a real comment
+CCccccccccccccccc
+var x = 1;
+... . . ..

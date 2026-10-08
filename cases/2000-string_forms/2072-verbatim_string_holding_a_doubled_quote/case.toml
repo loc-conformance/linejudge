@@ -1,0 +1,5 @@
+trap = """
+a C# verbatim string writes a quote of its text as two quotes, so "" ends nothing and only a quote
+standing alone closes it. A counter that ends the string at the first of the two reads the second
+as a plain string that stops at the end of its line, and the line below, still inside the verbatim
+string, comes out as a comment"""

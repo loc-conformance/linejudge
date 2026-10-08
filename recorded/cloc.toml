@@ -382,6 +382,23 @@ same-as = "default"
 [answer.2070-verbatim_string_crossing_lines.docstring-as-code]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
+[answer.2072-verbatim_string_holding_a_doubled_quote.default]
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+the verbatim string is followed across lines, as in 2070, until the doubled quote ends it, so the
+// on the next line, still inside the string, counts as a comment"""
+
+[answer.2072-verbatim_string_holding_a_doubled_quote.stripstr]
+same-as = "default"
+
+[answer.2072-verbatim_string_holding_a_doubled_quote.docstring-as-code]
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+the verbatim string is followed across lines, as in 2070, until the doubled quote ends it, so the
+// on the next line, still inside the string, counts as a comment"""
+
 [answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.default]
 is-known-failure = true
 counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
@@ -392,6 +409,23 @@ same-as = "default"
 [answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.docstring-as-code]
 is-known-failure = true
 counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
+
+[answer.2077-interpolation_hole_holding_the_strings_own_quote.default]
+is-known-failure = true
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+the quote of the character in the hole ends the string, so the two lines below, still inside it,
+count as comments"""
+
+[answer.2077-interpolation_hole_holding_the_strings_own_quote.stripstr]
+same-as = "default"
+
+[answer.2077-interpolation_hole_holding_the_strings_own_quote.docstring-as-code]
+is-known-failure = true
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+the quote of the character in the hole ends the string, so the two lines below, still inside it,
+count as comments"""
 
 [answer.2080-odd_triple_quote_count.default]
 is-known-failure = true

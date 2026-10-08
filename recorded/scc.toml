@@ -108,8 +108,19 @@ counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 [answer.2070-verbatim_string_crossing_lines.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
+[answer.2072-verbatim_string_holding_a_doubled_quote.default]
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+
 [answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.default]
 counted = { lines = 7, code = 6, comments = 1, blanks = 0 }
+
+[answer.2077-interpolation_hole_holding_the_strings_own_quote.default]
+is-known-failure = true
+counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
+note = """
+the quote of the character in the hole ends the string, and the apostrophes after it are read as
+quotes that cross lines. Three of them leave one open, which keeps the two lines below inside a
+string by chance and swallows the real comment under the closing quote"""
 
 [answer.2080-odd_triple_quote_count.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }

@@ -1,0 +1,10 @@
+var reply = @"He said ""hi""
+... ..... . SSssssssssssssss
+// still inside the string
+ssssssssssssssssssssssssss
+";
+Z.
+// a real comment
+CCccccccccccccccc
+var x = 1;
+... . . ..

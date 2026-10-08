@@ -228,6 +228,22 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 [answer.2070-verbatim_string_crossing_lines.region]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
+[answer.2072-verbatim_string_holding_a_doubled_quote.content]
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, extra = 0 }
+note = """
+the first quote of the doubled pair ends the verbatim string and the second opens a plain one that
+stops at the end of its line, so the // on the next line opens a comment. 3.3.0 reads the pair as
+one quote"""
+
+[answer.2072-verbatim_string_holding_a_doubled_quote.region]
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+the first quote of the doubled pair ends the verbatim string and the second opens a plain one that
+stops at the end of its line, so the // on the next line opens a comment. 3.3.0 reads the pair as
+one quote"""
+
 [answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.content]
 is-known-failure = true
 counted = { lines = 7, code = 5, comments = 2, extra = 0 }
@@ -241,6 +257,20 @@ counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
 note = """
 only the $@" order of the prefixes is declared, so @$" is read as a plain quote that cannot cross
 the line, and the // on the next line of that string opens a comment. 3.3.0 declares both"""
+
+[answer.2077-interpolation_hole_holding_the_strings_own_quote.content]
+is-known-failure = true
+counted = { lines = 6, code = 3, comments = 3, extra = 0 }
+note = """
+the string is read as text from end to end, holes included, so the quote of the character in the
+hole ends it and the two lines below are comments"""
+
+[answer.2077-interpolation_hole_holding_the_strings_own_quote.region]
+is-known-failure = true
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+the string is read as text from end to end, holes included, so the quote of the character in the
+hole ends it and the two lines below are comments"""
 
 [answer.2080-odd_triple_quote_count.content]
 counted = { lines = 5, code = 4, comments = 1, extra = 0 }
