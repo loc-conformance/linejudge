@@ -1,0 +1,4 @@
+trap = """
+a C# interpolated verbatim string takes its two prefixes in either order, $@" and @$", and both
+run across lines. A counter that lists one order alone reads the string of the other as a plain
+quote, so its second line comes out as code holding a comment"""

@@ -1,0 +1,14 @@
+var a = $@"one
+... . . SSSsss
+// two
+ssssss
+";
+Z.
+var b = @$"three
+... . . SSSsssss
+// four
+sssssss
+";
+Z.
+// a real comment
+CCccccccccccccccc

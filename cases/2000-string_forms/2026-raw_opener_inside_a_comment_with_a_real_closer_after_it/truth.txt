@@ -1,0 +1,6 @@
+/* r#" */ let a = "/*"; let b = r#"a " b"#;
+CCcccccUU ... . . SssZ. ... . . SSSsssssZZ.
+// a real comment
+CCccccccccccccccc
+let y = 1;
+... . . ..

@@ -1,0 +1,5 @@
+trap = """
+Rust block comments nest, and on /*/*/ the two openers take the first four bytes. Each */ that
+seems to sit on that line shares a byte with one of them and closes nothing, so the comment is two
+levels deep when the line ends and needs both closers below. A counter that does not nest, or that
+nests but reads a closer out of bytes an opener already took, closes everything on the first line"""

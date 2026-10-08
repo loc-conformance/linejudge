@@ -1,0 +1,10 @@
+/*/*/
+CCccc
+*/
+cc
+let x = 1;
+cccccccccc
+*/
+UU
+let y = 2;
+... . . ..

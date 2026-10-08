@@ -65,6 +65,9 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 [answer.1210-close_touching_reopen_nesting.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
+[answer.1215-nesting_openers_sharing_bytes_with_closers.default]
+counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+
 [answer.1220-nested_block_comment_in_odin.default]
 counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 
@@ -87,6 +90,9 @@ counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 [answer.2025-raw_opener_inside_a_comment.default]
 counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
 
+[answer.2026-raw_opener_inside_a_comment_with_a_real_closer_after_it.default]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
 [answer.2030-string_symbol_of_another_kind_inside.default]
 counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
 
@@ -101,6 +107,9 @@ counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 
 [answer.2070-verbatim_string_crossing_lines.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.default]
+counted = { lines = 7, code = 6, comments = 1, blanks = 0 }
 
 [answer.2080-odd_triple_quote_count.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
