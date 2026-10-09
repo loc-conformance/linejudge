@@ -1,0 +1,6 @@
+val greeting = """He said "hi"""" /* the "greeting",
+... ........ . SSSssssssssssssZZZ CCcccccccccccccccc
+written the way the client sends it */
+ccccccccccccccccccccccccccccccccccccUU
+val x = 1
+... . . .

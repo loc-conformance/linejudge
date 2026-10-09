@@ -161,6 +161,13 @@ and the real closing quote then opens a string that takes the real comment under
 [answer.2080-odd_triple_quote_count.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
+[answer.2085-raw_string_ending_in_a_quote.default]
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note = """
+the raw string closes at the first three of the four quotes, and the quote left over opens a
+string that takes the comment opener with it, so the comment's second line counts as code"""
+
 [answer.2090-docstring_holding_a_comment_symbol.default]
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 

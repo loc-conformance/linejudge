@@ -125,6 +125,9 @@ string by chance and swallows the real comment under the closing quote"""
 [answer.2080-odd_triple_quote_count.default]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
+[answer.2085-raw_string_ending_in_a_quote.default]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
 [answer.2090-docstring_holding_a_comment_symbol.default]
 counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
 note = """

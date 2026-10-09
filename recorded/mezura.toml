@@ -278,6 +278,22 @@ counted = { lines = 5, code = 4, comments = 1, extra = 0 }
 [answer.2080-odd_triple_quote_count.region]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
+[answer.2085-raw_string_ending_in_a_quote.content]
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, extra = 0 }
+note = """
+the raw string closes at the first three of the four quotes, and the quote left over opens a
+string that takes the comment opener with it, so the comment's second line counts as code. 3.3.0
+closes at the last three"""
+
+[answer.2085-raw_string_ending_in_a_quote.region]
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note = """
+the raw string closes at the first three of the four quotes, and the quote left over opens a
+string that takes the comment opener with it, so the comment's second line counts as code. 3.3.0
+closes at the last three"""
+
 [answer.2090-docstring_holding_a_comment_symbol.content]
 counted = { lines = 5, code = 5, comments = 0, extra = 0 }
 

@@ -440,6 +440,15 @@ same-as = "default"
 [answer.2080-odd_triple_quote_count.docstring-as-code]
 counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
+[answer.2085-raw_string_ending_in_a_quote.default]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.2085-raw_string_ending_in_a_quote.stripstr]
+same-as = "default"
+
+[answer.2085-raw_string_ending_in_a_quote.docstring-as-code]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
 [answer.2090-docstring_holding_a_comment_symbol.default]
 counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
 
