@@ -1,3 +1,5 @@
 trap = """
 a Rust character literal holding a double quote. The quote is the value of the character and opens
-no string, so the comment lines under it are comments"""
+no string, so the block comment after it on the same line is real. A counter that opens a string
+at the quote hides that opener whether its strings end with the line or run on, and counts the
+second line of the comment as code"""

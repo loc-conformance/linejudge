@@ -1,4 +1,5 @@
 trap = """
 OCaml lets a name end in an apostrophe, so x' is one name and the apostrophe opens nothing. The
-line under it holds a real character literal, and the comment under that is written with (* *),
-which nests"""
+line under it holds a real character literal and opens a comment written with (* *), which nests.
+A counter that pairs the apostrophes wrongly is inside a string when it meets the opener, whether
+its strings end with the line or run on"""

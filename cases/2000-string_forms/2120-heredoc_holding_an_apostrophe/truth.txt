@@ -2,6 +2,8 @@ cat <<TEXT
 ... SSSSSS
 it's fine in here
 sssssssssssssssss
+# and this line is inside the heredoc too
+sssssssssssssssssssssssssssssssssssssssss
 TEXT
 ZZZZ
 # a real comment

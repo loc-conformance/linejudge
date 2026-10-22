@@ -38,23 +38,14 @@ same-as = "default"
 [answer.1040-pairs_in_either_order.docstring-as-code]
 counted = { lines = 8, code = 8, comments = 0, blanks = 0 }
 
-[answer.1050-block_comment_holding_line_comment.default]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
-[answer.1050-block_comment_holding_line_comment.stripstr]
-same-as = "default"
-
-[answer.1050-block_comment_holding_line_comment.docstring-as-code]
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-
 [answer.1060-line_comment_holding_block_open.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.1060-line_comment_holding_block_open.stripstr]
 same-as = "default"
 
 [answer.1060-line_comment_holding_block_open.docstring-as-code]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.1070-block_comment_closed_then_line_comment.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -129,15 +120,6 @@ same-as = "default"
 [answer.1130-closer_in_code_with_nothing_open.docstring-as-code]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
-[answer.1140-three_slashes_are_one_comment.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
-
-[answer.1140-three_slashes_are_one_comment.stripstr]
-same-as = "default"
-
-[answer.1140-three_slashes_are_one_comment.docstring-as-code]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
-
 [answer.1150-doc_comment_opening_after_code.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
@@ -190,6 +172,15 @@ same-as = "default"
 
 [answer.1190-nested_block_comment_that_does_not.docstring-as-code]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
+[answer.1195-closer_sharing_a_byte_with_an_opener_in_the_text.default]
+counted = { lines = 5, code = 2, comments = 2, blanks = 1 }
+
+[answer.1195-closer_sharing_a_byte_with_an_opener_in_the_text.stripstr]
+same-as = "default"
+
+[answer.1195-closer_sharing_a_byte_with_an_opener_in_the_text.docstring-as-code]
+counted = { lines = 5, code = 2, comments = 2, blanks = 1 }
 
 [answer.1200-nested_block_comment_that_nests.default]
 is-known-failure = true
@@ -278,74 +269,146 @@ command counts as one"""
 
 [answer.1240-a_comment_opener_inside_a_vector_type.default]
 is-known-failure = true
-counted = { lines = 8, code = 1, comments = 7, blanks = 0 }
+counted = { lines = 10, code = 1, comments = 9, blanks = 0 }
 note = """
-the <* of the vector type opens a documentation comment that nothing closes, so the four lines of
-the macro under it are counted as comment. The same file with int[<4>] comes out right"""
+the <* of the vector type opens a documentation comment, which the one below the macro closes.
+That closing line begins with <* itself and cloc opens a comment there once more, so the function
+under it counts as comment too. The same file with int[<4>] comes out right"""
 
 [answer.1240-a_comment_opener_inside_a_vector_type.stripstr]
 same-as = "default"
 
 [answer.1240-a_comment_opener_inside_a_vector_type.docstring-as-code]
 is-known-failure = true
-counted = { lines = 8, code = 1, comments = 7, blanks = 0 }
+counted = { lines = 10, code = 1, comments = 9, blanks = 0 }
 note = """
-the <* of the vector type opens a documentation comment that nothing closes, so the four lines of
-the macro under it are counted as comment. The same file with int[<4>] comes out right"""
+the <* of the vector type opens a documentation comment, which the one below the macro closes.
+That closing line begins with <* itself and cloc opens a comment there once more, so the function
+under it counts as comment too. The same file with int[<4>] comes out right"""
 
-[answer.2010-comment_symbol_inside_string.default]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+[answer.1260-pod_closer_indented_inside_the_documentation.default]
+counted = { lines = 15, code = 3, comments = 5, blanks = 7 }
 
-[answer.2010-comment_symbol_inside_string.stripstr]
+[answer.1260-pod_closer_indented_inside_the_documentation.stripstr]
 same-as = "default"
 
+[answer.1260-pod_closer_indented_inside_the_documentation.docstring-as-code]
+counted = { lines = 15, code = 3, comments = 5, blanks = 7 }
+
+[answer.1280-matlab_block_markers_sharing_their_line.default]
+is-known-failure = true
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+note = """
+the %} with words after it on line 3 closes the block, so those words and line 4 count as code, and
+the %{ with words after it on line 6 opens one over line 7. With the words on those two lines
+written as plain text the file reads right"""
+
+[answer.1280-matlab_block_markers_sharing_their_line.stripstr]
+same-as = "default"
+
+[answer.1280-matlab_block_markers_sharing_their_line.docstring-as-code]
+is-known-failure = true
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+note = """
+the %} with words after it on line 3 closes the block, so those words and line 4 count as code, and
+the %{ with words after it on line 6 opens one over line 7. With the words on those two lines
+written as plain text the file reads right"""
+
+[answer.2010-comment_symbol_inside_string.default]
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note = """
+the // of the address inside the string is read as a line comment, which hides the /* after the
+string, so the line closing that comment counts as code"""
+
+[answer.2010-comment_symbol_inside_string.stripstr]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
 [answer.2010-comment_symbol_inside_string.docstring-as-code]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note = """
+the // of the address inside the string is read as a line comment, which hides the /* after the
+string, so the line closing that comment counts as code"""
 
 [answer.2020-string_symbol_inside_comment.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.2020-string_symbol_inside_comment.stripstr]
 same-as = "default"
 
 [answer.2020-string_symbol_inside_comment.docstring-as-code]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.2025-raw_opener_inside_a_comment.default]
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 1, comments = 5, blanks = 0 }
+note = """
+the /* inside the string "/*" is read as a comment opener, and the */ at the end of the last line
+closes it, so the two lines of code between them count as comments"""
 
 [answer.2025-raw_opener_inside_a_comment.stripstr]
-same-as = "default"
+is-known-failure = true
+counted = { lines = 6, code = 0, comments = 6, blanks = 0 }
+note = """
+the quote of the r#" inside the block comment pairs with the first quote of "/*", the comment's
+own closer between them is stripped as the content of a string, and the comment then runs from the
+first line to the */ at the end of the last line"""
 
 [answer.2025-raw_opener_inside_a_comment.docstring-as-code]
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 1, comments = 5, blanks = 0 }
+note = """
+the /* inside the string "/*" is read as a comment opener, and the */ at the end of the last line
+closes it, so the two lines of code between them count as comments"""
 
 [answer.2026-raw_opener_inside_a_comment_with_a_real_closer_after_it.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note = """
+the /* inside the string "/*" is read as a comment opener, and the */ at the end of the last line
+closes it, so the line of code between them counts as a comment"""
 
 [answer.2026-raw_opener_inside_a_comment_with_a_real_closer_after_it.stripstr]
-same-as = "default"
+is-known-failure = true
+counted = { lines = 4, code = 0, comments = 4, blanks = 0 }
+note = """
+the quote of the r#" inside the block comment pairs with the first quote of "/*", the comment's
+own closer between them is stripped as the content of a string, and the comment then runs from the
+first line to the */ at the end of the last line"""
 
 [answer.2026-raw_opener_inside_a_comment_with_a_real_closer_after_it.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note = """
+the /* inside the string "/*" is read as a comment opener, and the */ at the end of the last line
+closes it, so the line of code between them counts as a comment"""
 
 [answer.2030-string_symbol_of_another_kind_inside.default]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2030-string_symbol_of_another_kind_inside.stripstr]
 same-as = "default"
 
 [answer.2030-string_symbol_of_another_kind_inside.docstring-as-code]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2040-comment_pair_opening_inside_a_string.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+the /* inside the string "/*" is read as a comment opener, and the comment ending the file closes
+it, so the code line between counts as comment"""
 
 [answer.2040-comment_pair_opening_inside_a_string.stripstr]
-same-as = "default"
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2040-comment_pair_opening_inside_a_string.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+the /* inside the string "/*" is read as a comment opener, and the comment ending the file closes
+it, so the code line between counts as comment"""
 
 [answer.2050-string_opening_after_block_close.default]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
@@ -373,49 +436,29 @@ note = """
 a // at the head of a line opens a comment inside a backtick template as readily as outside one,
 so that line of template text counts as a comment"""
 
-[answer.2070-verbatim_string_crossing_lines.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
-[answer.2070-verbatim_string_crossing_lines.stripstr]
-same-as = "default"
-
-[answer.2070-verbatim_string_crossing_lines.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
-
 [answer.2072-verbatim_string_holding_a_doubled_quote.default]
 is-known-failure = true
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 note = """
-the verbatim string is followed across lines, as in 2070, until the doubled quote ends it, so the
-// on the next line, still inside the string, counts as a comment"""
+the two // lines inside the verbatim string count as comments, and they do the same when the string
+holds no doubled quote and no backslash"""
 
 [answer.2072-verbatim_string_holding_a_doubled_quote.stripstr]
 same-as = "default"
 
 [answer.2072-verbatim_string_holding_a_doubled_quote.docstring-as-code]
 is-known-failure = true
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 note = """
-the verbatim string is followed across lines, as in 2070, until the doubled quote ends it, so the
-// on the next line, still inside the string, counts as a comment"""
-
-[answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.default]
-is-known-failure = true
-counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
-
-[answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.stripstr]
-same-as = "default"
-
-[answer.2075-interpolated_verbatim_string_with_its_prefixes_either_way.docstring-as-code]
-is-known-failure = true
-counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
+the two // lines inside the verbatim string count as comments, and they do the same when the string
+holds no doubled quote and no backslash"""
 
 [answer.2077-interpolation_hole_holding_the_strings_own_quote.default]
 is-known-failure = true
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 note = """
-the quote of the character in the hole ends the string, so the two lines below, still inside it,
-count as comments"""
+the two // lines inside the string count as comments, and they do the same when the string holds
+no hole at all"""
 
 [answer.2077-interpolation_hole_holding_the_strings_own_quote.stripstr]
 same-as = "default"
@@ -424,12 +467,12 @@ same-as = "default"
 is-known-failure = true
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 note = """
-the quote of the character in the hole ends the string, so the two lines below, still inside it,
-count as comments"""
+the two // lines inside the string count as comments, and they do the same when the string holds
+no hole at all"""
 
 [answer.2080-odd_triple_quote_count.default]
 is-known-failure = true
-counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
 note = """
 a triple quoted string is read as documentation wherever it opens, the middle of a line of code
 included, so the lines holding its text and its closing quotes are added to the comment count"""
@@ -438,16 +481,32 @@ included, so the lines holding its text and its closing quotes are added to the 
 same-as = "default"
 
 [answer.2080-odd_triple_quote_count.docstring-as-code]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 4, comments = 2, blanks = 0 }
+note = """
+the flag makes cloc skip the stage that turns a docstring into a comment, so nothing tells the
+filters below that those lines are inside anything, and the one whose first mark is a # is dropped
+as a comment line"""
 
 [answer.2085-raw_string_ending_in_a_quote.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note = """
+the // of the address inside the raw string is taken for a line comment that cuts the first line,
+so the /* after it is never seen and the comment's second line counts as code"""
 
 [answer.2085-raw_string_ending_in_a_quote.stripstr]
 same-as = "default"
+note = """
+the /* on the first line is blanked as text inside a string, so the comment's second line counts as
+code"""
 
 [answer.2085-raw_string_ending_in_a_quote.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+note = """
+the // of the address inside the raw string is taken for a line comment that cuts the first line,
+so the /* after it is never seen and the comment's second line counts as code"""
 
 [answer.2090-docstring_holding_a_comment_symbol.default]
 counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
@@ -476,49 +535,145 @@ same-as = "default"
 counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
 
 [answer.2110-here_string_holding_an_apostrophe.default]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
+note = """
+it reads no here strings, so the line beginning with # inside one counts as a comment"""
 
 [answer.2110-here_string_holding_an_apostrophe.stripstr]
 same-as = "default"
 
 [answer.2110-here_string_holding_an_apostrophe.docstring-as-code]
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
+note = """
+it reads no here strings, so the line beginning with # inside one counts as a comment"""
 
 [answer.2120-heredoc_holding_an_apostrophe.default]
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+it reads no heredocs, so the line beginning with # inside one counts as a comment"""
 
 [answer.2120-heredoc_holding_an_apostrophe.stripstr]
 same-as = "default"
 
 [answer.2120-heredoc_holding_an_apostrophe.docstring-as-code]
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+it reads no heredocs, so the line beginning with # inside one counts as a comment"""
+
+[answer.2125-operator_spelled_like_a_heredoc_opener.default]
+is-known-failure = true
+counted = { lines = 16, code = 12, comments = 3, blanks = 1 }
+note = """
+reads no heredoc in Ruby, so the line of the heredoc that begins with # counts as a comment"""
+
+[answer.2125-operator_spelled_like_a_heredoc_opener.stripstr]
+same-as = "default"
+
+[answer.2125-operator_spelled_like_a_heredoc_opener.docstring-as-code]
+is-known-failure = true
+counted = { lines = 16, code = 12, comments = 3, blanks = 1 }
+note = """
+reads no heredoc in Ruby, so the line of the heredoc that begins with # counts as a comment"""
+
+[answer.2127-heredoc_closing_word_indented_only_after_a_tilde_or_dash.default]
+is-known-failure = true
+counted = { lines = 16, code = 12, comments = 3, blanks = 1 }
+note = """
+reads no heredoc in Ruby, so lines 4 and 13, the lines of the heredocs beginning with #, count as
+comments"""
+
+[answer.2127-heredoc_closing_word_indented_only_after_a_tilde_or_dash.stripstr]
+same-as = "default"
+
+[answer.2127-heredoc_closing_word_indented_only_after_a_tilde_or_dash.docstring-as-code]
+is-known-failure = true
+counted = { lines = 16, code = 12, comments = 3, blanks = 1 }
+note = """
+reads no heredoc in Ruby, so lines 4 and 13, the lines of the heredocs beginning with #, count as
+comments"""
 
 [answer.2130-raw_string_holding_quotes.default]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+the /* inside the raw string is read as a comment opener, as it is inside a plain string too,
+and the */ at the end of the last line closes it, so the line of code between them counts as a
+comment"""
 
 [answer.2130-raw_string_holding_quotes.stripstr]
 same-as = "default"
+note = """
+Rust has no raw string here, so the string ends at the plain quote inside it and the /* after that
+quote opens a comment, which the */ at the end of the last line closes"""
 
 [answer.2130-raw_string_holding_quotes.docstring-as-code]
-counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+the /* inside the raw string is read as a comment opener, as it is inside a plain string too,
+and the */ at the end of the last line closes it, so the line of code between them counts as a
+comment"""
+
+[answer.2135-raw_string_holding_a_shorter_closer.default]
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+the /* inside the raw string is read as a comment opener, as it is inside a plain string too,
+and the */ at the end of the last line closes it, so the line of code between them counts as a
+comment"""
+
+[answer.2135-raw_string_holding_a_shorter_closer.stripstr]
+same-as = "default"
+note = """
+Rust has no raw string here, so the quote after the two hashes opens an ordinary string that the
+quote of "# closes, and the /* after it opens a comment, which the */ at the end of the last line
+closes"""
+
+[answer.2135-raw_string_holding_a_shorter_closer.docstring-as-code]
+is-known-failure = true
+counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+note = """
+the /* inside the raw string is read as a comment opener, as it is inside a plain string too,
+and the */ at the end of the last line closes it, so the line of code between them counts as a
+comment"""
 
 [answer.2140-raw_string_holding_its_own_closing_bracket.default]
-counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
+note = """
+the /* on the third line opens a comment, which the block comment ending the file closes. A /*
+inside an ordinary string on one line opens one as well, so no string keeps it out"""
 
 [answer.2140-raw_string_holding_its_own_closing_bracket.stripstr]
 same-as = "default"
 
 [answer.2140-raw_string_holding_its_own_closing_bracket.docstring-as-code]
-counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
+note = """
+the /* on the third line opens a comment, which the block comment ending the file closes. A /*
+inside an ordinary string on one line opens one as well, so no string keeps it out"""
 
 [answer.2150-delimited_raw_string_names_its_own_closer.default]
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+note = """
+the /* on the second line opens a comment, which the block comment ending the file closes. A /*
+inside an ordinary string on one line opens one as well, so no string keeps it out"""
 
 [answer.2150-delimited_raw_string_names_its_own_closer.stripstr]
 same-as = "default"
 
 [answer.2150-delimited_raw_string_names_its_own_closer.docstring-as-code]
-counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
+note = """
+the /* on the second line opens a comment, which the block comment ending the file closes. A /*
+inside an ordinary string on one line opens one as well, so no string keeps it out"""
 
 [answer.2170-lua_level_bracket_holding_plain_close.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
@@ -556,22 +711,22 @@ a // at the head of a line opens a comment inside a triple apostrophe string too
 counts as one, while the /* under it opens nothing and takes no line with it"""
 
 [answer.3010-escaped_quote_before_comment.default]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3010-escaped_quote_before_comment.stripstr]
 same-as = "default"
 
 [answer.3010-escaped_quote_before_comment.docstring-as-code]
-counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.default]
-counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
+counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.stripstr]
 same-as = "default"
 
 [answer.3020-multiline_string_ending_in_backslash.docstring-as-code]
-counted = { lines = 6, code = 2, comments = 4, blanks = 0 }
+counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
 
 [answer.3030-raw_string_ending_in_backslash.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -628,13 +783,13 @@ same-as = "default"
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.4020-two_char_literals_holding_escapes.default]
-counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
 
 [answer.4020-two_char_literals_holding_escapes.stripstr]
 same-as = "default"
 
 [answer.4020-two_char_literals_holding_escapes.docstring-as-code]
-counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
 
 [answer.4030-character_written_with_a_backslash.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
@@ -664,13 +819,13 @@ same-as = "default"
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 
 [answer.4055-apostrophe_inside_a_comment.default]
-counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+counted = { lines = 8, code = 3, comments = 5, blanks = 0 }
 
 [answer.4055-apostrophe_inside_a_comment.stripstr]
 same-as = "default"
 
 [answer.4055-apostrophe_inside_a_comment.docstring-as-code]
-counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+counted = { lines = 8, code = 3, comments = 5, blanks = 0 }
 
 [answer.4060-primed_identifier_haskell.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
@@ -748,8 +903,8 @@ and is never blank, so the blank inside the spliced string comes out code"""
 is-known-failure = true
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 note = """
-a line comment stops at the line break whatever the line ends with, so the line spliced onto it
-counts as code"""
+a line comment ending in a backslash takes its line break with it and stops there, so the line
+spliced onto it is joined to the comment's own line and counts as code"""
 
 [answer.5030-line_splice_inside_a_comment.stripstr]
 same-as = "default"
@@ -758,15 +913,15 @@ same-as = "default"
 is-known-failure = true
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 note = """
-a line comment stops at the line break whatever the line ends with, so the line spliced onto it
-counts as code"""
+a line comment ending in a backslash takes its line break with it and stops there, so the line
+spliced onto it is joined to the comment's own line and counts as code"""
 
 [answer.5040-line_splice_in_a_comment_with_no_words.default]
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-a comment carrying no letter or digit is read like any other and still stops at the line break,
-so the line spliced onto it counts as code"""
+a comment carrying no letter or digit is read like any other: it takes its line break with it and
+stops there, so the line spliced onto it is joined to the comment's own line and counts as code"""
 
 [answer.5040-line_splice_in_a_comment_with_no_words.stripstr]
 same-as = "default"
@@ -775,15 +930,16 @@ same-as = "default"
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-a comment carrying no letter or digit is read like any other and still stops at the line break,
-so the line spliced onto it counts as code"""
+a comment carrying no letter or digit is read like any other: it takes its line break with it and
+stops there, so the line spliced onto it is joined to the comment's own line and counts as code"""
 
 [answer.5050-line_splice_after_a_closed_block_comment.default]
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-a block comment closing earlier on the line does not move where the line comment after it stops,
-which is still the line break, so the line spliced onto it counts as code"""
+a block comment closing earlier on the line changes nothing: the line comment after it takes its
+line break with it and stops there, so the line spliced onto it is joined to that line and counts
+as code"""
 
 [answer.5050-line_splice_after_a_closed_block_comment.stripstr]
 same-as = "default"
@@ -792,17 +948,28 @@ same-as = "default"
 is-known-failure = true
 counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
 note = """
-a block comment closing earlier on the line does not move where the line comment after it stops,
-which is still the line break, so the line spliced onto it counts as code"""
+a block comment closing earlier on the line changes nothing: the line comment after it takes its
+line break with it and stops there, so the line spliced onto it is joined to that line and counts
+as code"""
 
 [answer.5060-code_then_a_spliced_line_comment.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
+note = """
+the comment takes its line break with it and stops there, so the first spliced line is joined to
+the code line above it and the second counts as code. A single splice comes out right by
+accident, since what it joins lands on a line that is code already"""
 
 [answer.5060-code_then_a_spliced_line_comment.stripstr]
 same-as = "default"
 
 [answer.5060-code_then_a_spliced_line_comment.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
+note = """
+the comment takes its line break with it and stops there, so the first spliced line is joined to
+the code line above it and the second counts as code. A single splice comes out right by
+accident, since what it joins lands on a line that is code already"""
 
 [answer.5070-blank_line_inside_a_spliced_comment.default]
 is-known-failure = true
@@ -832,20 +999,20 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.6020-comment_opener_inside_an_attribute.default]
 is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 note = """
-a comment opener inside a quoted attribute value opens a comment all the same, and nothing below
-closes it, so both lines under it count as comments"""
+a comment opener inside a quoted attribute value opens a comment all the same, and the comment
+ending the file closes it, so both lines between count as comments"""
 
 [answer.6020-comment_opener_inside_an_attribute.stripstr]
 same-as = "default"
 
 [answer.6020-comment_opener_inside_an_attribute.docstring-as-code]
 is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 note = """
-a comment opener inside a quoted attribute value opens a comment all the same, and nothing below
-closes it, so both lines under it count as comments"""
+a comment opener inside a quoted attribute value opens a comment all the same, and the comment
+ending the file closes it, so both lines between count as comments"""
 
 [answer.6030-opening_tag_split_over_two_lines.default]
 is-known-failure = true
@@ -946,7 +1113,7 @@ is-known-failure = true
 counted = { lines = 13, code = 9, comments = 3, blanks = 1 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end, and every number comes out right only
+the file is counted as one language from beginning to end, and the totals come out right only
 because the symbols it applies to a vue file already cover the markup, the js and the css
 comments, while neither block is named"""
 
@@ -958,7 +1125,7 @@ is-known-failure = true
 counted = { lines = 13, code = 9, comments = 3, blanks = 1 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end, and every number comes out right only
+the file is counted as one language from beginning to end, and the totals come out right only
 because the symbols it applies to a vue file already cover the markup, the js and the css
 comments, while neither block is named"""
 
@@ -967,8 +1134,8 @@ is-known-failure = true
 counted = { lines = 11, code = 9, comments = 2, blanks = 0 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end and no lang attribute is read, so every
-number comes out right only because those symbols already treat // as a comment"""
+the file is counted as one language from beginning to end and no lang attribute is read, so the
+totals come out right only because cloc's Vue symbols already treat // as a comment"""
 
 [answer.6100-block_language_named_by_the_tag.stripstr]
 same-as = "default"
@@ -978,8 +1145,29 @@ is-known-failure = true
 counted = { lines = 11, code = 9, comments = 2, blanks = 0 }
 counted-regions = []
 note = """
-the file is counted as one language from beginning to end and no lang attribute is read, so every
-number comes out right only because those symbols already treat // as a comment"""
+the file is counted as one language from beginning to end and no lang attribute is read, so the
+totals come out right only because cloc's Vue symbols already treat // as a comment"""
+
+[answer.6105-block_language_named_on_a_middle_line_of_the_tag.default]
+is-known-failure = true
+counted = { lines = 7, code = 6, comments = 1, blanks = 0 }
+counted-regions = []
+note = """
+the file is counted as one language from beginning to end and no style block is separated out
+however its tag is written, so the totals come out right only because cloc's Vue symbols already
+treat // as a comment"""
+
+[answer.6105-block_language_named_on_a_middle_line_of_the_tag.stripstr]
+same-as = "default"
+
+[answer.6105-block_language_named_on_a_middle_line_of_the_tag.docstring-as-code]
+is-known-failure = true
+counted = { lines = 7, code = 6, comments = 1, blanks = 0 }
+counted-regions = []
+note = """
+the file is counted as one language from beginning to end and no style block is separated out
+however its tag is written, so the totals come out right only because cloc's Vue symbols already
+treat // as a comment"""
 
 [answer.6110-php_block_holding_html_around_it.default]
 is-known-failure = true
@@ -1029,13 +1217,21 @@ same-as = "default"
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.7020-regex_holding_a_comment_opener.default]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note = """
+the /* inside the pattern is read as a comment opener, and the comment ending the file closes it,
+so the two code lines between count as comment"""
 
 [answer.7020-regex_holding_a_comment_opener.stripstr]
 same-as = "default"
 
 [answer.7020-regex_holding_a_comment_opener.docstring-as-code]
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
+is-known-failure = true
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
+note = """
+the /* inside the pattern is read as a comment opener, and the comment ending the file closes it,
+so the two code lines between count as comment"""
 
 [answer.8010-punctuation_only_line.default]
 counted = { lines = 3, code = 3, comments = 0, blanks = 0 }

@@ -1,5 +1,5 @@
-val greeting = """He said "hi"""" /* the "greeting",
-... ........ . SSSssssssssssssZZZ CCcccccccccccccccc
+val note = """see https://example.com/ for 12" of "snow"""" /* the "note",
+... .... . SSSssssssssssssssssssssssssssssssssssssssssssZZZ CCcccccccccccc
 written the way the client sends it */
 ccccccccccccccccccccccccccccccccccccUU
 val x = 1

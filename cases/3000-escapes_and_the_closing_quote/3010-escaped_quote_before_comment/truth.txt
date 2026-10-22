@@ -1,4 +1,6 @@
-char *s = "a \" b"; // the escaped quote does not close the string
+char *s = "a \" b"; /* the escaped quote does not close the string
 .... .. . SssssssZ. CCcccccccccccccccccccccccccccccccccccccccccccc
+so this comment is real */
+ccccccccccccccccccccccccUU
 int x = 1;
 ... . . ..

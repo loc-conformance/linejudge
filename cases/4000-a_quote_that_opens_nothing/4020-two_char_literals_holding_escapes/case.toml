@@ -1,3 +1,5 @@
 trap = """
 two character literals on one line, one holding an escaped backslash and one holding a quote.
-Ordinary Rust that any escaping routine is written with, and not a line contrived for this suite"""
+Ordinary Rust that any escaping routine is written with, nothing contrived for this suite. The
+comment after them opens a block, so a counter that is left inside a string at the end of the line
+hides the opener whether its strings end with the line or run on"""

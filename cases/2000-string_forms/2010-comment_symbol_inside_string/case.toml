@@ -1,2 +1,4 @@
 trap = """
-a comment symbol inside a string is text"""
+a comment symbol inside a string is text. The address holds //, which opens a line comment
+anywhere outside a string, so a counter that takes it for one also hides the block comment opened
+after the string and counts the second line of that comment as code"""

@@ -1,3 +1,3 @@
 /* a block
-*/"a string with no space before it" ;
-// a real comment
+*/"a string with no space before it" ; /* a real comment
+that closes on this line */

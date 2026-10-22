@@ -1,0 +1,7 @@
+trap = """
+Perl's documentation, POD, runs from a line beginning with =pod down to a line beginning with =cut.
+This documentation shows a =cut as an example, indented, and Perl closes the block only at a =cut
+that starts its line, so the indented one is text and the block runs on to the real one. A counter
+that closes at any =cut reads the sentence under the example and the real =cut as code. The block
+opens with =pod, the one word every counter that reads POD knows, so the indented closer is the
+only thing the file asks about"""

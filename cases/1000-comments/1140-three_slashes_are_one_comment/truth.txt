@@ -1,4 +1,0 @@
-/// a doc comment, one line comment and not two
-CCccccccccccccccccccccccccccccccccccccccccccccc
-int x = 1;
-... . . ..

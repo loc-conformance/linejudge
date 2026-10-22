@@ -1,0 +1,8 @@
+trap = """
+In Ruby a heredoc opened with <<~ or <<- may close at its word written behind spaces, and one
+opened with a plain << closes only at its word at the very start of a line. The first heredoc here
+closes at an indented TEXT, so a counter that wants the word at the start of the line reads the rest
+of the file as string, the comment at the end included. The second, opened with a plain <<RUBY,
+holds the code it generates, whose indented RUBY closes nothing, so a counter that takes the word
+behind spaces after any opener ends it there and reads the line beginning with # under it as a
+comment"""

@@ -1,5 +1,9 @@
 trap = """
-an apostrophe inside a comment, in the word don't, with a real character literal on the line below
-it. The apostrophe is text there and pairs with nothing, so a counter pairing it with the literal's
-own quote swallows every line between them. The block comment further down holds it's and carries
-code after it closes, which is the same trap on one line"""
+an apostrophe inside a comment, in the word don't, two lines above a real character literal. The
+apostrophe is text there and pairs with nothing, so a counter pairing it with the literal's own
+quote swallows every line between them. The block comment further down holds it's and carries code
+after it closes, which is the same trap on one line. The literal holds a double quote, so a counter
+with no character literal form whose strings run across lines opens a string there and cannot pass
+this file either. The file ends with a line comment holding */, so a block comment left open by a
+mistake earlier has a closer to reach whether the counter nests block comments or not, and a
+counter that ignores an opener nobody closes cannot pass by accident"""

@@ -1,3 +1,5 @@
 trap = """
 the backtick is what escapes inside PowerShell's double quoted string, so the quote in the middle
-of the line closes nothing"""
+of the line closes nothing. A block comment opens after the string, so a counter that ends the
+string at that quote opens another at the last one and hides the comment, whether its strings end
+with the line or run on"""

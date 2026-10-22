@@ -1,2 +1,5 @@
 trap = """
-standard SQL escapes a quote by doubling it and the backslash is an ordinary character"""
+standard SQL escapes a quote by doubling it and the backslash is an ordinary character. A block
+comment opens after the string on the same line, so a counter that reads the backslash as an
+escape leaves the string open and hides the opener, whether its strings end with the line or run
+on"""

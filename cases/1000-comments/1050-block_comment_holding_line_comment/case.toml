@@ -1,2 +1,0 @@
-trap = """
-a line comment inside a block comment is part of the block"""

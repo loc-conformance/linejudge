@@ -1,4 +1,4 @@
-let path = r#"C:\ends\in\backslash\"#;
-... .... . SSSsssssssssssssssssssssZZ.
-// a real comment
-CCccccccccccccccc
+let path = r#"C:\ends\in\backslash\"#; /* a real comment
+... .... . SSSsssssssssssssssssssssZZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU

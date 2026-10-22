@@ -1,3 +1,4 @@
 trap = """
 a triple quoted string opened on one line and closed on another keeps the lines between out of the
-comment count, since a string is not a comment"""
+comment count, since a string is not a comment. One of those lines begins with #, so a counter
+that ends the string with the line it opens on counts that one as a comment"""

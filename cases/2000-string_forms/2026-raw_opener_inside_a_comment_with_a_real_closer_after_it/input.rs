@@ -1,3 +1,4 @@
-/* r#" */ let a = "/*"; let b = r#"a " b"#;
+/* r#" */ let a = "/*"; let b = r#"a " /* b"#;
 // a real comment
 let y = 1;
+// a second real comment */

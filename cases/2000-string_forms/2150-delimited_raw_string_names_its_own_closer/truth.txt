@@ -1,8 +1,10 @@
-const char *raw = R"xy(a lone " quote and
-..... .... .... . SSSSSssssssssssssssssss
+const char *raw = R"xy(a lone " then ")" in it
+..... .... .... . SSSSSsssssssssssssssssssssss
 /* this opens nothing, it is inside the raw string
 ssssssssssssssssssssssssssssssssssssssssssssssssss
 )xy";
 ZZZZ.
 printf("done");
 .......SssssZ..
+/* a real comment */
+CCccccccccccccccccUU

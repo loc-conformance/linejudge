@@ -1,3 +1,5 @@
 trap = """
 Rust ends a raw string with a quote and a hash, and those two characters appear here in ordinary
-code with no raw string open. They are a plain string holding a hash and nothing more"""
+code with no raw string open. They are a plain string holding a hash and nothing more. A counter
+that takes them for a closer anyway opens a string at the last quote, which hides the block
+comment opened after it whether its strings end with the line or run on"""

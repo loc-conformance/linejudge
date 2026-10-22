@@ -1,0 +1,27 @@
+package Example;
+....... ........
+
+=pod
+CCCC
+
+c
+End every block of documentation with a line like this one:
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+c
+    =cut
+cccccccc
+
+c
+The block above is an example, and this line is still documentation.
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+
+c
+=cut
+UUUU
+
+sub run { return 1 }
+... ... . ...... . .
+
+1;
+..

@@ -1,6 +1,6 @@
 x' = "don't"
 .. . SsssssZ
-y' = 'a'
-.. . SsZ
--- a real comment
-CCccccccccccccccc
+y' = 'a' {- a real comment
+.. . SsZ CCccccccccccccccc
+that closes on this line -}
+cccccccccccccccccccccccccUU

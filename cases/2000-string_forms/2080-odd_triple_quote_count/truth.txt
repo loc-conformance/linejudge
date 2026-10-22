@@ -4,6 +4,8 @@ b = """two
 . . SSSsss
 still inside the docstring
 ssssssssssssssssssssssssss
+# not a comment, still inside the string
+ssssssssssssssssssssssssssssssssssssssss
 """
 ZZZ
 # a real comment

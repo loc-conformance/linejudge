@@ -2,4 +2,7 @@ trap = """
 a Kotlin raw string ends at the last three quotes of a run, so a quote written just before its
 closer is text, and the string here ends with four quotes in a row. A counter that closes it at the
 first three is left with one quote over, which opens a string that runs into the comment after it
-and hides where that comment begins"""
+and hides where that comment begins. The text holds an address and an inch mark on purpose: a
+counter that reads no strings takes the // of the address for a line comment, and one that pairs
+the quotes with no raw form ends with the comment opener inside a string of its own making, so
+neither finds the comment by accident"""

@@ -5,3 +5,4 @@ let c = '"';
 let y = 1;
 // a real comment
 // a second real comment
+// a third real comment */

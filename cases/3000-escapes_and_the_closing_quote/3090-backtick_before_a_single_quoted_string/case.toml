@@ -1,3 +1,5 @@
 trap = """
 the other PowerShell string form escapes nothing inside itself, so the backtick can only speak
-outside it, where it stops the apostrophe from opening anything"""
+outside it, where it stops the apostrophe from opening anything. A block comment opens after it on
+the same line, so a counter that opens a string at the apostrophe hides the comment, whether its
+strings end with the line or run on"""

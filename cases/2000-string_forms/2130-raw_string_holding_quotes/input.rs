@@ -1,2 +1,3 @@
-let a = r#"say "hi" and stay code"#;
-// a real comment
+let a = r#"say "hi /* and stay code"#;
+let b = 1;
+// a real comment */

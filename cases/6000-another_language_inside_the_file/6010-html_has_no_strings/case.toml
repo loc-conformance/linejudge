@@ -1,3 +1,4 @@
 trap = """
 HTML has no strings of its own, so the apostrophe in the word it's is text like everything around
-it and opens nothing"""
+it and opens nothing. A comment opens after it on the same line, so a counter that opens a string
+at the apostrophe hides the comment, whether its strings end with the line or run on"""

@@ -1,2 +1,4 @@
 trap = """
-a string beginning at the byte straight after a block comment closes"""
+a string beginning at the byte straight after a block comment closes. A counter that skips that
+byte opens its string at the last quote, which hides the block comment opened after it whether
+its strings end with the line or run on"""

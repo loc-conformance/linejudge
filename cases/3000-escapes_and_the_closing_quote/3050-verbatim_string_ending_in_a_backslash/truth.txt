@@ -1,6 +1,6 @@
-let dir = @"C:\temp\"
-... ... . SSssssssssZ
-// a real comment
-CCccccccccccccccc
+let dir = @"C:\temp\" (* a real comment
+... ... . SSssssssssZ CCccccccccccccccc
+that closes on this line *)
+cccccccccccccccccccccccccUU
 let x = 1
 ... . . .

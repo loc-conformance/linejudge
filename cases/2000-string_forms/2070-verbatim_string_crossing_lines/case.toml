@@ -1,3 +1,0 @@
-trap = """
-a C# verbatim string, which opens with @" and closes with a bare quote, so its two ends are not
-the same symbol. It runs across lines, and the backslashes inside it escape nothing"""

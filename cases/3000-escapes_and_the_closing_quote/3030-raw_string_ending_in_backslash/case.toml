@@ -1,3 +1,5 @@
 trap = """
 a Rust raw string, r#" to "#, whose last character is a backslash. Nothing escapes inside a raw
-string, so the closer closes it and the line ends where it looks like it ends"""
+string, so the closer closes it and the string ends where it looks like it ends. A block comment
+opens after it on the same line, so a counter that leaves the string open hides the opener
+whether its strings end with the line or run on"""

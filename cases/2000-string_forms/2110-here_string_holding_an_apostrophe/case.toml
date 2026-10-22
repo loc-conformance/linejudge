@@ -1,3 +1,6 @@
 trap = """
 an apostrophe inside a PowerShell here string. The body of a here string is literal and it ends
-only at a closer sitting at the start of a line, so the apostrophe in the word is a byte"""
+only at a closer sitting at the start of a line, so the apostrophe in the word is a byte. The line
+under it begins with #, so a counter that ends the string at the apostrophe, or reads no here
+string at all, counts that line as a comment. Two real comments follow the closer, so a counter
+that also opens a string there and lets it run on loses both and cannot land on the right totals"""

@@ -12,3 +12,5 @@ let y = 1;
 CCccccccccccccccc
 // a second real comment
 CCcccccccccccccccccccccc
+// a third real comment */
+CCcccccccccccccccccccccccc

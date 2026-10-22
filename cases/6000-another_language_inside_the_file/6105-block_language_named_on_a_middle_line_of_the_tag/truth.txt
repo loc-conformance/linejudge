@@ -1,0 +1,14 @@
+<style
+>>>>>> SCSS
+  lang="scss"
+  >>>>>SssssZ SCSS
+  scoped
+  >>>>>> SCSS
+>
+> SCSS
+// an scss line comment, which plain css does not have
+CCcccccccccccccccccccccccccccccccccccccccccccccccccccc
+.a { .b { color: red; } }
+.. . .. . ...... .... . .
+</style>
+<<<<<<<<

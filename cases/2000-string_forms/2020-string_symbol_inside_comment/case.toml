@@ -1,2 +1,3 @@
 trap = """
-an unmatched quote inside a comment opens nothing"""
+an unmatched quote inside a comment opens nothing. A comment line follows the code, so a counter
+that opens a string at that quote and lets it run across lines counts that comment as code"""

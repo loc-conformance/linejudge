@@ -1,6 +1,6 @@
-let re = /"/;
-... .. . ....
+let re = /"/; /* a real comment
+... .. . .... CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
 let x = 1;
 ... . . ..
-// a real comment
-CCccccccccccccccc

@@ -1,2 +1,4 @@
 trap = """
-a block comment opener inside a string opens nothing"""
+a block comment opener inside a string opens nothing. The file ends with a block comment of its
+own, so a comment opened there by mistake has a closer to reach, and a counter that ignores an
+opener nobody closes cannot pass by accident"""

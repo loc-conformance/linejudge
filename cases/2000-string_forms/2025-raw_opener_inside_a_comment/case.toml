@@ -2,4 +2,7 @@ trap = """
 a Rust raw string opener written inside a block comment. Its closing symbol is "#, so a counter
 that pairs it with the next quote it meets loses the real string later on the same line, and the
 /* inside that string then opens a comment of its own. The raw string on the line below holds one
-quote, so a counter with no raw string form cannot pass this file either"""
+quote and a /* after it, so a counter with no raw string form cannot pass this file either, whether
+its strings end with their line or run across it. The file ends with a line comment holding */, so
+a block comment left open by a mistake earlier has a closer to reach whether the counter nests
+block comments or not, and a counter that ignores an opener nobody closes cannot pass by accident"""

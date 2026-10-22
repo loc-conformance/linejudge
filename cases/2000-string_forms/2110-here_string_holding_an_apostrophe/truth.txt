@@ -2,9 +2,13 @@ $s = @'
 .. . SS
 it is a here string with an apostrophe: don't
 sssssssssssssssssssssssssssssssssssssssssssss
+# and this line is inside it too
+ssssssssssssssssssssssssssssssss
 '@
 ZZ
 # a real comment
 Cccccccccccccccc
+# a second real comment
+Ccccccccccccccccccccccc
 $x = 1
 .. . .

@@ -1,3 +1,6 @@
 trap = """
-a Rust raw string, opened with r#" and closed with "#, so the plain quotes written inside it are
-text and close nothing"""
+a Rust raw string, opened with r#" and closed with "#, so the plain quote written inside it is text
+and closes nothing. A counter that ends the string at that quote reads the /* after it as a comment
+opener. The file ends with a line comment holding */, so a block comment left open by a mistake
+earlier has a closer to reach whether the counter nests block comments or not, and a counter that
+ignores an opener nobody closes cannot pass by accident"""

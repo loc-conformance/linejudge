@@ -1,3 +1,5 @@
 trap = """
 two lone apostrophes on one Rust line: the one that marks a lifetime, and the one in the word
-don't inside a string. Neither opens anything, and a counter pairing them would swallow the line"""
+don't inside a string. Neither opens anything, and a counter pairing them would swallow the line
+and open a string at the last quote, which hides the block comment opened after it whether its
+strings end with the line or run on"""

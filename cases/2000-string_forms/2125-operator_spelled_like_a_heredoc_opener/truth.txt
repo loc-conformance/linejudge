@@ -1,0 +1,31 @@
+class Report
+..... ......
+  class <<self
+  ..... ......
+    # the class methods
+    Ccccccccccccccccccc
+    def title
+    ... .....
+      'Totals'
+      SssssssZ
+    end
+    ...
+  end
+  ...
+
+  def body
+  ... ....
+    <<TEXT
+    SSSSSS
+it's the body
+sssssssssssss
+# not a comment
+sssssssssssssss
+TEXT
+ZZZZ
+  end
+  ...
+  # a real comment
+  Cccccccccccccccc
+end
+...

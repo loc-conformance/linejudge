@@ -1,6 +1,6 @@
 let x' = "don't"
 ... .. . SsssssZ
-let y' = 'a'
-... .. . SsZ
-(* a real comment *)
-CCccccccccccccccccUU
+let y' = 'a' (* a real comment
+... .. . SsZ CCccccccccccccccc
+that closes on this line *)
+cccccccccccccccccccccccccUU

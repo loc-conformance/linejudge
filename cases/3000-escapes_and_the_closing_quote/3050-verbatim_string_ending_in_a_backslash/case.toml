@@ -1,3 +1,5 @@
 trap = """
 a verbatim string whose last byte is a backslash. In F# the body of @"..." is literal, so the
-closing quote closes it whatever precedes it, and the line ends where it looks like it ends"""
+closing quote closes it whatever precedes it, and the string ends where it looks like it ends. A
+block comment opens after it on the same line, so a counter that leaves the string open hides the
+opener whether its strings end with the line or run on"""

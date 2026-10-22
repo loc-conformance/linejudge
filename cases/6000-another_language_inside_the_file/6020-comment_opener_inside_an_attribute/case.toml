@@ -1,3 +1,4 @@
 trap = """
-a comment opener written inside a quoted attribute value, where HTML reads it as text. Nothing
-closes it further down, so a counter that opened a comment there never ends one"""
+a comment opener written inside a quoted attribute value, where HTML reads it as text. The file
+ends with a closed comment of its own, so a comment opened there by mistake has a closer to reach,
+and a counter that ignores an opener nobody closes cannot pass by accident"""

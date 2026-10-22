@@ -1,6 +1,6 @@
-UPDATE t SET path = 'C:\';
-...... . ... .... . SsssZ.
--- a real comment
-CCccccccccccccccc
+UPDATE t SET path = 'C:\'; /* a real comment
+...... . ... .... . SsssZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
 SELECT 2;
 ...... ..

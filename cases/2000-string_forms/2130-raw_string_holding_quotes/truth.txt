@@ -1,4 +1,6 @@
-let a = r#"say "hi" and stay code"#;
-... . . SSSssssssssssssssssssssssZZ.
-// a real comment
-CCccccccccccccccc
+let a = r#"say "hi /* and stay code"#;
+... . . SSSssssssssssssssssssssssssZZ.
+let b = 1;
+... . . ..
+// a real comment */
+CCcccccccccccccccccc

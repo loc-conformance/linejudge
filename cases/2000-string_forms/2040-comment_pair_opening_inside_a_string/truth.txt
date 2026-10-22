@@ -2,5 +2,5 @@ char *s = "/*";
 .... .. . SssZ.
 int x = 1;
 ... . . ..
-// a real comment
-CCccccccccccccccc
+/* a real comment */
+CCccccccccccccccccUU

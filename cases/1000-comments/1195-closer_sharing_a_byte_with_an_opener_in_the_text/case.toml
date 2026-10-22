@@ -1,0 +1,5 @@
+trap = """
+the comment ends on a path pattern, assets/*/, and C reads the /* inside a comment as text, so the
+*/ that shares its asterisk closes the comment there. Rust nests its comments and reads the same
+bytes as one more level, which is case 1215. The file ends with a block comment of its own, so a
+comment that runs on past the pattern by mistake has a closer to reach"""

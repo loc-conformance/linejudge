@@ -1,10 +1,12 @@
 /* r#" opens a raw string */ let s = "/*";
 CCccccccccccccccccccccccccUU ... . . SssZ.
-let text = r#"the " character"#;
-... .... . SSSsssssssssssssssZZ.
+let text = r#"the " /* character"#;
+... .... . SSSssssssssssssssssssZZ.
 let y = 1;
 ... . . ..
 // a real comment
 CCccccccccccccccc
 // a second real comment
 CCcccccccccccccccccccccc
+// a third real comment */
+CCcccccccccccccccccccccccc

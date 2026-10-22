@@ -1,2 +1,5 @@
 trap = """
-a line holding real code ends in a spliced line comment, so the next line belongs to that comment in C"""
+a line holding real code ends in a spliced line comment, so the next two lines belong to that
+comment in C. The splice is written twice on purpose: a counter that joins a spliced line onto the
+one above and counts it as code gets a single splice right by accident, since the line above is
+code already and the line it took away is counted as a comment"""

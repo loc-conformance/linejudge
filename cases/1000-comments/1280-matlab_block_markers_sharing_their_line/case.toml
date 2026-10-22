@@ -1,0 +1,5 @@
+trap = """
+MATLAB's %{ and %} open and close a block comment only when they are alone on their line, spaces
+aside. The %} followed by words inside the block closes nothing, and the %{ followed by words is an
+ordinary % comment, so the line under it is code. A counter that takes either symbol anywhere on its
+line closes the block early and opens one over the last line, and the two mistakes do not cancel"""

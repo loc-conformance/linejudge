@@ -1,4 +1,5 @@
 trap = """
 Haskell lets a name end in an apostrophe, so x' is one name and the apostrophe opens nothing. The
 line under it holds a real character literal, where a pair of apostrophes does mean what it looks
-like"""
+like, and a block comment opens after it. A counter that pairs the apostrophes wrongly is inside a
+string when it meets the opener, whether its strings end with the line or run on"""

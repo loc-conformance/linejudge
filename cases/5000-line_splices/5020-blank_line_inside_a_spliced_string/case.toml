@@ -1,3 +1,5 @@
 trap = """
 the splice carries a string only off a line ending in a backslash, and the blank line does not,
-so the string is over before the comment line"""
+so the string is over before the comment line. Case 5010 is its other half: a counter that never
+sees a splice and ends its strings with the line is caught there, and one that never sees a splice
+and lets its strings run across lines is caught here"""

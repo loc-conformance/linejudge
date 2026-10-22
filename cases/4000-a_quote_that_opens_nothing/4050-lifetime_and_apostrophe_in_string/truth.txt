@@ -1,6 +1,6 @@
-let msg: &'static str = "don't panic";
-... .... ........ ... . SsssssssssssZ.
-// a real comment
-CCccccccccccccccc
+let msg: &'static str = "don't panic"; /* a real comment
+... .... ........ ... . SsssssssssssZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
 // a second real comment
 CCcccccccccccccccccccccc

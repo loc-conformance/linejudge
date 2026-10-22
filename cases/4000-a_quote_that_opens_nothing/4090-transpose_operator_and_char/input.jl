@@ -1,3 +1,3 @@
-b = a'
+b = a' #= a real comment
+that closes on this line =#
 c = 'x'
-# a real comment

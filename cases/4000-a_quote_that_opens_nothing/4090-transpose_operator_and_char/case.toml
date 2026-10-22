@@ -1,4 +1,5 @@
 trap = """
 Julia transposes a matrix by writing an apostrophe after it, so a' is an operation and the
-apostrophe stands alone. A real character literal sits on the line below, and a counter that pairs
-the two swallows everything between them"""
+apostrophe stands alone. A block comment opens after it and a real character literal sits under
+the comment, so a counter that pairs the two apostrophes swallows the comment, and one that ends
+its strings with the line hides the opener all the same"""

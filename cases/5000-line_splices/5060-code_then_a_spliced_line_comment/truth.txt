@@ -1,5 +1,7 @@
 int a = 1; // comment \
 ... . . .. CCcccccccccc
+   continued \
+cccccccccccccc
    joined to the comment
 cccccccccccccccccccccccc
 int x = 1;

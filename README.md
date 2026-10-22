@@ -138,8 +138,8 @@ counters (like scc and mezura, whereas cloc hints it so we can infer it) expose 
 $ linejudge explain 7020 --counter mezura
 
 mezura.content on 7020-regex_holding_a_comment_opener
-  by its rules    3 lines, 3 code, 0 comments, 0 extra
-  mezura answers  3 lines, 1 code, 2 comments, 0 extra   ✗ differs
+  by its rules    4 lines, 3 code, 1 comments, 0 extra
+  mezura answers  4 lines, 1 code, 3 comments, 0 extra   ✗ differs
   mezura reads 2 lines differently
 
   2  let x = 1;

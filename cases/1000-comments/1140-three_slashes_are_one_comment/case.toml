@@ -1,2 +1,0 @@
-trap = """
-three slashes hold one line comment and not two overlapping ones"""

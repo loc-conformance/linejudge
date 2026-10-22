@@ -14,3 +14,7 @@ macro rotate(int[<*>] x, uint shift)
 	...... ......... .. .......
 }
 .
+<* A real documentation comment. *>
+CCcccccccccccccccccccccccccccccccUU
+fn void keep() {}
+.. .... ...... ..

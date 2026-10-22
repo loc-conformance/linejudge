@@ -1,3 +1,5 @@
 trap = """
 F# lets a name end in an apostrophe, so s' is one name. The apostrophe in the word it's, inside the
-string on the same line, is the other one. Neither may pair with the other"""
+string on the same line, is the other one. Neither may pair with the other: a counter that pairs
+them opens a string at the closing quote, which hides the block comment opened after it whether
+its strings end with the line or run on"""

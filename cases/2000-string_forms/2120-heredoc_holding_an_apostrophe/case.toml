@@ -1,3 +1,6 @@
 trap = """
 an apostrophe inside the body of a shell heredoc. The word that ends a heredoc is chosen where it
-is written, so no fixed list of comment and string symbols can say what closes this one"""
+is written, so no fixed list of comment and string symbols can say what closes this one. The body
+holds a line beginning with #, so a counter that does not read heredocs counts that line as a
+comment, unless the apostrophe has opened a string that runs on, and then it counts the comments
+at the end as code"""

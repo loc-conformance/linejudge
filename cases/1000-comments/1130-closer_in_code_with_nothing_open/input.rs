@@ -1,2 +1,2 @@
-let s = "#";
-// a real comment
+let s = "#"; /* a real comment
+that closes on this line */

@@ -1,0 +1,5 @@
+trap = """
+a style block whose opening tag runs over four lines, with each attribute on a line of its own and
+the language named on the second. A counter that takes the language from the first line of the
+tag, or from the line holding the > that ends it, falls back to plain CSS, which has no // comment,
+and counts the SCSS comment as code"""

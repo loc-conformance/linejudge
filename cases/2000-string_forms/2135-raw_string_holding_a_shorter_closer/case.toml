@@ -1,0 +1,7 @@
+trap = """
+a Rust raw string opened with two hashes, r##", holding the one hash closer "# as text. Only a quote
+followed by as many hashes as the opener carried ends it, so a counter that ends a raw string at the
+first "# it meets reads the /* after it as a comment opener, and so does one that knows the one
+hash form alone. The file ends with a line comment holding */, so a block comment left open by a
+mistake earlier has a closer to reach whether the counter nests block comments or not, and a
+counter that ignores an opener nobody closes cannot pass by accident"""

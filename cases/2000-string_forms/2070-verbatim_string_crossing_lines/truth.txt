@@ -1,6 +1,0 @@
-var path = @"C:\one
-... .... . SSssssss
-C:\two";
-ssssssZ.
-// a real comment
-CCccccccccccccccc

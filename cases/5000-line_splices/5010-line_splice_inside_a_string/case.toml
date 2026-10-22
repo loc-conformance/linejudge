@@ -1,3 +1,5 @@
 trap = """
 a backslash at the end of the line continues the string in C, so the // inside it is not a
-comment"""
+comment. Case 5020 is its other half: a counter that never sees a splice and lets its strings run
+across lines reads this file right and is caught there, and one that never sees a splice and ends
+its strings with the line is caught here"""

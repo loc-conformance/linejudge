@@ -1,0 +1,6 @@
+trap = """
+In Ruby, class <<self opens the class of self itself, and the << there is an operator. Read as a
+heredoc, it would need a line holding self alone further down, and Ruby refuses to parse a heredoc
+that never closes. A counter that opens one there reads every line after it as string, the comment
+under it included. The real heredoc further down holds an apostrophe and a line beginning with #,
+so a counter that reads no heredocs gets that one wrong, and the comment after it as well"""

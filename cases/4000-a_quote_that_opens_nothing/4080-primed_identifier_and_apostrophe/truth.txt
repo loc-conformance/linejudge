@@ -1,6 +1,6 @@
-let s' = "it's fine"
-... .. . SsssssssssZ
+let s' = "it's fine" (* a real comment
+... .. . SsssssssssZ CCccccccccccccccc
+that closes on this line *)
+cccccccccccccccccccccccccUU
 let t' = 1
 ... .. . .
-// a real comment
-CCccccccccccccccc

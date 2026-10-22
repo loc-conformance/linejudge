@@ -1,7 +1,10 @@
 trap = """
 a C++ raw string, R"( to )", holding a block comment opener on a line of its own. Only the raw
-pair keeps that opener from starting a comment that never closes, and a lone ) inside does not end
-the string. The body of the opening line holds one further quote on purpose, so that counting the
-quotes on that line gives an even number: a counter that only tracks quotes then reaches the
-comment opener with nothing open, and cannot swallow it by accident and pass without reading the
-raw string at all"""
+pair keeps that opener from starting a comment, and a lone ) inside does not end the string. The
+lone ) sits on the line before the opener on purpose, so a counter that ends the raw string at the
+first ) meets the opener with nothing open, and the comment it opens runs to the last line. The
+body of the opening line holds one further quote on purpose, so that counting the quotes on that
+line gives an even number: a counter that only tracks quotes then reaches the comment opener with
+nothing open, and cannot swallow it by accident and pass without reading the raw string at all. The
+file ends with a block comment of its own, so the comment opened by mistake has a closer to reach,
+and a counter that ignores an opener nobody closes cannot pass by accident"""

@@ -1,8 +1,0 @@
-/* block opens
-CCcccccccccccc
-// this line comment is inside the block
-cccccccccccccccccccccccccccccccccccccccc
-end of block */
-cccccccccccccUU
-int x = 1;
-... . . ..

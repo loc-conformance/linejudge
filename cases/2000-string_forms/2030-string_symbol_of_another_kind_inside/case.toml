@@ -1,2 +1,4 @@
 trap = """
-only the symbol that opened a string can close it, so the other kind inside is text"""
+only the symbol that opened a string can close it, so the other kind inside is text. A counter that
+lets the other kind close it is left with a string open at the end of the line, so if its strings
+run across lines it counts the comment at the end as code"""

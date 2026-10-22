@@ -1,4 +1,6 @@
-url = "http://example.com/#anchor"
-... . SssssssssssssssssssssssssssZ
-value = 1
-..... . .
+const url = "http://example.com/"; /* a real comment
+..... ... . SsssssssssssssssssssZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
+let value = 1;
+... ..... . ..

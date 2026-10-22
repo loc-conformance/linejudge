@@ -1,3 +1,5 @@
 trap = """
-an escaped quote does not close the string, so the // after it is a real comment and not text
-inside it"""
+an escaped quote does not close the string, so the /* after it opens a real comment. A counter
+that ends the string at the escaped quote opens another at the last one, which hides the opener
+whether its strings end with the line or run on, and the second line of the comment comes out as
+code"""

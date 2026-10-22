@@ -1,6 +1,6 @@
-Write-Host "a `" b"
-.......... SssssssZ
-# a real comment
-Cccccccccccccccc
+Write-Host "a `" b" <# a real comment
+.......... SssssssZ CCccccccccccccccc
+that closes on this line #>
+cccccccccccccccccccccccccUU
 $x = 1
 .. . .

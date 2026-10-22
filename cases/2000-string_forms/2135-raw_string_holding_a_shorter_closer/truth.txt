@@ -1,0 +1,6 @@
+let s = r##"a "# /* is not the end"##;
+... . . SSSSssssssssssssssssssssssZZZ.
+let y = 1;
+... . . ..
+// a real comment */
+CCcccccccccccccccccc

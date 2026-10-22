@@ -1,7 +1,9 @@
 fn js_escape(s: &str) -> String {
 .. ............ ..... .. ...... .
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-    ..........SssZ. SssssZ..........SsZ. SssssZ.
+    s.replace('\\', "\\\\").replace('"', "\\\"") /* backslashes first,
+    ..........SssZ. SssssZ..........SsZ. SssssZ. CCccccccccccccccccccc
+    then quotes */
+ccccccccccccccccUU
 }
 .
 // one

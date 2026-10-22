@@ -1,0 +1,14 @@
+function z = f(x)
+........ . . ....
+%{
+CC
+%} not the end
+cccccccccccccc
+z = x;
+cccccc
+%}
+UU
+%{ note
+Ccccccc
+z = x + 1;
+. . . . ..

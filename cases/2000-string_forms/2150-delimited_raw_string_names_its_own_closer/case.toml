@@ -1,4 +1,9 @@
 trap = """
 a C++ raw string that puts a word of its own between the R" and the bracket, and then ends only at
 that same word. The closer is chosen where the string is written, so no fixed list of symbols can
-say what ends this one"""
+say what ends this one. Its first line holds )", the closer of the plain form, so a counter that
+ends every raw string at the first )" closes this one there and reads the block opener on the next
+line as a comment. A lone quote earlier on that line keeps the count of quotes even, so a counter
+that only pairs quotes reaches the block opener with nothing open as well. The file ends with a
+block comment of its own, so the comment opened by mistake has a closer to reach, and a counter
+that ignores an opener nobody closes cannot pass by accident"""
