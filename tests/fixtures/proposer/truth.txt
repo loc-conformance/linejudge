@@ -5,7 +5,7 @@ CCCCccccccccccccccccUUU
 <p>it's fine, an apostrophe opens nothing</p>
 ....... ..... .. .......... ..... ...........
 <script type="text/typescript">
->>>>>>> .....SsssssssssssssssZ> TypeScript
+>>>>>>> >>>>>SsssssssssssssssZ> TypeScript
 // a line comment
 CCccccccccccccccc
 /** A documented function.
@@ -31,7 +31,7 @@ ssssssssssssssssssZ.
 </script>
 <<<<<<<<<
 <style lang="scss">
->>>>>> .....SssssZ> SCSS
+>>>>>> >>>>>SssssZ> SCSS
 /* a css comment */ .a { color: red; }
 CCcccccccccccccccUU .. . ...... .... .
 </style>

@@ -86,6 +86,7 @@ impl Truth {
         // one file's markers against another file's lines.
         if faults.is_empty() {
             check_span_structure(&lines, &mut faults);
+            check_element_tags_reach_their_end(&lines, &mut faults);
         }
         if !faults.is_empty() {
             return Err(faults.into());
@@ -309,6 +310,56 @@ fn check_span_structure(lines: &[RawLine], faults: &mut Vec<String>) {
     }
 }
 
+// A line of a tag left without its `>` row would otherwise be read as the first line of the region.
+fn check_element_tags_reach_their_end(lines: &[RawLine], faults: &mut Vec<String>) {
+    let mut unfinished: Option<&RawLine> = None;
+    for line in lines {
+        let opens = line.marker.contains(TAG_OPENS);
+        match unfinished {
+            Some(opened) if !opens => {
+                faults.push(format!(
+                    "[{}] has no > row and the tag that begins at [{}] has not reached its >",
+                    line.source, opened.source
+                ));
+                unfinished = None;
+                continue;
+            }
+            Some(opened) => {
+                if let (Some(claim), Some(named)) = (&line.label, &opened.label)
+                    && claim.language != named.language
+                {
+                    faults.push(format!(
+                        "[{}] names {} inside the tag that begins at [{}] and names {}",
+                        line.source, claim.language, opened.source, named.language
+                    ));
+                }
+            }
+            None if opens && begins_an_element_tag(line) => unfinished = Some(line),
+            None => {}
+        }
+        if opens && reaches_the_end_of_a_tag(line) {
+            unfinished = None;
+        }
+    }
+}
+
+fn begins_an_element_tag(line: &RawLine) -> bool {
+    let mut bytes = read_tag_bytes(line);
+    bytes.next() == Some('<') && bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
+}
+
+fn reaches_the_end_of_a_tag(line: &RawLine) -> bool {
+    read_tag_bytes(line).any(|byte| byte == '>')
+}
+
+fn read_tag_bytes(line: &RawLine) -> impl Iterator<Item = char> {
+    line.source
+        .chars()
+        .zip(line.marker.chars())
+        .filter(|(_, mark)| *mark == TAG_OPENS)
+        .map(|(byte, _)| byte)
+}
+
 // A label is `HTML`, or `HTML (optional vue-template)` where the language is in question. The
 // reading has to be named: a bare `(optional)` would have every dialect answering one question
 // for two different ones.
@@ -333,7 +384,7 @@ fn split_reading_off(named: &str) -> Result<(&str, Option<String>), String> {
 // Regions nest, a php page holding markup holding a script, and a line belongs to the innermost
 // one. The tags are a stack, and a tag's own lines belong to whatever encloses the tag.
 //
-// Every line of an opening tag names its language, so a tag written over two lines names it twice.
+// Every line of an opening tag names its language.
 // Nothing is worked out from where a line sits: the same language again is the tag above carrying
 // on, a different one opens a region inside it, and no language at all is refused.
 fn assign_regions(lines: &[RawLine]) -> Result<Vec<Vec<RegionClaim>>, Vec<String>> {
@@ -341,42 +392,50 @@ fn assign_regions(lines: &[RawLine]) -> Result<Vec<Vec<RegionClaim>>, Vec<String
     let mut regions: Vec<Vec<RegionClaim>> = lines.iter().map(|_| Vec::new()).collect();
 
     let mut stack: Vec<RegionClaim> = Vec::new();
+    let mut opened_at: Vec<&str> = Vec::new();
     let mut named_above: Option<&RegionClaim> = None;
     for (index, line) in lines.iter().enumerate() {
         let opens = line.marker.contains(TAG_OPENS);
         let closes = line.marker.contains(TAG_CLOSES);
         let mut named_here = None;
         if opens && closes {
-            faults.push("a line both opens and closes a tag, which is not yet a shape".to_string());
+            faults.push(format!(
+                "[{}] both opens and closes a tag, which is not yet a shape",
+                line.source
+            ));
         } else if opens {
             match &line.label {
                 Some(claim) => {
                     match named_above {
                         Some(above) if above == claim => {}
                         Some(above) if above.language == claim.language => faults.push(format!(
-                            "one opening tag calls {} optional on one of its lines and not on the \
-                             other",
-                            claim.language
+                            "[{}] is part of a tag that calls {} optional on one of its lines but \
+                             plain on another",
+                            line.source, claim.language
                         )),
-                        _ => stack.push(claim.clone()),
+                        _ => {
+                            stack.push(claim.clone());
+                            opened_at.push(&line.source);
+                        }
                     }
                     named_here = Some(claim);
                 }
-                None => faults.push("an opening tag names no language".to_string()),
+                None => faults.push(format!("[{}] opens a tag and names no language", line.source)),
             }
             regions[index] = stack[..stack.len().saturating_sub(1)].to_vec();
         } else if closes {
             if stack.pop().is_none() {
-                faults.push("a closing tag closes nothing".to_string());
+                faults.push(format!("[{}] closes nothing", line.source));
             }
+            opened_at.pop();
             regions[index] = stack.clone();
         } else {
             regions[index] = stack.clone();
         }
         named_above = named_here;
     }
-    if !stack.is_empty() {
-        faults.push("an opening tag is never closed".to_string());
+    for source in opened_at {
+        faults.push(format!("the tag at [{source}] is never closed"));
     }
 
     claim_labeled_spans(lines, &mut regions, &mut faults);
@@ -581,7 +640,7 @@ mod tests {
     fn a_tag_written_over_two_lines_names_its_language_on_both_and_opens_one_region() {
         let input = "<script\n  type=\"text/javascript\">\nvar x = 1;\n</script>\n";
         let marked = "<script\n>>>>>>> JavaScript\n  type=\"text/javascript\">\n  \
-                      .....SsssssssssssssssZ> JavaScript\nvar x = 1;\n... . . ..\n</script>\n\
+                      >>>>>SsssssssssssssssZ> JavaScript\nvar x = 1;\n... . . ..\n</script>\n\
                       <<<<<<<<<\n";
         let truth = Truth::read(marked, input).unwrap();
         assert!(truth.lines[0].regions.is_empty());
@@ -596,6 +655,49 @@ mod tests {
         let disagreeing = marked.replace("Z> JavaScript", "Z> JavaScript (optional vue-template)");
         let refused = Truth::read(&disagreeing, input).unwrap_err();
         assert!(refused[0].contains("optional on one of its lines"), "{refused:?}");
+    }
+
+    #[test]
+    fn a_tag_written_over_four_lines_keeps_all_of_them_in_the_file_and_opens_one_region() {
+        let input = "<style\n  lang=\"scss\"\n  scoped\n>\n.a { }\n</style>\n";
+        let marked = "<style\n>>>>>> SCSS\n  lang=\"scss\"\n  >>>>>SssssZ SCSS\n  scoped\n  \
+                      >>>>>> SCSS\n>\n> SCSS\n.a { }\n.. . .\n</style>\n<<<<<<<<\n";
+        let truth = Truth::read(marked, input).unwrap();
+        for line in &truth.lines[..4] {
+            assert!(line.regions.is_empty(), "every line of the tag belongs to the file");
+        }
+        assert_eq!(truth.lines[4].regions.len(), 1, "and one region was opened, not four");
+        assert_eq!(truth.lines[4].regions[0].language, "SCSS");
+    }
+
+    #[test]
+    fn a_line_of_a_tag_left_without_its_row_is_refused_and_the_tag_is_named() {
+        let input = "<style\n  lang=\"scss\"\n  scoped\n>\n.a { }\n</style>\n";
+        let marked = "<style\n>>>>>> SCSS\n  lang=\"scss\"\n  >>>>>SssssZ SCSS\n  scoped\n  \
+                      >>>>>> SCSS\n>\n> SCSS\n.a { }\n.. . .\n</style>\n<<<<<<<<\n";
+        let unfinished = "the tag that begins at [<style] has not reached its >";
+
+        let middle = marked.replace("  >>>>>> SCSS", "  ......");
+        let refused = Truth::read(&middle, input).unwrap_err();
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        assert_eq!(refused[0], format!("[  scoped] has no > row and {unfinished}"));
+
+        let last = marked.replace("\n>\n> SCSS\n", "\n>\n.\n");
+        let refused = Truth::read(&last, input).unwrap_err();
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        assert_eq!(refused[0], format!("[>] has no > row and {unfinished}"));
+
+        let renamed = marked.replace("  >>>>>> SCSS", "  >>>>>> CSS");
+        let refused = Truth::read(&renamed, input).unwrap_err();
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        assert_eq!(
+            refused[0],
+            "[  scoped] names CSS inside the tag that begins at [<style] and names SCSS"
+        );
+
+        // Only a tag written as < and a name runs over lines, and <?php ends where it stands.
+        let php = Truth::read("<?php\n>>>>> PHP\necho 1;\n.... ..\n?>\n<<\n", "<?php\necho 1;\n?>\n");
+        assert!(php.is_ok(), "{php:?}");
     }
 
     #[test]

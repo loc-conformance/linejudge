@@ -62,13 +62,18 @@ const USAGE: &str = r#"propose-markers <spec>
     reading a counter answers, `rust-doc-comment` rather than `Markdown`, since one counter can
     read a Rust doc comment as Markdown and not a Java one.
 
-    A tag written over two lines is two > rows, and each of them names the language: the same
-    language twice is one tag opening one region, and two different ones are two regions nested.
-    A row that leaves it out is refused when the truth is read.
+    A tag written over several lines has a > row on each of them, and each line names the
+    language once: the same language on every line is one tag opening one region. A tag written
+    as < and a name runs to the > that ends it, and every line up to there has to carry a > row
+    naming that same language, or the truth is refused when it is read. The name of each
+    attribute and its = sign are bytes of the tag too, so a line holding only attributes stays
+    inside the tag:
 
-        1 > (JavaScript) <script
-        2 S "|text/javascript|"
-        2 > (JavaScript) >
+        1 > (SCSS) <style
+        2 > (SCSS) lang=
+        2 S "|scss|"
+        3 > (SCSS) scoped
+        4 > (SCSS) >
 
     Tags nest, and every line belongs to the innermost of them, so a php file whose page holds a
     script is written as two pairs one inside the other:
@@ -548,15 +553,16 @@ mod tests {
         let source = ["<script", "  type=\"text/javascript\">", "</script>"];
         let spec = [
             "1 > (JavaScript) <script",
+            "2 > (JavaScript) type=",
             "2 S \"|text/javascript|\"",
-            "2 > (JavaScript) >",
+            "2 > >",
             "3 < </script>",
         ];
         let truth = propose(&source, &spec);
         assert_eq!(
             truth,
             "<script\n>>>>>>> JavaScript\n  type=\"text/javascript\">\n\
-             \x20 .....SsssssssssssssssZ> JavaScript\n</script>\n<<<<<<<<<\n"
+             \x20 >>>>>SsssssssssssssssZ> JavaScript\n</script>\n<<<<<<<<<\n"
         );
     }
 

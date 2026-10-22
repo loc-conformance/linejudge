@@ -433,7 +433,8 @@ mod tests {
         let real = a_derivation(&corpus, &dialects, case);
 
         let block = a_block(case);
-        let agreeing = TheirAnswer::PerLine(a_counter_saying(&["code", "comments", "code"], &real));
+        let agreeing =
+            TheirAnswer::PerLine(a_counter_saying(&["code", "comments", "comments", "code"], &real));
         let mut written = Vec::new();
         write_the_header(&mut written, &block, &real, &ItsAnswer::NotMeasured, &agreeing, &explained)
             .unwrap();
@@ -442,7 +443,8 @@ mod tests {
         assert!(text.contains("mezura reads every line the same way"), "{text}");
         assert!(!text.contains("mezura says"), "{text}");
 
-        let differing = TheirAnswer::PerLine(a_counter_saying(&["code", "code", "code"], &real));
+        let differing =
+            TheirAnswer::PerLine(a_counter_saying(&["code", "comments", "code", "code"], &real));
         let mut written = Vec::new();
         write_the_header(&mut written, &block, &real, &ItsAnswer::NotMeasured, &differing, &explained)
             .unwrap();
@@ -458,9 +460,9 @@ mod tests {
         let (corpus, dialects, _) = read_everything();
         let case = find_case(&corpus, "5060-code_then_a_spliced_line_comment").unwrap();
         let real = a_derivation(&corpus, &dialects, case);
-        let unreadable = TheirAnswer::Unreadable("it answers 4 lines, and the file has 3".to_string());
+        let unreadable = TheirAnswer::Unreadable("it answers 5 lines, and the file has 4".to_string());
         let text = a_header(case, &real, &ItsAnswer::NotMeasured, &unreadable, &[]);
-        assert!(text.contains("what mezura printed could not be read: it answers 4 lines"), "{text}");
+        assert!(text.contains("what mezura printed could not be read: it answers 5 lines"), "{text}");
     }
 
     #[test]

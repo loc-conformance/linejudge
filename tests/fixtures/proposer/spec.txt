@@ -7,6 +7,7 @@
 1 C <!--| a page comment |-->
 2 S "|<!-- text in an attribute|"
 4 > (TypeScript) <script
+4 > type=
 4 S "|text/typescript|"
 4 > >
 5 C //| a line comment
@@ -15,6 +16,7 @@
 12-13 S `| ... |`
 16 < </script>
 17 > (SCSS) <style
+17 > lang=
 17 S "|scss|"
 17 > >
 18 C /*| a css comment |*/
