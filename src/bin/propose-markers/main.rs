@@ -86,7 +86,9 @@ const USAGE: &str = r#"propose-markers <spec>
     Lines are numbered from 1 and a line no row names comes out as all dots, which is what a
     line of plain code is. Rows touching one line are written in the order they sit on it, and
     each is searched for after the previous one ends. A text that is still ambiguous is refused,
-    and the refusal is answered by appending @2 for the second occurrence.
+    and the refusal is answered by writing @2 right after it for the second occurrence: at the
+    end of a one-line row, or after the opener or closer of a span that crosses lines, like
+    /*@1| ... |*/@2.
 "#;
 
 const OPTIONAL_WORD: &str = "optional";
@@ -98,6 +100,7 @@ enum Item {
         marks: Marks,
         label: Option<String>,
         opener: String,
+        opener_occurrence: Option<usize>,
         interior: String,
         closer: Option<String>,
         occurrence: Option<usize>,
@@ -186,7 +189,7 @@ fn parse_row(row: &str) -> Result<Item, String> {
     };
 
     let mut parts = text.split('|');
-    let opener = parts.next().unwrap_or_default().to_string();
+    let (opener, opener_occurrence) = split_occurrence(parts.next().unwrap_or_default());
     let Some(interior) = parts.next() else {
         return Err(format!("[{text}] has no bar after its opening symbol"));
     };
@@ -194,15 +197,24 @@ fn parse_row(row: &str) -> Result<Item, String> {
     if parts.next().is_some() {
         return Err(format!("[{text}] holds more bars than a span can mean"));
     }
+    if from == to && opener_occurrence.is_some() {
+        return Err(format!("[{row}] is one line, so an occurrence goes at the end of the row"));
+    }
     if from != to && interior.trim() != "..." {
         return Err(format!("[{text}] crosses lines, so its middle is written ' ... '"));
+    }
+    if from != to && closer.is_none() && occurrence.is_some() {
+        return Err(format!(
+            "[{row}] has no closing symbol, so an occurrence goes after the opener"
+        ));
     }
     Ok(Item::Span {
         from,
         to,
         marks,
         label,
-        opener,
+        opener: opener.to_string(),
+        opener_occurrence,
         interior: interior.to_string(),
         closer,
         occurrence,
@@ -312,7 +324,17 @@ fn paint(
             note_label(id, labels, index, label)?;
             Ok(())
         }
-        Item::Span { from, to, marks, label, opener, interior, closer, occurrence } => {
+        Item::Span {
+            from,
+            to,
+            marks,
+            label,
+            opener,
+            opener_occurrence,
+            interior,
+            closer,
+            occurrence,
+        } => {
             let opens = marks.opener as u8;
             let inside = marks.interior as u8;
             let closes = marks.closer as u8;
@@ -331,7 +353,7 @@ fn paint(
                 note_label(id, labels, first, label)?;
                 return Ok(());
             }
-            let at = find_text(id, sources, first, opener, None, cursors)?;
+            let at = find_text(id, sources, first, opener, *opener_occurrence, cursors)?;
             paint_run(&mut markers[first][at..], inside);
             paint_run(&mut markers[first][at..at + opener.len()], opens);
             cursors.insert(first, sources[first].len());
@@ -343,8 +365,6 @@ fn paint(
                 }
             }
             match closer {
-                // A trailing @N on a crossing span picks the closer's occurrence, since the
-                // opener was already anchored by where the span begins.
                 Some(closing) => {
                     let at = find_text(id, sources, last, closing, *occurrence, cursors)?;
                     paint_run(&mut markers[last][..at], inside);
@@ -409,7 +429,7 @@ fn find_text(
         (1, None) => hits[0],
         (found, None) => {
             return Err(format!(
-                "{id} line {}: [{text}] is there {found} times, say which with @2",
+                "{id} line {}: [{text}] is there {found} times, write @2 right after it",
                 index + 1
             ));
         }
@@ -579,18 +599,32 @@ mod tests {
     }
 
     // 6400's second line, where the closer is there twice: once ending the comment above and once
-    // inside the '*/*' whose second half reopens it.
+    // inside the '*/*' whose second half reopens it; and 1215's first line, where the opener is
+    // there twice because a nested opener shares the middle slash of '/*/*/'.
     #[test]
     fn a_text_that_is_there_twice_is_refused_until_an_occurrence_is_named() {
         let source = ["int w = 8; /* tail", "*/ int z = 9; */* int y = 10;"];
         let refused = refuse(&source, &["1-2 C /*| ... |*/"]);
-        assert!(refused.contains("say which with @2"), "{refused}");
+        assert!(refused.contains("write @2 right after it"), "{refused}");
         let truth = propose(&source, &["1-2 C /*| ... |*/@1"]);
         assert_eq!(
             truth,
             "int w = 8; /* tail\n... . . .. CCccccc\n*/ int z = 9; */* int y = 10;\n\
              UU ... . . .. ... ... . . ...\n"
         );
+
+        let nested = ["/*/*/", "*/", "let x = 1;", "*/", "let y = 2;"];
+        let refused = refuse(&nested, &["1-4 C /*| ... |*/"]);
+        assert!(refused.contains("write @2 right after it"), "{refused}");
+        let truth = propose(&nested, &["1-4 C /*@1| ... |*/"]);
+        let hand_written = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join(
+                "cases/1000-comments/1215-nesting_openers_sharing_bytes_with_closers/truth.txt",
+            ),
+        )
+        .unwrap()
+        .replace("\r\n", "\n");
+        assert_eq!(truth, hand_written);
     }
 
     #[test]
@@ -603,6 +637,10 @@ mod tests {
         assert!(refused.contains("' ... '"), "{refused}");
         let refused = refuse(&["<script>"], &["1-2 > (CSS) <script>"]);
         assert!(refused.contains("a tag row is one line"), "{refused}");
+        let refused = refuse(&["/* a */ /* b */"], &["1 C /*@1| a |*/"]);
+        assert!(refused.contains("is one line, so an occurrence goes at the end"), "{refused}");
+        let refused = refuse(&["// a // b \\", "still"], &["1-2 C //| ...@1"]);
+        assert!(refused.contains("has no closing symbol"), "{refused}");
     }
 
     fn propose(sources: &[&str], spec: &[&str]) -> String {

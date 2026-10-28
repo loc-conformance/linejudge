@@ -150,7 +150,9 @@ propose-markers <spec>
     Lines are numbered from 1 and a line no row names comes out as all dots, which is what a
     line of plain code is. Rows touching one line are written in the order they sit on it, and
     each is searched for after the previous one ends. A text that is still ambiguous is refused,
-    and the refusal is answered by appending @2 for the second occurrence.
+    and the refusal is answered by writing @2 right after it for the second occurrence: at the
+    end of a one-line row, or after the opener or closer of a span that crosses lines, like
+    /*@1| ... |*/@2.
 ```
 
 ## Check it yourself, always
