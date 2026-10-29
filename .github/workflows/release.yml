@@ -72,7 +72,7 @@ jobs:
           $name = "linejudge-${{ github.ref_name }}-${{ matrix.platform }}"
           New-Item -ItemType Directory -Path $name | Out-Null
           Copy-Item target/release/linejudge.exe -Destination $name
-          Copy-Item LICENSE-MIT, LICENSE-APACHE, README.md -Destination $name
+          Copy-Item LICENSE-MIT, LICENSE-APACHE, CHANGELOG.md, README.md -Destination $name
           Compress-Archive -Path $name -DestinationPath "$name.zip"
 
       - name: Package for linux and macos
@@ -81,7 +81,7 @@ jobs:
           name="linejudge-${{ github.ref_name }}-${{ matrix.platform }}"
           mkdir "$name"
           cp target/release/linejudge "$name/"
-          cp LICENSE-MIT LICENSE-APACHE README.md "$name/"
+          cp LICENSE-MIT LICENSE-APACHE CHANGELOG.md README.md "$name/"
           tar czf "$name.tar.gz" "$name"
 
       - name: Upload the archive
@@ -99,19 +99,26 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Download every archive
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      # Attaches the archives to the release of this tag. A release already created by hand from
-      # the github UI only gains the files and keeps its notes. One that does not exist is created.
+      - name: Cut the notes of this version out of the Changelog
+        run: awk '/^## /{if (seen++) exit} /^---/{if (seen) exit} seen' CHANGELOG.md > notes.md
+
+      # Attaches the archives to the release of this tag, creating it if it does not exist yet.
+      # The notes come from the Changelog on every run, so anything written into the github UI
+      # before the tag was pushed is replaced.
       - name: Attach the archives to the release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
           fail_on_unmatched_files: true
+          body_path: notes.md
 
   # Last, because everything above can be run again and this cannot: a version handed to crates.io
   # is there for good, and only a yank ever takes it back.
