@@ -1,6 +1,6 @@
 counter = "mezura"
-version = "v3.2.0 (2026-09-19)"
-measured-with = "linejudge 0.2.0"
+version = "v3.3.0 (2026-10-29)"
+measured-with = "linejudge 0.3.0"
 
 [answer.1010-code_then_comment_on_one_line.content]
 counted = { lines = 2, code = 2, comments = 0, extra = 0 }
@@ -105,20 +105,10 @@ counted = { lines = 2, code = 1, comments = 1, extra = 0 }
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.1195-closer_sharing_a_byte_with_an_opener_in_the_text.content]
-is-known-failure = true
-counted = { lines = 5, code = 0, comments = 4, extra = 1 }
-note = """
-of the /* and the */ sharing the asterisk of assets/*/ it keeps the /*, choosing as though no
-comment were open, so the comment runs on to the */ of the last line. With a space or a letter
-between the / and the */ the file reads right"""
+counted = { lines = 5, code = 2, comments = 2, extra = 1 }
 
 [answer.1195-closer_sharing_a_byte_with_an_opener_in_the_text.region]
-is-known-failure = true
-counted = { lines = 5, code = 0, comments = 5, blanks = 0 }
-note = """
-of the /* and the */ sharing the asterisk of assets/*/ it keeps the /*, choosing as though no
-comment were open, so the comment runs on to the */ of the last line. With a space or a letter
-between the / and the */ the file reads right"""
+counted = { lines = 5, code = 2, comments = 2, blanks = 1 }
 
 [answer.1200-nested_block_comment_that_nests.content]
 counted = { lines = 2, code = 1, comments = 1, extra = 0 }
@@ -133,22 +123,10 @@ counted = { lines = 4, code = 1, comments = 2, extra = 1 }
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
 [answer.1215-nesting_openers_sharing_bytes_with_closers.content]
-is-known-failure = true
-counted = { lines = 5, code = 2, comments = 0, extra = 3 }
-note = """
-the second /* shares its asterisk with the */ ending the first line, and the /* is dropped while
-the */ is kept, so the comment closes on the first line and the lines below are read outside any
-comment. This happens only when the comment's own /* has shared a byte with a */ as well: /* /*/
-on its own is read right"""
+counted = { lines = 5, code = 1, comments = 1, extra = 3 }
 
 [answer.1215-nesting_openers_sharing_bytes_with_closers.region]
-is-known-failure = true
-counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
-note = """
-the second /* shares its asterisk with the */ ending the first line, and the /* is dropped while
-the */ is kept, so the comment closes on the first line and the lines below are read outside any
-comment. This happens only when the comment's own /* has shared a byte with a */ as well: /* /*/
-on its own is read right"""
+counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
 
 [answer.1220-nested_block_comment_in_odin.content]
 counted = { lines = 6, code = 2, comments = 3, extra = 1 }
@@ -169,32 +147,16 @@ counted = { lines = 10, code = 4, comments = 2, extra = 4 }
 counted = { lines = 10, code = 6, comments = 4, blanks = 0 }
 
 [answer.1260-pod_closer_indented_inside_the_documentation.content]
-is-known-failure = true
-counted = { lines = 15, code = 8, comments = 0, extra = 7 }
-note = """
-Perl's documentation is not declared, so every line of it counts as code"""
+counted = { lines = 15, code = 3, comments = 5, extra = 7 }
 
 [answer.1260-pod_closer_indented_inside_the_documentation.region]
-is-known-failure = true
-counted = { lines = 15, code = 8, comments = 0, blanks = 7 }
-note = """
-Perl's documentation is not declared, so every line of it counts as code"""
+counted = { lines = 15, code = 3, comments = 9, blanks = 3 }
 
 [answer.1280-matlab_block_markers_sharing_their_line.content]
-is-known-failure = true
-counted = { lines = 7, code = 3, comments = 2, extra = 2 }
-note = """
-%{ and %} are read anywhere on their line, so the %} on line 3 closes the block and its words and
-line 4 count as code, and the %{ on line 6 opens one over line 7. With the words on those two lines
-written as plain text the file reads right"""
+counted = { lines = 7, code = 2, comments = 3, extra = 2 }
 
 [answer.1280-matlab_block_markers_sharing_their_line.region]
-is-known-failure = true
-counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
-note = """
-%{ and %} are read anywhere on their line, so the %} on line 3 closes the block and its words and
-line 4 count as code, and the %{ on line 6 opens one over line 7. With the words on those two lines
-written as plain text the file reads right"""
+counted = { lines = 7, code = 2, comments = 5, blanks = 0 }
 
 [answer.2010-comment_symbol_inside_string.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
@@ -215,22 +177,10 @@ counted = { lines = 6, code = 3, comments = 3, extra = 0 }
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 
 [answer.2026-raw_opener_inside_a_comment_with_a_real_closer_after_it.content]
-is-known-failure = true
-counted = { lines = 4, code = 1, comments = 3, extra = 0 }
-note = """
-the r#" inside the comment is taken for a string opener and the quotes of "/*" are dropped for
-being unable to close it. The "# of the real raw string then closes that opener, so the line is
-never read again with the opener set aside, and the /* left bare opens a comment that runs to the
-end of the file"""
+counted = { lines = 4, code = 2, comments = 2, extra = 0 }
 
 [answer.2026-raw_opener_inside_a_comment_with_a_real_closer_after_it.region]
-is-known-failure = true
-counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
-note = """
-the r#" inside the comment is taken for a string opener and the quotes of "/*" are dropped for
-being unable to close it. The "# of the real raw string then closes that opener, so the line is
-never read again with the opener set aside, and the /* left bare opens a comment that runs to the
-end of the file"""
+counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
 
 [answer.2030-string_symbol_of_another_kind_inside.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
@@ -257,20 +207,10 @@ counted = { lines = 4, code = 4, comments = 0, extra = 0 }
 counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 
 [answer.2072-verbatim_string_holding_a_doubled_quote.content]
-is-known-failure = true
-counted = { lines = 6, code = 3, comments = 3, extra = 0 }
-note = """
-the first quote of the first doubled pair ends the verbatim string and the second opens a plain one,
-in which the backslash escapes the quote after it, so that string closes on the first line and the
-two lines below count as comments"""
+counted = { lines = 6, code = 5, comments = 1, extra = 0 }
 
 [answer.2072-verbatim_string_holding_a_doubled_quote.region]
-is-known-failure = true
-counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
-note = """
-the first quote of the first doubled pair ends the verbatim string and the second opens a plain one,
-in which the backslash escapes the quote after it, so that string closes on the first line and the
-two lines below count as comments"""
+counted = { lines = 6, code = 5, comments = 1, blanks = 0 }
 
 [answer.2077-interpolation_hole_holding_the_strings_own_quote.content]
 is-known-failure = true
@@ -293,18 +233,10 @@ counted = { lines = 6, code = 5, comments = 1, extra = 0 }
 counted = { lines = 6, code = 5, comments = 1, blanks = 0 }
 
 [answer.2085-raw_string_ending_in_a_quote.content]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, extra = 0 }
-note = """
-the raw string closes at the first three of the four quotes, and the quote left over opens a
-string that takes the comment opener with it, so the comment's second line counts as code"""
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.2085-raw_string_ending_in_a_quote.region]
-is-known-failure = true
-counted = { lines = 3, code = 3, comments = 0, blanks = 0 }
-note = """
-the raw string closes at the first three of the four quotes, and the quote left over opens a
-string that takes the comment opener with it, so the comment's second line counts as code"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2090-docstring_holding_a_comment_symbol.content]
 counted = { lines = 5, code = 5, comments = 0, extra = 0 }
@@ -325,46 +257,22 @@ counted = { lines = 7, code = 5, comments = 2, extra = 0 }
 counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
 
 [answer.2120-heredoc_holding_an_apostrophe.content]
-is-known-failure = true
-counted = { lines = 6, code = 6, comments = 0, extra = 0 }
-note = """
-it reads no heredocs, so the apostrophe opens a string and every line under it is counted as code.
-Without the apostrophe the line beginning with # inside the heredoc counts as a comment"""
+counted = { lines = 6, code = 4, comments = 2, extra = 0 }
 
 [answer.2120-heredoc_holding_an_apostrophe.region]
-is-known-failure = true
-counted = { lines = 6, code = 6, comments = 0, blanks = 0 }
-note = """
-it reads no heredocs, so the apostrophe opens a string and every line under it is counted as code.
-Without the apostrophe the line beginning with # inside the heredoc counts as a comment"""
+counted = { lines = 6, code = 4, comments = 2, blanks = 0 }
 
 [answer.2125-operator_spelled_like_a_heredoc_opener.content]
-is-known-failure = true
-counted = { lines = 16, code = 14, comments = 1, extra = 1 }
-note = """
-reads no heredoc in Ruby, so the apostrophe of it's on line 11 opens a string that runs to the end
-of the file, and the comment on line 15 counts as code"""
+counted = { lines = 16, code = 13, comments = 2, extra = 1 }
 
 [answer.2125-operator_spelled_like_a_heredoc_opener.region]
-is-known-failure = true
-counted = { lines = 16, code = 14, comments = 1, blanks = 1 }
-note = """
-reads no heredoc in Ruby, so the apostrophe of it's on line 11 opens a string that runs to the end
-of the file, and the comment on line 15 counts as code"""
+counted = { lines = 16, code = 13, comments = 2, blanks = 1 }
 
 [answer.2127-heredoc_closing_word_indented_only_after_a_tilde_or_dash.content]
-is-known-failure = true
-counted = { lines = 16, code = 13, comments = 2, extra = 1 }
-note = """
-reads no heredoc in Ruby, so the apostrophe of it's on line 3 opens a string that the one on line
-11 closes, and line 13, beginning with #, counts as a comment"""
+counted = { lines = 16, code = 14, comments = 1, extra = 1 }
 
 [answer.2127-heredoc_closing_word_indented_only_after_a_tilde_or_dash.region]
-is-known-failure = true
-counted = { lines = 16, code = 14, comments = 2, blanks = 0 }
-note = """
-reads no heredoc in Ruby, so the apostrophe of it's on line 3 opens a string that the one on line
-11 closes. The blank line 7 inside it counts as code, and line 13, beginning with #, as a comment"""
+counted = { lines = 16, code = 14, comments = 1, blanks = 1 }
 
 [answer.2130-raw_string_holding_quotes.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
@@ -373,20 +281,10 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2135-raw_string_holding_a_shorter_closer.content]
-is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, extra = 0 }
-note = """
-its Rust declares r" and r#" alone, so the quote after the two hashes opens an ordinary string that
-the quote of "# closes, and the /* after it opens a comment, which the */ at the end of the last
-line closes"""
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.2135-raw_string_holding_a_shorter_closer.region]
-is-known-failure = true
-counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
-note = """
-its Rust declares r" and r#" alone, so the quote after the two hashes opens an ordinary string that
-the quote of "# closes, and the /* after it opens a comment, which the */ at the end of the last
-line closes"""
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2140-raw_string_holding_its_own_closing_bracket.content]
 counted = { lines = 6, code = 5, comments = 1, extra = 0 }
@@ -395,20 +293,10 @@ counted = { lines = 6, code = 5, comments = 1, extra = 0 }
 counted = { lines = 6, code = 5, comments = 1, blanks = 0 }
 
 [answer.2150-delimited_raw_string_names_its_own_closer.content]
-is-known-failure = true
-counted = { lines = 5, code = 1, comments = 4, extra = 0 }
-note = """
-the plain R"( is declared and this delimited form is not, so the quotes of the opening line pair
-off as ordinary strings and the block opener under them opens a comment, which the block comment
-ending the file closes"""
+counted = { lines = 5, code = 4, comments = 1, extra = 0 }
 
 [answer.2150-delimited_raw_string_names_its_own_closer.region]
-is-known-failure = true
-counted = { lines = 5, code = 1, comments = 4, blanks = 0 }
-note = """
-the plain R"( is declared and this delimited form is not, so the quotes of the opening line pair
-off as ordinary strings and the block opener under them opens a comment, which the block comment
-ending the file closes"""
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.2170-lua_level_bracket_holding_plain_close.content]
 counted = { lines = 4, code = 1, comments = 2, extra = 1 }
@@ -593,20 +481,16 @@ HTML declares no string symbols, on purpose, because its quotes hold attributes 
 full of apostrophes. The price is this one: a quoted opener cannot be seen"""
 
 [answer.6030-opening_tag_split_over_two_lines.content]
-is-known-failure = true
-counted = { lines = 5, code = 5, comments = 0, extra = 0 }
-counted-regions = []
-note = """
-the block is not found, so the comment inside it is read with the page's symbols, and HTML has
-no //"""
+counted = { lines = 5, code = 4, comments = 1, extra = 0 }
+counted-regions = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, extra = 0 },
+]
 
 [answer.6030-opening_tag_split_over_two_lines.region]
-is-known-failure = true
-counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
-counted-regions = []
-note = """
-the block is not found, so the comment inside it is read with the page's symbols, and HTML has
-no //"""
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
+counted-regions = [
+    { language = "JavaScript", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
 
 [answer.6040-script_tag_in_upper_case.content]
 counted = { lines = 6, code = 5, comments = 1, extra = 0 }
@@ -685,20 +569,16 @@ counted-regions = [
 ]
 
 [answer.6105-block_language_named_on_a_middle_line_of_the_tag.content]
-is-known-failure = true
-counted = { lines = 7, code = 6, comments = 0, extra = 1 }
-counted-regions = []
-note = """
-the block is found when its tag sits on one line and missed when the tag is split over four, so the
-comment inside it is read with Vue's own symbols, and those have no //"""
+counted = { lines = 7, code = 5, comments = 1, extra = 1 }
+counted-regions = [
+    { language = "SCSS", lines = 2, code = 1, comments = 1, extra = 0 },
+]
 
 [answer.6105-block_language_named_on_a_middle_line_of_the_tag.region]
-is-known-failure = true
-counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
-counted-regions = []
-note = """
-the block is found when its tag sits on one line and missed when the tag is split over four, so the
-comment inside it is read with Vue's own symbols, and those have no //"""
+counted = { lines = 7, code = 6, comments = 1, blanks = 0 }
+counted-regions = [
+    { language = "SCSS", lines = 2, code = 1, comments = 1, blanks = 0 },
+]
 
 [answer.6110-php_block_holding_html_around_it.content]
 is-known-failure = true

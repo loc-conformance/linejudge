@@ -7,7 +7,7 @@ explain-output = "linejudge-per-line"
 [acquisition]
 channel = "crates-io"
 name    = "mezura"
-version = "3.2.0"
+version = "3.3.0"
 
 [variation.content]
 dialect = "content"

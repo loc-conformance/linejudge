@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.3.0, 2026-10-29
+
+The corpus grows to 95 active cases and tightens 38 existing cases so that a counter cannot pass a
+trap by accident.
+
+Breaking:
+
+- Thirty-eight existing cases had their trailing lines strengthened so that a misparsed comment,
+  string or line splice changes the line counts rather than coinciding with the right answer. Some
+  counters are expected to fail some existing cases that were passing by mistake.
+  Regenerate recorded answers with `linejudge record --counter <name>`:
+  - Unclosed comments (1060, 2040, 2140, 2150, 6020, 7020 now end in a closed comment, 1240 holds
+    a second closed comment below its macro, and 2130 ends in a line comment holding `*/`).
+  - Strings left open by a missed closer or escape (1130, 2050, 3010, 3020, 3030, 3050, 3070, 3080,
+    3090, 4010, 4020, 4050, 4060, 4070, 4080, 4090, 6010 and 7010 open a block comment after the
+    string on the same line, 2010 is rewritten in JavaScript, 2020 and 2030 end in a comment line,
+    and 2080, 2110 and 2120 hold a `#` line inside the string).
+  - Spliced lines (5060 now splices twice; 5010 and 5020 note that they form a pair).
+  - Three redundant cases were removed in favour of the cases that test the same construct: 1050
+    (covered by 1090), 1140 (covered by 1150, 8040 and 8050) and 2070 (covered by 2072).
+  - Measured against the 0.2.0 records, these tightened cases catch previously masked failures in
+    cloc (2010, 2040, 2110, 2120, 5060, 7020, and 2080 under `--docstring-as-code`), scc (2110) and
+    mezura 3.2.0 (7010).
+- In `truth.txt`, an opening HTML/Vue tag split across multiple lines must carry `>` on every line
+  up to its closing `>`; leaving an intermediate line unmarked is now refused.
+
+New:
+
+- Fourteen new cases:
+  - 1195: a C block comment ending on `assets/*/`, where `*/` closes the comment even though `*`
+    follows `/`.
+  - 1215: overlapping `/*/*/` in Rust and C where comment openers and closers share bytes.
+  - 1260: Perl POD containing an indented `=cut` example line that does not end the block.
+  - 1280: MATLAB `%{` with trailing text on the same line (a line comment, not a block opener) and
+    a nested `%{ ... %}` block.
+  - 2025, 2026: raw string openers inside comments or strings on a line that later closes a real
+    raw string.
+  - 2072, 2077: multi-line C# verbatim and interpolated verbatim strings (`@"..."`, `@$"..."`) with
+    doubled `""` quotes.
+  - 2085: Kotlin/Scala multi-line `"""` strings whose content ends with one or more quotes before
+    the closing `"""`.
+  - 2125, 2127: Ruby `class <<self` (not a heredoc) above a real heredoc, and `<<~TEXT` (indented
+    closer) above `<<RUBY` (unindented closer only).
+  - 2135: Rust `r##"..."##` raw strings containing a shorter `"#` sequence inside.
+  - 4055: Java/Kotlin/C# `'"'` character literals containing a double quote before a comment token.
+  - 6105: a Vue `<style>` opening tag split across four lines with `lang="scss"` on an inner line.
+- `propose-markers` now accepts `@N` right after the opener of a crossing span (`1-4 C /*@1| ...
+  |*/`), while a trailing `@N` continues to select the closer occurrence.
+
+Other:
+
+- mezura 3.3.0 declared (with `--no-default-config` and `--no-local`), with its answers recorded
+  over all 95 cases.
+- Cases 6030, 6080 and 6100 were re-marked for multi-line tags with no change to any counter's
+  verdict.
+
+-----------------------------------------------------------------------------------------------------------
+
 ## 0.2.0, 2026-09-12
 
 A counter can now be measured more than one way against a single set of rules. cloc has
