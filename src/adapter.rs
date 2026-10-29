@@ -532,8 +532,8 @@ fn fill_in_the_scripts_dir(arg: &str, scripts: &[PathBuf]) -> String {
         .iter()
         .rev()
         .find(|dir| dir.join(script).is_file())
-        .map(&fill)
-        .or_else(|| scripts.first().map(&fill))
+        .map(fill)
+        .or_else(|| scripts.first().map(fill))
         .unwrap_or_else(|| arg.to_string())
 }
 
