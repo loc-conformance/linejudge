@@ -252,6 +252,13 @@ note = """
 an apostrophe does not open a string in Groovy, so the three apostrophes are code, the // below
 counts as a comment and the /* under it opens a block that nothing closes"""
 
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.default]
+is-known-failure = true
+counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
+note = """
+its Zig carries no \\\\ string symbol, so the quote on line 3 opens a string that crosses lines and
+swallows both comments below it. With that quote taken out the file comes out right"""
+
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 

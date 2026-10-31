@@ -204,6 +204,14 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 [answer.2190-triple_quote_read_as_three_short_ones.default]
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.default]
+is-known-failure = true
+counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
+note = """
+the \\\\ on line 2 opens a string that does not close when the line ends, so every line from there
+to the end of the file counts as code, and the answer is the same with the quote on line 3 taken
+out"""
+
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 

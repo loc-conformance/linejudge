@@ -710,6 +710,15 @@ note = """
 a // at the head of a line opens a comment inside a triple apostrophe string too, so that line
 counts as one, while the /* under it opens nothing and takes no line with it"""
 
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.default]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.stripstr]
+same-as = "default"
+
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.docstring-as-code]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 

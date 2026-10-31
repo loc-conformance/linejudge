@@ -316,6 +316,16 @@ counted = { lines = 5, code = 5, comments = 0, extra = 0 }
 [answer.2190-triple_quote_read_as_three_short_ones.region]
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.content]
+is-known-failure = true
+counted = { lines = 7, code = 3, comments = 3, extra = 1 }
+note = """
+its Zig carries no \\\\ string symbol, so the // after \\\\ on line 2 is read as a comment and \\\\ in
+front of it is punctuation, which leaves the line with comment words and no code words"""
+
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.region]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
 [answer.3010-escaped_quote_before_comment.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 

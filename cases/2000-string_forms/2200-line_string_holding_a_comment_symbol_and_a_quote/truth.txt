@@ -1,0 +1,14 @@
+const msg =
+..... ... .
+    \\// inside the string
+    SSssssssssssssssssssss
+    \\it holds one " quote
+    SSssssssssssssssssssss
+;
+.
+// a real comment
+CCccccccccccccccc
+// a second real comment
+CCcccccccccccccccccccccc
+const x = 1;
+..... . . ..
