@@ -51,7 +51,7 @@ if (picks.length) {
 const find = document.querySelector('.find input');
 if (find) {
   const found = document.querySelector('.found');
-  const rows = [...document.querySelectorAll('tbody tr')];
+  const rows = [...document.querySelectorAll('tbody:not(.summary) tr')];
   const show = () => {
     const wanted = find.value.trim().toLowerCase();
     let group = null;
