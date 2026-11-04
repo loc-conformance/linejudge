@@ -1,3 +1,7 @@
+(def s "first
+.... . Ssssss
+; still inside the string")
+sssssssssssssssssssssssssZ.
 (def q \")
 .... . Ss.
 (def x 1)

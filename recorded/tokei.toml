@@ -263,13 +263,18 @@ swallows both comments below it. With that quote taken out the file comes out ri
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.default]
-counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+is-known-failure = true
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+note = """
+its Odin has double and single quoted strings and no backtick one, so the // on line 3, inside
+the raw string, is read as a comment. The same /* comes out as code between double quotes and
+opens a comment between backticks"""
 
 [answer.3030-raw_string_ending_in_backslash.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.default]
 is-known-failure = true
@@ -304,7 +309,11 @@ the quote inside '"' opens a string that is still open when the line ends, so th
 and every comment under it count as code. Without that character literal the line reads right"""
 
 [answer.4030-character_written_with_a_backslash.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+line 2 sits inside the string opened on line 1 and begins with ;, and it is read as a comment. The
+string itself does run on: with plain text on that line the line comes out as code"""
 
 [answer.4040-escaped_apostrophe_outside_quotes.default]
 counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
@@ -327,7 +336,7 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.4080-primed_identifier_and_apostrophe.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.4090-transpose_operator_and_char.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }

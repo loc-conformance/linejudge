@@ -1,5 +1,9 @@
-let s' = "it's fine" (* a real comment
-... .. . SsssssssssZ CCccccccccccccccc
+let s' = "it's fine
+... .. . Ssssssssss
+// and this line is inside it too
+sssssssssssssssssssssssssssssssss
+and so is this one" (* a real comment
+ssssssssssssssssssZ CCccccccccccccccc
 that closes on this line *)
 cccccccccccccccccccccccccUU
 let t' = 1

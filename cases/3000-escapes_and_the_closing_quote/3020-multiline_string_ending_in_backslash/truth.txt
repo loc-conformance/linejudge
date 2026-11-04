@@ -1,7 +1,11 @@
 package main
 ....... ....
-Separators :: `/\` /* a block comment
-.......... .. SssZ CCcccccccccccccccc
+Separators :: `
+.......... .. S
+//
+ss
+/\` /* a block comment
+ssZ CCcccccccccccccccc
 that must be seen
 ccccccccccccccccc
 */
