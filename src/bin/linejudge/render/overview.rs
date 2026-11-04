@@ -39,7 +39,7 @@ pub fn render_the_overview(sweep: &Sweep) -> String {
             // Only the tool's name and version head its column, as a screen reader repeats a
             // column's header on every cell it moves to. The totals sit in the row below.
             thead { tr {
-                th scope="col" aria-label="case" { (render_the_search(counted)) }
+                th scope="col" { (render_the_search(counted)) }
                 @for counter in &sweep.counters { (render_one_column_head(counter)) }
             } }
             tbody .summary { tr {
@@ -160,6 +160,8 @@ fn render_one_column_head(counter: &Counter) -> Markup {
         th scope="col" data-counter=(counter.name) {
             div .tname {
                 a href=(format!("{TOOLS_DIR}/{}.html", counter.name)) { (counter.name) }
+                // The two divs sit apart on screen, and a screen reader runs them together.
+                span .visually-hidden { "\u{a0}" }
             }
             div .tver title=(counter.version) { (format_the_version_of(counter)) }
         }
@@ -376,15 +378,18 @@ fn format_the_regions_of(regions: &[Region]) -> String {
         .join(" · ")
 }
 
-// Most tools open their version line by repeating their own name, which the column head has just
-// said in bold.
+// A screen reader announces the column head on every cell in the column, so it holds just the
+// version number. The whole line a tool prints stays in the tooltip.
 fn format_the_version_of(counter: &Counter) -> &str {
-    counter
+    let line = counter
         .version
         .strip_prefix(&counter.name)
         .map(str::trim_start)
         .filter(|rest| !rest.is_empty())
-        .unwrap_or(&counter.version)
+        .unwrap_or(&counter.version);
+    line.split_whitespace()
+        .find(|word| word.starts_with(|c: char| c.is_ascii_digit()))
+        .unwrap_or(line)
 }
 
 // The organisation profile is the repository's parent path, taken from it rather than written out
