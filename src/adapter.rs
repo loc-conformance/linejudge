@@ -47,6 +47,7 @@ const ADAPTER_EXTENSION: &str = "toml";
 const BINARY_PLACEHOLDER: &str = "{binary}";
 const FILE_PLACEHOLDER: &str = "{file}";
 const EXPLAIN_SCRIPTS_PLACEHOLDER: &str = "{explain-scripts}";
+const RELEASE_FILE_ARCHS: [&str; 2] = ["x86_64", "aarch64"];
 const RELEASE_FILE_SYSTEMS: [&str; 4] = ["windows", "linux", "macos", OTHER_SYSTEM];
 const VERSION_FLAG: &str = "--version";
 
@@ -56,6 +57,8 @@ const VERSION_FLAG: &str = "--version";
 pub struct Adapter {
     /// The counter this runs, which is also what its file is named after.
     pub name_of_counter: String,
+    /// `binary-name`, without the extension, which the caller adds for the system it runs on.
+    pub name_of_binary: String,
     /// Where the counter itself lives, for a report that links to it. `None` is not linked.
     pub repository: Option<String>,
     /// The command line it is run with, `{file}` standing for the file, and the arguments of the
@@ -129,6 +132,18 @@ impl Adapter {
                 raw.name
             ));
         }
+        if let Some(named) = &raw.name_of_binary {
+            let file = Path::new(named);
+            let is_plain = file.file_name().and_then(|name| name.to_str()) == Some(named.as_str());
+            let is_exe = file.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
+            if !is_plain || is_exe {
+                return Err(format!(
+                    "{}: binary-name = \"{named}\" has to be the plain file name of the command, \
+                     without .exe",
+                    path.display()
+                ));
+            }
+        }
         if !raw.args.iter().any(|a| a == FILE_PLACEHOLDER) {
             return Err(format!("{} names no {FILE_PLACEHOLDER} to count", path.display()));
         }
@@ -188,11 +203,13 @@ impl Adapter {
                 ));
             }
             for (system, named) in how.file.iter().flatten() {
-                if !RELEASE_FILE_SYSTEMS.contains(&system.as_str()) {
+                if !is_a_release_file_key(system) {
                     return Err(format!(
-                        "{}: {system} is not a system a release file can be named for: it knows {}",
+                        "{}: {system} is not a system a release file can be named for: it knows {}, \
+                         and a system with -{} after it",
                         path.display(),
-                        RELEASE_FILE_SYSTEMS.join(", ")
+                        RELEASE_FILE_SYSTEMS.join(", "),
+                        RELEASE_FILE_ARCHS.join(" or -")
                     ));
                 }
                 if !named.contains(VERSION_PLACEHOLDER) && named.contains(&how.version) {
@@ -295,8 +312,10 @@ impl Adapter {
                 .then_with(|| b.is_major.cmp(&a.is_major))
                 .then_with(|| a.name.cmp(&b.name))
         });
+        let name_of_binary = raw.name_of_binary.unwrap_or_else(|| raw.name.clone());
         Ok(Adapter {
             name_of_counter: raw.name,
+            name_of_binary,
             repository: raw.repository,
             args: raw.args,
             explain_args: raw.explain_args,
@@ -420,7 +439,8 @@ pub struct Acquisition {
     /// measure the same build.
     pub version: String,
     /// The release file to take, named outright per system: `windows`, `linux`, `macos`, and
-    /// `other` for any system not named. `{version}` in a name stands for the version above.
+    /// `other` for any system not named, and a system with `-x86_64` or `-aarch64`, tried first.
+    /// `{version}` in a name stands for the version above.
     pub file: Option<BTreeMap<String, String>>,
 }
 
@@ -559,10 +579,21 @@ fn run_counter(binary: &Path, args: &[String]) -> Result<String, String> {
     String::from_utf8(output.stdout).map_err(|e| format!("{} printed no text: {e}", binary.display()))
 }
 
+fn is_a_release_file_key(key: &str) -> bool {
+    RELEASE_FILE_SYSTEMS.contains(&key)
+        || key.split_once('-').is_some_and(|(system, arch)| {
+            system != OTHER_SYSTEM
+                && RELEASE_FILE_SYSTEMS.contains(&system)
+                && RELEASE_FILE_ARCHS.contains(&arch)
+        })
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawAdapter {
     name: String,
+    #[serde(rename = "binary-name")]
+    name_of_binary: Option<String>,
     repository: Option<String>,
     output: Option<OutputFormat>,
     args: Vec<String>,
@@ -804,6 +835,37 @@ mod tests {
         let sound = read("an_acquisition_with_nothing_wrong", &format!("{base}{table}"));
         let how = sound.unwrap().acquisition.unwrap();
         assert_eq!(how.file.unwrap()["other"], "t-{version}.pl");
+
+        let per_arch = read("a_release_file_per_architecture",
+                &format!("{base}[acquisition.file]\nlinux-aarch64 = \"t-{{version}}\"\n"));
+        assert!(per_arch.is_ok(), "{:?}", per_arch.unwrap_err());
+        for unknown in ["linux-i686", "other-aarch64"] {
+            let refused = read("a_release_file_for_an_unknown_architecture",
+                    &format!("{base}[acquisition.file]\n{unknown} = \"t-{{version}}\"\n"));
+            assert!(refused.unwrap_err().contains("-x86_64 or -aarch64"), "{unknown}");
+        }
+    }
+
+    #[test]
+    fn the_binary_name_is_read_from_the_adapter_and_defaults_to_the_counter() {
+        let base = "name = \"tokei\"\noutput = \"tokei-json\"\nargs = [\"{file}\"]\n\
+                    [variation.default]\ndialect = \"default\"\nmajor = true\nargs = []\n";
+        let read = |dir: &str, text: &str| {
+            let path = write_an_adapter(dir, text);
+            let outcome = Adapter::read(&path, &read_the_shipped_dialects());
+            fs::remove_dir_all(path.parent().unwrap()).unwrap();
+            outcome
+        };
+        assert_eq!(read("an_adapter_naming_no_binary", base).unwrap().name_of_binary, "tokei");
+        let named = read("an_adapter_naming_its_binary",
+                &base.replace("args = [\"{file}\"]", "binary-name = \"tk\"\nargs = [\"{file}\"]"));
+        assert_eq!(named.unwrap().name_of_binary, "tk");
+        for crooked in ["../tk", "bin/tk", "", "tk.exe", "tk.EXE"] {
+            let refused = read("an_adapter_naming_a_binary_with_a_path",
+                    &base.replace("args = [\"{file}\"]",
+                            &format!("binary-name = \"{crooked}\"\nargs = [\"{{file}}\"]")));
+            assert!(refused.unwrap_err().contains("plain file name"), "{crooked}");
+        }
     }
 
     #[test]

@@ -10,8 +10,12 @@ const PARTIAL_SUFFIX: &str = ".partial";
 // A downloaded counter lives where linejudge keeps its own files and never in anybody's tree. The
 // version is part of the directory name, so two projects that pinned two versions do not overwrite
 // one another.
-pub fn find_the_binary_of(name_of_counter: &str, version: &str) -> Option<PathBuf> {
-    let named = format!("{name_of_counter}{EXE_SUFFIX}");
+pub fn find_the_binary_of(
+    name_of_counter: &str,
+    name_of_binary: &str,
+    version: &str,
+) -> Option<PathBuf> {
+    let named = format!("{name_of_binary}{EXE_SUFFIX}");
     find_the_app_dirs()
         .into_iter()
         .map(|root| name_the_dir_under(&root, name_of_counter, version).join(&named))
@@ -59,20 +63,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_downloaded_counter_is_found_under_its_own_name_and_the_version_it_was_pinned_at() {
+    fn a_downloaded_counter_is_found_under_its_binary_in_the_directory_of_its_name_and_version() {
         let counter = "a-counter-no-machine-has";
         let root = find_the_app_dirs().last().unwrap().join(BIN_DIR);
         let dir = root.join(format!("{counter}-1.2.3"));
-        let binary = dir.join(format!("{counter}{EXE_SUFFIX}"));
+        let binary = dir.join(format!("acnmh{EXE_SUFFIX}"));
         let _ = fs::remove_dir_all(&dir);
-        assert!(find_the_binary_of(counter, "1.2.3").is_none());
+        assert!(find_the_binary_of(counter, "acnmh", "1.2.3").is_none());
 
         fs::create_dir_all(&dir).unwrap();
         fs::write(&binary, "not really a binary").unwrap();
-        let found = find_the_binary_of(counter, "1.2.3");
-        let other = find_the_binary_of(counter, "1.2.4");
+        let found = find_the_binary_of(counter, "acnmh", "1.2.3");
+        let by_its_name = find_the_binary_of(counter, counter, "1.2.3");
+        let other = find_the_binary_of(counter, "acnmh", "1.2.4");
         fs::remove_dir_all(&dir).unwrap();
         assert_eq!(found.unwrap(), binary);
+        assert!(by_its_name.is_none(), "the file goes by the binary and the directory by the counter");
         assert!(other.is_none(), "another version is another directory");
     }
 
@@ -81,13 +87,13 @@ mod tests {
         let counter = "another-counter-no-machine-has";
         let partial = create_a_partial_dir_for(counter, "2.0.0").unwrap();
         fs::write(partial.join("half-a-file"), "not really a binary").unwrap();
-        assert!(find_the_binary_of(counter, "2.0.0").is_none(), "half of one is not one");
+        assert!(find_the_binary_of(counter, counter, "2.0.0").is_none(), "half of one is not one");
 
         let started_again = create_a_partial_dir_for(counter, "2.0.0").unwrap();
         let left = started_again.join("half-a-file").exists();
         fs::write(started_again.join(format!("{counter}{EXE_SUFFIX}")), "a binary").unwrap();
         let dir = finish_the_partial_dir(&started_again).unwrap();
-        let found = find_the_binary_of(counter, "2.0.0");
+        let found = find_the_binary_of(counter, counter, "2.0.0");
         fs::remove_dir_all(&dir).unwrap();
         assert!(!left, "the second attempt started from what the first left");
         assert_eq!(found.unwrap(), dir.join(format!("{counter}{EXE_SUFFIX}")));

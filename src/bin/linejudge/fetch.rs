@@ -43,7 +43,7 @@ pub fn fetch_every_counter(
                     "its adapter does not say where to download it from, so it is skipped"))?;
             continue;
         };
-        let arrived = match find_the_binary_of(name_of_counter, &how.version) {
+        let arrived = match find_the_binary_of(name_of_counter, &adapter.name_of_binary, &how.version) {
             Some(there) => Ok((there, "is already here")),
             None => fetch_one_counter(out, adapter, how).map(|binary| (binary, "is ready")),
         };
@@ -82,11 +82,12 @@ fn fetch_one_counter(
     how: &Acquisition,
 ) -> Result<PathBuf, String> {
     let name_of_counter = &adapter.name_of_counter;
+    let name_of_binary = &adapter.name_of_binary;
     let partial = create_a_partial_dir_for(name_of_counter, &how.version)?;
     let assembled = match how.channel.as_str() {
-        CRATES_IO => build_from_crates_io(out, name_of_counter, how, &partial),
-        GITHUB_RELEASE_ASSET => download_a_release_asset(out, name_of_counter, how, &partial),
-        GITHUB_RELEASE_FILE => download_a_named_release_file(out, name_of_counter, how, &partial),
+        CRATES_IO => build_from_crates_io(out, name_of_binary, how, &partial),
+        GITHUB_RELEASE_ASSET => download_a_release_asset(out, name_of_binary, how, &partial),
+        GITHUB_RELEASE_FILE => download_a_named_release_file(out, name_of_binary, how, &partial),
         other => Err(format!(
             "{other} is not a channel this program knows: it knows {}",
             CHANNELS.join(", ")
@@ -108,7 +109,7 @@ fn fetch_one_counter(
         ));
     }
     let dir = finish_the_partial_dir(&partial)?;
-    Ok(dir.join(format!("{name_of_counter}{EXE_SUFFIX}")))
+    Ok(dir.join(format!("{name_of_binary}{EXE_SUFFIX}")))
 }
 
 // crates.io holds source and never an executable, so this channel is a compile and needs cargo on
@@ -116,7 +117,7 @@ fn fetch_one_counter(
 // binary is lifted out of there and the rest of what cargo wrote is left behind.
 fn build_from_crates_io(
     out: &mut dyn Write,
-    name_of_counter: &str,
+    name_of_binary: &str,
     how: &Acquisition,
     into: &Path,
 ) -> Result<PathBuf, String> {
@@ -127,13 +128,15 @@ fn build_from_crates_io(
             .map(str::to_string);
     let asked: Vec<&str> = installing.iter().map(String::as_str).collect();
     run_the_program("cargo", &asked).map_err(Refusal::into_words)?;
-    let named = format!("{name_of_counter}{EXE_SUFFIX}");
+    let named = format!("{name_of_binary}{EXE_SUFFIX}");
     let built = root.join("bin").join(&named);
     if !built.is_file() {
         return Err(format!(
-            "cargo built {} {} and no {named} came out of it, so the crate installs its command \
-             under another name",
-            how.name, how.version
+            "cargo built {} {} as {} and no {named} came out of it; set binary-name to the \
+             command, without .exe",
+            how.name,
+            how.version,
+            list_the_file_names_in(&root.join("bin")).join(", ")
         ));
     }
     let binary = into.join(&named);
@@ -146,7 +149,7 @@ fn build_from_crates_io(
 // the checksums published beside it say whether the download arrived whole.
 fn download_a_release_asset(
     out: &mut dyn Write,
-    name_of_counter: &str,
+    name_of_binary: &str,
     how: &Acquisition,
     into: &Path,
 ) -> Result<PathBuf, String> {
@@ -164,23 +167,23 @@ fn download_a_release_asset(
         format!("{downloaded} could not be unpacked: {}", refused.into_words())
     })?;
     let _ = fs::remove_file(&archive);
-    let named = format!("{name_of_counter}{EXE_SUFFIX}");
+    let named = format!("{name_of_binary}{EXE_SUFFIX}");
     find_the_file_named(&named, into).ok_or_else(|| {
-        format!("{downloaded} holds no {named}, so this counter is packed under another name")
+        format!("{downloaded} holds no {named}; set binary-name to the command it holds, without .exe")
     })
 }
 
 // The release publishes plain files whose names say nothing about systems, so the adapter names
-// the one to take for each system outright. Nothing is unpacked, so it is saved straight under
-// the name the lookup goes by. A script among them runs off its own first line, which names its
-// interpreter, once it is marked runnable.
+// the one to take for each system, or for each system and architecture, outright. Nothing is
+// unpacked, so it is saved straight under the name the lookup goes by. A script among them runs
+// off its own first line, which names its interpreter, once it is marked runnable.
 fn download_a_named_release_file(
     out: &mut dyn Write,
-    name_of_counter: &str,
+    name_of_binary: &str,
     how: &Acquisition,
     into: &Path,
 ) -> Result<PathBuf, String> {
-    let wanted = choose_the_file_for(how, OS)?;
+    let wanted = choose_the_file_for(how, OS, ARCH)?;
     let release = find_the_release_of(&how.name, &how.version)?;
     let asset = release.assets.iter().find(|asset| asset.name == wanted).ok_or_else(|| {
         format!(
@@ -189,20 +192,24 @@ fn download_a_named_release_file(
         )
     })?;
     say(out, &format!("downloading {wanted}"))?;
-    let binary = into.join(format!("{name_of_counter}{EXE_SUFFIX}"));
+    let binary = into.join(format!("{name_of_binary}{EXE_SUFFIX}"));
     save_a_url(&asset.browser_download_url, &binary)?;
     check_it_arrived_whole(&release.assets, &wanted, &binary)?;
     mark_it_runnable(&binary)?;
     Ok(binary)
 }
 
-fn choose_the_file_for(how: &Acquisition, os: &str) -> Result<String, String> {
+fn choose_the_file_for(how: &Acquisition, os: &str, arch: &str) -> Result<String, String> {
     let files = how.file.as_ref().ok_or_else(|| {
         format!("{GITHUB_RELEASE_FILE} needs an [acquisition.file] table naming the file to take")
     })?;
-    let named = files.get(os).or_else(|| files.get(OTHER_SYSTEM)).ok_or_else(|| {
-        format!("its adapter names no release file for {os} and none for {OTHER_SYSTEM}")
-    })?;
+    let named = files
+        .get(&format!("{os}-{arch}"))
+        .or_else(|| files.get(os))
+        .or_else(|| files.get(OTHER_SYSTEM))
+        .ok_or_else(|| {
+            format!("its adapter names no release file for {os} on {arch} and none for {OTHER_SYSTEM}")
+        })?;
     Ok(named.replace(VERSION_PLACEHOLDER, &how.version))
 }
 
@@ -374,6 +381,17 @@ fn find_the_file_named(named: &str, under: &Path) -> Option<PathBuf> {
         .find_map(|dir| find_the_file_named(named, &dir))
 }
 
+fn list_the_file_names_in(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
 pub(crate) fn read_a_url(url: &str) -> Result<String, String> {
     match find_the_header_for(url) {
         Some(header) => download_with_curl_or_wget(
@@ -500,18 +518,37 @@ mod tests {
     #[test]
     fn a_named_release_file_is_chosen_by_system_and_other_stands_for_the_rest() {
         let how = an_acquisition(&[("windows", "cloc-{version}.exe"), ("other", "cloc-{version}.pl")]);
-        assert_eq!(choose_the_file_for(&how, "windows").unwrap(), "cloc-2.10.exe");
-        assert_eq!(choose_the_file_for(&how, "linux").unwrap(), "cloc-2.10.pl");
-        assert_eq!(choose_the_file_for(&how, "macos").unwrap(), "cloc-2.10.pl");
+        assert_eq!(choose_the_file_for(&how, "windows", "x86_64").unwrap(), "cloc-2.10.exe");
+        assert_eq!(choose_the_file_for(&how, "linux", "x86_64").unwrap(), "cloc-2.10.pl");
+        assert_eq!(choose_the_file_for(&how, "macos", "aarch64").unwrap(), "cloc-2.10.pl");
 
         let windows_only = an_acquisition(&[("windows", "cloc-{version}.exe")]);
-        let refused = choose_the_file_for(&windows_only, "linux").unwrap_err();
-        assert!(refused.contains("no release file for linux"), "{refused}");
+        let refused = choose_the_file_for(&windows_only, "linux", "x86_64").unwrap_err();
+        assert!(refused.contains("no release file for linux on x86_64"), "{refused}");
 
         let mut unnamed = an_acquisition(&[]);
         unnamed.file = None;
-        let refused = choose_the_file_for(&unnamed, "windows").unwrap_err();
+        let refused = choose_the_file_for(&unnamed, "windows", "x86_64").unwrap_err();
         assert!(refused.contains("[acquisition.file]"), "{refused}");
+    }
+
+    #[test]
+    fn a_release_file_for_the_architecture_comes_before_the_one_for_the_system() {
+        let how = an_acquisition(&[
+            ("windows", "cs-x86_64-pc-windows-gnu.exe"),
+            ("windows-aarch64", "cs-aarch64-pc-windows-gnullvm.exe"),
+            ("linux-x86_64", "cs-x86_64-unknown-linux-gnu"),
+            ("linux-aarch64", "cs-aarch64-unknown-linux-gnu"),
+            ("other", "cs-aarch64-apple-darwin"),
+        ]);
+        for (os, arch, wanted) in [
+            ("windows", "x86_64", "cs-x86_64-pc-windows-gnu.exe"),
+            ("windows", "aarch64", "cs-aarch64-pc-windows-gnullvm.exe"),
+            ("linux", "aarch64", "cs-aarch64-unknown-linux-gnu"),
+            ("macos", "x86_64", "cs-aarch64-apple-darwin"),
+        ] {
+            assert_eq!(choose_the_file_for(&how, os, arch).unwrap(), wanted, "{os} on {arch}");
+        }
     }
 
     #[test]

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0, unreleased
+
+Breaking:
+
+- Cases 3020, 3050, 4030 and 4080 now hold a multi-line string with a line inside it that looks
+  like a comment. A counter that reads no string there fails them where it used to pass by
+  accident. Measured against the 0.3.0 records, they catch previously masked failures in cloc
+  (all four, in `default` and `docstring-as-code`), scc (3020, 4030) and tokei (3020, 4030).
+  Regenerate recorded answers with `linejudge record --counter <name>`.
+
+New:
+
+- Case 2200: a Zig `\\` multiline string whose first line holds `//` and whose second holds a
+  lone double quote.
+- An adapter can set `binary-name`, the command a counter is downloaded and run under when that
+  is not its name.
+- `[acquisition.file]` takes a file per system and architecture, such as `linux-aarch64`, which is
+  tried before the file for the system.
+
+Other:
+
+- `record` writes a note holding backslashes so that it reads back as the same text.
+
 ## 0.3.0, 2026-10-29
 
 The corpus grows to 95 active cases and tightens 38 existing cases so that a counter cannot pass a

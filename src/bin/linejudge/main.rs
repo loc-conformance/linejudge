@@ -429,8 +429,10 @@ fn run(args: Vec<String>) -> Result<bool, Trouble> {
             adapters
                 .iter()
                 .find(|adapter| adapter.name_of_counter == name_of_counter)
-                .and_then(|adapter| adapter.acquisition.as_ref())
-                .and_then(|how| fetched::find_the_binary_of(name_of_counter, &how.version))
+                .and_then(|adapter| {
+                    let how = adapter.acquisition.as_ref()?;
+                    fetched::find_the_binary_of(name_of_counter, &adapter.name_of_binary, &how.version)
+                })
         })
     };
 
