@@ -313,7 +313,7 @@ fn write_the_note(
     if note.contains("\"\"\"") {
         return Err(format!("the note on {}.{} holds a \"\"\", which cannot be written", key.0, key.1));
     }
-    let _ = writeln!(text, "note = \"\"\"\n{note}\"\"\"");
+    let _ = writeln!(text, "note = \"\"\"\n{}\"\"\"", note.replace('\\', "\\\\"));
     Ok(())
 }
 
@@ -475,5 +475,16 @@ mod tests {
             .err()
             .unwrap_or_else(|| panic!("it was written anyway"));
         assert!(refused.contains("cannot be written"), "{refused}");
+    }
+
+    #[test]
+    fn a_note_holding_backslashes_reads_back_as_the_same_text() {
+        let note = r"Zig opens a line string with \\, and \n here is a backslash and a letter";
+        let key = ("1010-a_case".to_string(), "default".to_string());
+        let mut text = String::from("[answer.1010-a_case.default]\n");
+        write_the_note(&mut text, &key, Some(note)).unwrap();
+        let read: toml::Value = toml::from_str(&text)
+            .unwrap_or_else(|e| panic!("what was written does not parse: {e}\n{text}"));
+        assert_eq!(read["answer"]["1010-a_case"]["default"]["note"].as_str(), Some(note), "{text}");
     }
 }
