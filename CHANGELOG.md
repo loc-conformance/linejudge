@@ -22,6 +22,8 @@ New:
 Other:
 
 - `record` writes a note holding backslashes so that it reads back as the same text.
+- mezura 3.4.0 declared, with its answers recorded over all 96 cases. It now passes 2200 under
+  `content`.
 
 ## 0.3.0, 2026-10-29
 
