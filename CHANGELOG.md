@@ -18,12 +18,17 @@ New:
   is not its name.
 - `[acquisition.file]` takes a file per system and architecture, such as `linux-aarch64`, which is
   tried before the file for the system.
+- `{empty-file}` in an adapter's arguments is an empty file, to point a counter's configuration
+  flag at.
 
 Other:
 
 - `record` writes a note holding backslashes so that it reads back as the same text.
 - mezura 3.4.0 declared, with its answers recorded over all 96 cases. It now passes 2200 under
   `content`.
+- scc is run with `--no-config`, so a `.sccconfig` on the machine no longer changes its answers.
+- cloc is run with `--config` pointed at an empty file, so an `options.txt` on the machine no
+  longer changes its answers.
 
 ## 0.3.0, 2026-10-29
 

@@ -1,9 +1,9 @@
 name       = "scc"
 repository = "https://github.com/boyter/scc"
-args       = ["--format", "json", "{file}"]
+args       = ["--format", "json", "--no-config", "{file}"]
 # The trace prints one `line N ended with state: S: counted as X` per line of the file, which is
 # scc's own per-line answer even though its JSON never carries one.
-explain-args   = ["-t", "--no-cocomo", "--format", "json", "{file}"]
+explain-args   = ["-t", "--no-cocomo", "--format", "json", "--no-config", "{file}"]
 explain-output = "scc-trace"
 
 [acquisition]

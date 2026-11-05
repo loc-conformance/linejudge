@@ -46,6 +46,8 @@ pub const UNKNOWN_VERSION: &str = "unknown version";
 const ADAPTER_EXTENSION: &str = "toml";
 const BINARY_PLACEHOLDER: &str = "{binary}";
 const FILE_PLACEHOLDER: &str = "{file}";
+const EMPTY_FILE_PLACEHOLDER: &str = "{empty-file}";
+const EMPTY_FILE_NAME: &str = "linejudge-empty-file";
 const EXPLAIN_SCRIPTS_PLACEHOLDER: &str = "{explain-scripts}";
 const RELEASE_FILE_ARCHS: [&str; 2] = ["x86_64", "aarch64"];
 const RELEASE_FILE_SYSTEMS: [&str; 4] = ["windows", "linux", "macos", OTHER_SYSTEM];
@@ -339,6 +341,7 @@ impl Adapter {
         binary: &Path,
         file: &Path,
     ) -> Result<Option<Answer>, String> {
+        write_the_empty_file_if_named(&self.args, variation)?;
         let args = self.build_args(variation, file);
         let printed = run_counter(binary, &args)?;
         match &variation.reader {
@@ -376,6 +379,9 @@ impl Adapter {
         scripts: &[PathBuf],
     ) -> Option<Result<String, String>> {
         let base = self.explain_args.as_ref()?;
+        if let Err(refused) = write_the_empty_file_if_named(base, variation) {
+            return Some(Err(refused));
+        }
         // A wrapper named by `explain-command` takes the counter as `{binary}`; otherwise the
         // counter is run directly.
         let (program, args) = match &self.explain_command {
@@ -513,12 +519,24 @@ fn name_every_one_of(dirs: &[PathBuf]) -> String {
 }
 
 fn build_command_args(base: &[String], variation: &Variation, file: &Path) -> Vec<String> {
-    let mut args: Vec<String> = base
-        .iter()
+    let empty = find_the_empty_file().display().to_string();
+    base.iter()
         .map(|a| a.replace(FILE_PLACEHOLDER, &file.display().to_string()))
-        .collect();
-    args.extend(variation.args.iter().cloned());
-    args
+        .chain(variation.args.iter().cloned())
+        .map(|a| a.replace(EMPTY_FILE_PLACEHOLDER, &empty))
+        .collect()
+}
+
+fn find_the_empty_file() -> PathBuf {
+    env::temp_dir().join(EMPTY_FILE_NAME)
+}
+
+fn write_the_empty_file_if_named(base: &[String], variation: &Variation) -> Result<(), String> {
+    if !base.iter().chain(&variation.args).any(|a| a.contains(EMPTY_FILE_PLACEHOLDER)) {
+        return Ok(());
+    }
+    let empty = find_the_empty_file();
+    fs::write(&empty, "").map_err(|e| format!("{} could not be written: {e}", empty.display()))
 }
 
 // A wrapper is handed the counter it speaks for and the directory it was itself written to, since
@@ -878,6 +896,18 @@ mod tests {
     }
 
     #[test]
+    fn the_empty_file_placeholder_becomes_a_file_that_exists_and_holds_nothing() {
+        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
+        let cloc = adapters.iter().find(|a| a.name_of_counter == "cloc").unwrap();
+        let args = cloc.build_args(&cloc.variations[0], Path::new("input.c"));
+        let at = args.iter().position(|a| a == "--config").unwrap();
+        assert!(!args[at + 1].contains(EMPTY_FILE_PLACEHOLDER), "{args:?}");
+        write_the_empty_file_if_named(&cloc.args, &cloc.variations[0]).unwrap();
+        assert_eq!(fs::read_to_string(&args[at + 1]).unwrap(), "");
+    }
+
+    #[test]
     fn the_per_line_command_is_declared_per_counter_and_has_to_name_the_file() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
@@ -886,12 +916,15 @@ mod tests {
         let scripts = scripts.as_slice();
         assert_eq!(
             scc.explain_args.as_deref().unwrap(),
-            ["-t", "--no-cocomo", "--format", "json", "{file}"]
+            ["-t", "--no-cocomo", "--format", "json", "--no-config", "{file}"]
         );
         assert_eq!(scc.explain_output, Some(PerLineFormat::SccTrace));
 
         let cloc = &adapters[0];
-        assert_eq!(cloc.explain_args.as_deref().unwrap(), ["--print-filter-stages", "--json", "{file}"]);
+        assert_eq!(
+            cloc.explain_args.as_deref().unwrap(),
+            ["--print-filter-stages", "--json", "--config", "{empty-file}", "{file}"]
+        );
         assert_eq!(cloc.explain_output, Some(PerLineFormat::ClocStages));
 
         let tokei = &adapters[3];
