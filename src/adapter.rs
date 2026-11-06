@@ -644,6 +644,12 @@ struct RawVariation {
 }
 
 #[cfg(test)]
+pub(crate) fn the_shipped_adapter_of(name_of_counter: &str) -> Adapter {
+    let dirs = [Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
+    Adapter::read_one(&dirs, name_of_counter, &crate::dialects::read_the_shipped_dialects()).unwrap()
+}
+
+#[cfg(test)]
 mod tests {
     use std::env;
 
@@ -677,9 +683,7 @@ mod tests {
 
     #[test]
     fn the_command_a_report_prints_is_written_from_where_the_run_works() {
-        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
+        let tokei = the_shipped_adapter_of("tokei");
         let here = env::current_dir().unwrap();
 
         let under = here.join("cases").join("0400-a_case").join("input.c");
@@ -891,9 +895,7 @@ mod tests {
 
     #[test]
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
-        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
+        let mezura = the_shipped_adapter_of("mezura");
         let args = mezura.build_args(&mezura.variations[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
@@ -901,9 +903,7 @@ mod tests {
 
     #[test]
     fn the_empty_file_placeholder_becomes_a_file_that_exists_and_holds_nothing() {
-        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let cloc = adapters.iter().find(|a| a.name_of_counter == "cloc").unwrap();
+        let cloc = the_shipped_adapter_of("cloc");
         let args = cloc.build_args(&cloc.variations[0], Path::new("input.c"));
         let at = args.iter().position(|a| a == "--config").unwrap();
         assert!(!args[at + 1].contains(EMPTY_FILE_PLACEHOLDER), "{args:?}");
@@ -913,9 +913,7 @@ mod tests {
 
     #[test]
     fn the_per_line_command_is_declared_per_counter_and_has_to_name_the_file() {
-        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let scc = adapters.iter().find(|a| a.name_of_counter == "scc").unwrap();
+        let scc = the_shipped_adapter_of("scc");
         let scripts = [PathBuf::from(EXPLAIN_SCRIPTS_DIR)];
         let scripts = scripts.as_slice();
         assert_eq!(
@@ -924,14 +922,14 @@ mod tests {
         );
         assert_eq!(scc.explain_output, Some(PerLineFormat::SccTrace));
 
-        let cloc = adapters.iter().find(|a| a.name_of_counter == "cloc").unwrap();
+        let cloc = the_shipped_adapter_of("cloc");
         assert_eq!(
             cloc.explain_args.as_deref().unwrap(),
             ["--print-filter-stages", "--json", "--config", "{empty-file}", "{file}"]
         );
         assert_eq!(cloc.explain_output, Some(PerLineFormat::ClocStages));
 
-        let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
+        let tokei = the_shipped_adapter_of("tokei");
         assert!(tokei.explain_args.is_none());
         assert!(
             tokei
@@ -952,10 +950,8 @@ mod tests {
 
     #[test]
     fn explain_args_and_explain_output_are_declared_together_or_not_at_all() {
-        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
-        let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
+        let mezura = the_shipped_adapter_of("mezura");
+        let tokei = the_shipped_adapter_of("tokei");
         assert_eq!(mezura.explain_output, Some(PerLineFormat::LinejudgePerLine));
         assert_eq!(tokei.explain_output, None);
 
@@ -982,8 +978,7 @@ mod tests {
 
     #[test]
     fn a_version_nobody_answers_is_unknown_and_stops_nothing() {
-        let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let tokei = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[3];
+        let tokei = the_shipped_adapter_of("tokei");
         assert_eq!(tokei.version_flag.as_deref(), Some("--version"));
         assert_eq!(tokei.read_version_or_unknown(Path::new("a-binary-that-does-not-exist")), "unknown version");
 

@@ -440,7 +440,7 @@ mod tests {
     use std::slice;
 
     use crate::adapter::UNKNOWN_VERSION;
-    use crate::adapter::{Adapter, is_the_declared_version};
+    use crate::adapter::{Adapter, is_the_declared_version, the_shipped_adapter_of};
     use crate::corpus::Corpus;
     use crate::deriver::derive_answer;
     use crate::dialects::read_the_shipped_dialects;
@@ -876,11 +876,6 @@ same-as = "stripstr"
             RecordedAnswers::read(slice::from_ref(&dir), &the_shipped_adapter_of(name_of_counter));
         fs::remove_dir_all(&dir).unwrap();
         read
-    }
-
-    fn the_shipped_adapter_of(name_of_counter: &str) -> Adapter {
-        let dirs = [Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        Adapter::read_one(&dirs, name_of_counter, &read_the_shipped_dialects()).unwrap()
     }
 
     fn read_a_broken_record(name: &str, text: &str) -> Faults {
