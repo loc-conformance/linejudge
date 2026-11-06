@@ -388,7 +388,12 @@ fn format_the_version_of(counter: &Counter) -> &str {
         .filter(|rest| !rest.is_empty())
         .unwrap_or(&counter.version);
     line.split_whitespace()
-        .find(|word| word.starts_with(|c: char| c.is_ascii_digit()))
+        .find(|word| {
+            word.strip_prefix(['v', 'V'])
+                .unwrap_or(word)
+                .starts_with(|c: char| c.is_ascii_digit())
+        })
+        .map(|word| word.trim_end_matches(','))
         .unwrap_or(line)
 }
 
@@ -505,9 +510,43 @@ mod tests {
 
         answer.verdict = Verdict::Agrees;
         answer.broke = None;
+        let plain = render_one_answer(&answer).into_string();
+        assert!(plain.contains("<span class=\"visually-hidden\">agrees</span>"), "{plain}");
+
+        answer.note = Some("a note".to_string());
+        let noted = render_one_answer(&answer).into_string();
+        assert!(
+            noted.contains("<span class=\"visually-hidden\">agrees, with a note</span>"),
+            "{noted}"
+        );
+
         answer.exception = Some("counts the shebang as comment".to_string());
         let shown = render_one_answer(&answer).into_string();
         assert!(shown.contains("declared intent: counts the shebang as comment"), "{shown}");
+    }
+
+    #[test]
+    fn the_column_head_keeps_the_version_token_and_drops_the_words_around_it() {
+        let shown = |name: &str, version: &str| {
+            let counter = Counter {
+                name: name.to_string(),
+                version: version.to_string(),
+                variations: Vec::new(),
+            };
+            format_the_version_of(&counter).to_string()
+        };
+        assert_eq!(shown("cloc", "2.10"), "2.10");
+        assert_eq!(shown("mezura", "v3.4.0 (2026-11-05)"), "v3.4.0");
+        assert_eq!(shown("mezura", "v3.4.0-rc.1 (2026-11-05)"), "v3.4.0-rc.1");
+        assert_eq!(shown("scc", "scc version 4.1.0"), "4.1.0");
+        assert_eq!(
+            shown("tokei", "tokei 15.0.0 compiled with serialization support: json"),
+            "15.0.0"
+        );
+        assert_eq!(shown("gocloc", "gocloc version v0.4.3 2025-01-10"), "v0.4.3");
+        assert_eq!(shown("polyglot", "polyglot version 0.5.29, (C) 2019"), "0.5.29");
+        assert_eq!(shown("mytool", "mytool git-8f3a1b"), "git-8f3a1b");
+        assert_eq!(shown("tokei", "unknown version"), "unknown version");
     }
 
     fn counts(lines: u32, buckets: &[(&str, u32)]) -> Counts {

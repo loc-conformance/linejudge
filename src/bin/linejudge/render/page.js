@@ -10,6 +10,16 @@ document.querySelectorAll('.chip.pick').forEach(chip => {
   });
 });
 
+const summary = document.querySelector('tbody.summary');
+if (summary) {
+  const head = summary.closest('table').querySelector('thead');
+  const pin = () => {
+    summary.style.setProperty('--head-height', head.offsetHeight + 'px');
+  };
+  pin();
+  new ResizeObserver(pin).observe(head);
+}
+
 // Ticking a tool off hides its column and shrinks the table by exactly that column's width, so
 // what is left closes up instead of leaving a gap to scroll past. What was ticked is remembered,
 // because a reader who came to watch two tools wants them still chosen tomorrow.
