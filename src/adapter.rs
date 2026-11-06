@@ -536,6 +536,9 @@ fn write_the_empty_file_if_named(base: &[String], variation: &Variation) -> Resu
         return Ok(());
     }
     let empty = find_the_empty_file();
+    if empty.metadata().is_ok_and(|metadata| metadata.is_file() && metadata.len() == 0) {
+        return Ok(());
+    }
     fs::write(&empty, "").map_err(|e| format!("{} could not be written: {e}", empty.display()))
 }
 

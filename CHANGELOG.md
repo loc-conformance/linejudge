@@ -24,8 +24,10 @@ New:
 Other:
 
 - `record` writes a note holding backslashes so that it reads back as the same text.
-- mezura 3.4.0 declared, with its answers recorded over all 96 cases. It now passes 2200 under
-  `content`.
+- `fetch` tries a download or build that failed transiently up to two more times, waiting 4s and
+  12s, and stops on the first attempt when the refusal is final.
+- mezura 3.4.0 declared, fetched from its GitHub release rather than built from crates.io, with its
+  answers recorded over all 96 cases. It now passes 2200 under `content`.
 - scc is run with `--no-config`, so a `.sccconfig` on the machine no longer changes its answers.
 - cloc is run with `--config` pointed at an empty file, so an `options.txt` on the machine no
   longer changes its answers.

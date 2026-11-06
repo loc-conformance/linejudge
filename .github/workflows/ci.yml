@@ -32,18 +32,35 @@ jobs:
       - name: Cache the cargo registry and the build dir
         uses: Swatinem/rust-cache@v2
 
+      - name: Cache the counters that were downloaded
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.local/share/linejudge/bin
+            ~/Library/Application Support/linejudge/bin
+            ~/AppData/Roaming/linejudge/bin
+          key: counters-${{ runner.os }}-${{ hashFiles('adapters/**') }}
+
       - name: Build
-        run: cargo build --release --verbose
+        run: cargo build --release --locked --verbose
 
       # --all-features on both, and it is not decoration: a binary behind a feature falls out of
       # the lint and out of the suite without it, and neither says so. Measured, a deliberate
       # unused variable inside the gated tool went unreported until --all-features was added, and
       # its ten tests stop running the same way.
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
 
       - name: Test
-        run: cargo test --all-features --verbose
+        run: cargo test --all-features --locked --verbose
+
+      - name: Download the counters
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./target/release/linejudge fetch
+
+      - name: Check the counters against the corpus
+        run: ./target/release/linejudge check
 
       # The corpus is read byte for byte and its answers are compared across machines, so a
       # checkout that rewrote line endings would fail in ways that look like counting bugs.

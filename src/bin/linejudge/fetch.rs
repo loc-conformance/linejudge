@@ -6,6 +6,8 @@ use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 use linejudge::adapter::{Acquisition, Adapter, is_the_declared_version};
 use linejudge::adapter::{
@@ -22,6 +24,18 @@ use crate::style;
 pub(crate) const GITHUB_API: &str = "https://api.github.com/repos";
 
 const CHECKSUM_WORDS: [&str; 2] = ["checksum", "sha256"];
+const RETRY_WAITS: [Duration; 2] = [Duration::from_secs(4), Duration::from_secs(12)];
+const FINAL_REFUSALS: [&str; 9] = [
+    "is not on this machine",
+    "set binary-name to the command",
+    "this release carries no",
+    "cannot pick a file for",
+    "is a file name with a path inside it",
+    "has no release tagged",
+    "could not compile",
+    "error: 401",
+    "error 401",
+];
 // crates.io answers 403 to a request that arrives as plain curl, which reads exactly like a crate
 // that is not there, so every request says who it is and where to complain about it.
 const USER_AGENT: &str =
@@ -83,18 +97,31 @@ fn fetch_one_counter(
 ) -> Result<PathBuf, String> {
     let name_of_counter = &adapter.name_of_counter;
     let name_of_binary = &adapter.name_of_binary;
-    let partial = create_a_partial_dir_for(name_of_counter, &how.version)?;
-    let assembled = match how.channel.as_str() {
-        CRATES_IO => build_from_crates_io(out, name_of_binary, how, &partial),
-        GITHUB_RELEASE_ASSET => download_a_release_asset(out, name_of_binary, how, &partial),
-        GITHUB_RELEASE_FILE => download_a_named_release_file(out, name_of_binary, how, &partial),
-        other => Err(format!(
-            "{other} is not a channel this program knows: it knows {}",
-            CHANNELS.join(", ")
-        )),
+    let release_file = match how.channel.as_str() {
+        CRATES_IO | GITHUB_RELEASE_ASSET => None,
+        GITHUB_RELEASE_FILE => Some(choose_the_file_for(how, OS, ARCH)?),
+        other => {
+            return Err(format!(
+                "{other} is not a channel this program knows: it knows {}",
+                CHANNELS.join(", ")
+            ));
+        }
     };
-    let binary = assembled.inspect_err(|_| {
-        let _ = fs::remove_dir_all(&partial);
+    let (partial, binary) = try_a_few_times(out, &RETRY_WAITS, |out| {
+        let partial = create_a_partial_dir_for(name_of_counter, &how.version)?;
+        let assembled = match &release_file {
+            Some(wanted) => {
+                download_a_named_release_file(out, name_of_binary, how, wanted, &partial)
+            }
+            None if how.channel == CRATES_IO => {
+                build_from_crates_io(out, name_of_binary, how, &partial)
+            }
+            None => download_a_release_asset(out, name_of_binary, how, &partial),
+        };
+        let binary = assembled.inspect_err(|_| {
+            let _ = fs::remove_dir_all(&partial);
+        })?;
+        Ok((partial, binary))
     })?;
     let printed = adapter.read_version(&binary).map_err(|refused| {
         let _ = fs::remove_dir_all(&partial);
@@ -110,6 +137,25 @@ fn fetch_one_counter(
     }
     let dir = finish_the_partial_dir(&partial)?;
     Ok(dir.join(format!("{name_of_binary}{EXE_SUFFIX}")))
+}
+
+fn try_a_few_times<T>(
+    out: &mut dyn Write,
+    waits: &[Duration],
+    mut step: impl FnMut(&mut dyn Write) -> Result<T, String>,
+) -> Result<T, String> {
+    let mut attempt = step(out);
+    for wait in waits {
+        let Err(refused) = &attempt else { return attempt };
+        let lowered = refused.to_ascii_lowercase();
+        if FINAL_REFUSALS.iter().any(|mark| lowered.contains(mark)) {
+            return attempt;
+        }
+        say(out, &format!("{refused}; trying again in {}s", wait.as_secs()))?;
+        thread::sleep(*wait);
+        attempt = step(out);
+    }
+    attempt
 }
 
 // crates.io holds source and never an executable, so this channel is a compile and needs cargo on
@@ -181,9 +227,9 @@ fn download_a_named_release_file(
     out: &mut dyn Write,
     name_of_binary: &str,
     how: &Acquisition,
+    wanted: &str,
     into: &Path,
 ) -> Result<PathBuf, String> {
-    let wanted = choose_the_file_for(how, OS, ARCH)?;
     let release = find_the_release_of(&how.name, &how.version)?;
     let asset = release.assets.iter().find(|asset| asset.name == wanted).ok_or_else(|| {
         format!(
@@ -194,7 +240,7 @@ fn download_a_named_release_file(
     say(out, &format!("downloading {wanted}"))?;
     let binary = into.join(format!("{name_of_binary}{EXE_SUFFIX}"));
     save_a_url(&asset.browser_download_url, &binary)?;
-    check_it_arrived_whole(&release.assets, &wanted, &binary)?;
+    check_it_arrived_whole(&release.assets, wanted, &binary)?;
     mark_it_runnable(&binary)?;
     Ok(binary)
 }
@@ -284,11 +330,16 @@ fn find_the_release_of(repository: &str, version: &str) -> Result<Release, Strin
     // Both tag shapes fail the same way when the version is not there, and one 404 said twice
     // reads as two faults.
     refused.dedup();
-    let said = refused.join("; ");
-    // A 404 is the only answer that means the version is not there.
-    if said.contains("404") {
+    let is_404 = |one: &str| {
+        let lowered = one.to_ascii_lowercase();
+        lowered.contains("error: 404") || lowered.contains("error 404")
+    };
+    if refused.iter().all(|one| is_404(one)) {
+        let said = refused.join("; ");
         return Err(format!("{repository} has no release tagged v{version} or {version}: {said}"));
     }
+    refused.retain(|one| !is_404(one));
+    let said = refused.join("; ");
     Err(format!(
         "github would not say what {repository} released as v{version} or {version}: {said}. \
          Unauthenticated it answers sixty requests an hour per address; GITHUB_TOKEN in the \
@@ -396,9 +447,9 @@ pub(crate) fn read_a_url(url: &str) -> Result<String, String> {
     match find_the_header_for(url) {
         Some(header) => download_with_curl_or_wget(
             &["-sSfL", "-H", &header, url],
-            &["-qO-", "--header", &header, url],
+            &["-nv", "-O-", "--header", &header, url],
         ),
-        None => download_with_curl_or_wget(&["-sSfL", url], &["-qO-", url]),
+        None => download_with_curl_or_wget(&["-sSfL", url], &["-nv", "-O-", url]),
     }
 }
 
@@ -650,6 +701,48 @@ AB12CD34  scc_Windows_x86_64.zip
         let mut quiet = Vec::new();
         report_the_path_that_shadows(&mut quiet, "tokei", &named).unwrap();
         assert!(quiet.is_empty(), "a counter it does not name has nothing to be said about it");
+    }
+
+    #[test]
+    fn a_transient_refusal_is_tried_again_and_a_final_one_stops_on_the_first_attempt() {
+        let waits = [Duration::ZERO, Duration::ZERO];
+        let mut printed = Vec::new();
+        let mut attempts = 0;
+        let outcome = try_a_few_times(&mut printed, &waits, |_| {
+            attempts += 1;
+            match attempts < 3 {
+                true => Err("curl: (56) OpenSSL SSL_read: Connection reset by peer".to_string()),
+                false => Ok("arrived"),
+            }
+        });
+        assert_eq!(outcome.unwrap(), "arrived");
+        assert_eq!(attempts, 3);
+        let said = String::from_utf8(printed).unwrap();
+        assert_eq!(said.matches("trying again in 0s").count(), 2, "{said}");
+
+        for final_refusal in [
+            "cargo is not on this machine",
+            "cs.zip holds no codestats.exe; set binary-name to the command it holds, without .exe",
+            "this release carries no cloc-2.10.pl, only cloc-2.10.tar.gz",
+            "this release carries nothing for linux on x86_64, only scc_Plan9_sparc.tar.gz",
+            "plan9 is a system this program cannot pick a file for",
+            "../scc.zip is a file name with a path inside it",
+            "AlDanial/cloc has no release tagged v9.9.9 or 9.9.9: 404",
+            "error: could not compile `tokei` (bin \"tokei\")",
+            "curl: (22) The requested URL returned error: 401",
+            "https://api.github.com/x:\n ERROR 401: Unauthorized.",
+        ] {
+            let mut printed = Vec::new();
+            let mut attempts = 0;
+            let refused = try_a_few_times(&mut printed, &waits, |_| -> Result<(), String> {
+                attempts += 1;
+                Err(final_refusal.to_string())
+            })
+            .unwrap_err();
+            assert_eq!(attempts, 1, "{final_refusal}");
+            assert_eq!(refused, final_refusal);
+            assert!(printed.is_empty(), "{final_refusal}");
+        }
     }
 
     fn a_release() -> Vec<Asset> {

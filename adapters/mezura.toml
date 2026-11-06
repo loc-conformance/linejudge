@@ -5,8 +5,8 @@ explain-args   = ["{file}", "--explain", "--output", "json", "--no-default-confi
 explain-output = "linejudge-per-line"
 
 [acquisition]
-channel = "crates-io"
-name    = "mezura"
+channel = "github-release-asset"
+name    = "subamanis/mezura"
 version = "3.4.0"
 
 [variation.content]
