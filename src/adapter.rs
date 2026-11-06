@@ -892,7 +892,8 @@ mod tests {
     #[test]
     fn the_file_takes_the_place_of_its_placeholder_and_the_dialect_speaks_last() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
-        let mezura = &Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap()[1];
+        let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
+        let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
         let args = mezura.build_args(&mezura.variations[1], Path::new("a/case/input.rs"));
         assert_eq!(args[0], "a/case/input.rs");
         assert_eq!(args[args.len() - 2..], ["--counting".to_string(), "region".to_string()]);
@@ -914,7 +915,7 @@ mod tests {
     fn the_per_line_command_is_declared_per_counter_and_has_to_name_the_file() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        let scc = &adapters[2];
+        let scc = adapters.iter().find(|a| a.name_of_counter == "scc").unwrap();
         let scripts = [PathBuf::from(EXPLAIN_SCRIPTS_DIR)];
         let scripts = scripts.as_slice();
         assert_eq!(
@@ -923,14 +924,14 @@ mod tests {
         );
         assert_eq!(scc.explain_output, Some(PerLineFormat::SccTrace));
 
-        let cloc = &adapters[0];
+        let cloc = adapters.iter().find(|a| a.name_of_counter == "cloc").unwrap();
         assert_eq!(
             cloc.explain_args.as_deref().unwrap(),
             ["--print-filter-stages", "--json", "--config", "{empty-file}", "{file}"]
         );
         assert_eq!(cloc.explain_output, Some(PerLineFormat::ClocStages));
 
-        let tokei = &adapters[3];
+        let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
         assert!(tokei.explain_args.is_none());
         assert!(
             tokei
@@ -953,8 +954,10 @@ mod tests {
     fn explain_args_and_explain_output_are_declared_together_or_not_at_all() {
         let dirs = vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("adapters")];
         let adapters = Adapter::read_all(&dirs, &read_the_shipped_dialects()).unwrap();
-        assert_eq!(adapters[1].explain_output, Some(PerLineFormat::LinejudgePerLine));
-        assert_eq!(adapters[3].explain_output, None);
+        let mezura = adapters.iter().find(|a| a.name_of_counter == "mezura").unwrap();
+        let tokei = adapters.iter().find(|a| a.name_of_counter == "tokei").unwrap();
+        assert_eq!(mezura.explain_output, Some(PerLineFormat::LinejudgePerLine));
+        assert_eq!(tokei.explain_output, None);
 
         let alone = write_an_adapter(
             "a_format_with_no_command",
