@@ -1,15 +1,4 @@
-document.querySelectorAll('.chip.pick').forEach(chip => {
-  chip.addEventListener('click', () => {
-    const group = chip.dataset.group;
-    document.querySelectorAll('.dv[data-group="' + group + '"]').forEach(shown => {
-      shown.hidden = shown.dataset.value !== chip.dataset.value;
-    });
-    document.querySelectorAll('.chip.pick[data-group="' + group + '"]').forEach(one => {
-      one.classList.toggle('active', one === chip);
-    });
-  });
-});
-
+const board = document.querySelector('.boardscroll');
 const summary = document.querySelector('tbody.summary');
 if (summary) {
   const head = summary.closest('table').querySelector('thead');
@@ -19,6 +8,31 @@ if (summary) {
   pin();
   new ResizeObserver(pin).observe(head);
 }
+
+document.querySelectorAll('.chip.pick').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const cell = chip.closest('td, th');
+    const ceiling = cell && board && board.scrollTop > 0
+      ? cell.getBoundingClientRect().bottom
+      : null;
+    const anchor = ceiling !== null
+      ? [...document.querySelectorAll('tbody:not(.summary) tr:not([hidden])')].find(
+          row => row.getBoundingClientRect().top >= ceiling - 2
+        )
+      : null;
+    const before = anchor ? anchor.getBoundingClientRect().top : 0;
+    const group = chip.dataset.group;
+    document.querySelectorAll('.dv[data-group="' + group + '"]').forEach(shown => {
+      shown.hidden = shown.dataset.value !== chip.dataset.value;
+    });
+    document.querySelectorAll('.chip.pick[data-group="' + group + '"]').forEach(one => {
+      one.classList.toggle('active', one === chip);
+    });
+    if (anchor) {
+      board.scrollTop += anchor.getBoundingClientRect().top - before;
+    }
+  });
+});
 
 // Ticking a tool off hides its column and shrinks the table by exactly that column's width, so
 // what is left closes up instead of leaving a gap to scroll past. What was ticked is remembered,
@@ -87,7 +101,7 @@ if (find) {
     if (group) {
       group.hidden = !anyInGroup;
     }
-    found.textContent = wanted ? `${showing} of ${found.dataset.all}` : found.dataset.all;
+    found.textContent = wanted ? `${showing} of ${found.dataset.all}` : '';
   };
   find.addEventListener('input', show);
   find.addEventListener('keydown', event => {

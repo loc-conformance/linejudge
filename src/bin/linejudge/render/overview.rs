@@ -14,6 +14,10 @@ const OPEN_TIP: &str = "the tool disagrees with its own rules here, and nobody h
                         disagreement yet to say why";
 const UNCLAIMED_TIP: &str = "the tool does not support this file's language, so the case counts \
                              neither for nor against it";
+const OTHER_PASSES_TIP: &str = "this case is counted correctly in a different dialect or \
+                                variation that this counter declares";
+const OTHER_FAILS_TIP: &str = "this case is counted wrong in a different dialect or variation \
+                               that this counter declares";
 
 pub fn render_the_overview(sweep: &Sweep) -> String {
     let counted: usize = sweep
@@ -144,13 +148,14 @@ fn render_the_picker(sweep: &Sweep) -> Markup {
 // The corner above the case names is as wide as they are and would otherwise hold nothing. A
 // corpus this long is read by looking for something, so the box that finds it lives there.
 fn render_the_search(counted: usize) -> Markup {
+    let hint = format!("find a case ({counted} cases)");
     html! {
-        div .found data-all=(format!("{counted} cases")) { (counted) " cases" }
         label .find {
             svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" {
                 path d=(SEARCH_MARK) fill="currentColor" {}
             }
-            input type="search" placeholder="find a case" aria-label="find a case";
+            input type="search" placeholder=(hint) aria-label="find a case";
+            span .found data-all=(format!("{counted} cases")) {}
         }
     }
 }
@@ -211,13 +216,30 @@ fn render_the_state_counts(answers: &[Answer]) -> Markup {
 
 fn render_one_cell(counter: &Counter, name_of_case: &str) -> Markup {
     let multi = counter.variations.len() > 1;
+    let mut any_agrees = false;
+    let mut any_fails = false;
+    if multi {
+        for variation in &counter.variations {
+            if let Some(answer) = variation.answers.iter().find(|one| one.case == name_of_case) {
+                any_agrees |= answer.verdict == Verdict::Agrees;
+                any_fails |= answer.verdict == Verdict::Fails;
+            }
+        }
+    }
     html! {
         td data-counter=(counter.name) {
             @for (at, variation) in counter.variations.iter().enumerate() {
                 @let answer = variation.answers.iter().find(|one| one.case == name_of_case);
                 @if multi {
                     div .dv data-group=(counter.name) data-value=(variation.name) hidden[at > 0] {
-                        @if let Some(answer) = answer { (render_one_answer(answer)) }
+                        @if let Some(answer) = answer {
+                            (render_one_answer(answer))
+                            @if answer.verdict == Verdict::Agrees && any_fails {
+                                span .corner.corner-fail.tip data-tip=(OTHER_FAILS_TIP) {}
+                            } @else if answer.verdict == Verdict::Fails && any_agrees {
+                                span .corner.corner-pass.tip data-tip=(OTHER_PASSES_TIP) {}
+                            }
+                        }
                     }
                 } @else {
                     @if let Some(answer) = answer { (render_one_answer(answer)) }
@@ -547,6 +569,53 @@ mod tests {
         assert_eq!(shown("polyglot", "polyglot version 0.5.29, (C) 2019"), "0.5.29");
         assert_eq!(shown("mytool", "mytool git-8f3a1b"), "git-8f3a1b");
         assert_eq!(shown("tokei", "unknown version"), "unknown version");
+    }
+
+    #[test]
+    fn a_cell_marks_when_another_variation_reaches_the_opposite_verdict() {
+        let answer_with = |verdict: Verdict| Answer {
+            case: "2010-a_case".to_string(),
+            verdict,
+            wants: Some(counts(2, &[("code", 2)])),
+            answered: Some(counts(2, &[("code", 1)])),
+            wants_regions: Vec::new(),
+            answered_regions: Vec::new(),
+            note: Some("reason".to_string()),
+            exception: None,
+            broke: None,
+            command: String::new(),
+        };
+        let variation = |name: &str, verdict: Verdict| Variation {
+            name: name.to_string(),
+            dialect: name.to_string(),
+            flags: Vec::new(),
+            major: true,
+            answers: vec![answer_with(verdict)],
+        };
+        let split = Counter {
+            name: "cloc".to_string(),
+            version: "2.10".to_string(),
+            variations: vec![
+                variation("default", Verdict::Fails),
+                variation("stripstr", Verdict::Agrees),
+            ],
+        };
+        let cell = render_one_cell(&split, "2010-a_case").into_string();
+        assert!(cell.contains("corner-pass"), "{cell}");
+        assert!(cell.contains(OTHER_PASSES_TIP), "{cell}");
+        assert!(cell.contains("corner-fail"), "{cell}");
+        assert!(cell.contains(OTHER_FAILS_TIP), "{cell}");
+
+        let agreeing = Counter {
+            name: "mezura".to_string(),
+            version: "v3.4.0".to_string(),
+            variations: vec![
+                variation("content", Verdict::Agrees),
+                variation("region", Verdict::Agrees),
+            ],
+        };
+        let cell = render_one_cell(&agreeing, "2010-a_case").into_string();
+        assert!(!cell.contains("corner"), "{cell}");
     }
 
     fn counts(lines: u32, buckets: &[(&str, u32)]) -> Counts {

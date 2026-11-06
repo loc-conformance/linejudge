@@ -120,6 +120,7 @@ a.why:hover {
 .boardscroll {
   position: relative;
   overflow: auto;
+  overflow-anchor: none;
   scrollbar-gutter: stable;
   max-height: 85vh;
   background: #ffffff;
@@ -185,6 +186,7 @@ td + td {
 }
 
 td {
+  position: relative;
   vertical-align: middle;
 }
 
@@ -198,7 +200,7 @@ thead th {
   z-index: 3;
   background: #ffffff;
   border-bottom: 0.125rem solid #d0d7de;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 th:first-child {
@@ -263,15 +265,17 @@ thead th:first-child {
 }
 
 .found {
-  margin-bottom: .4rem;
+  flex: none;
   color: #8c959f;
   font-size: .78rem;
   font-weight: 400;
+  white-space: nowrap;
 }
 
 .tname {
   font-size: 1.2rem;
   font-weight: 700;
+  line-height: 1.25;
 }
 
 .tver {
@@ -543,6 +547,28 @@ td:last-child .tip:hover::after,
 td:last-child .tip.open::after,
 th:last-child .tip:hover::after,
 th:last-child .tip.open::after {
+  left: auto;
+  right: 0;
+}
+
+.corner.tip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: .65rem;
+  height: .65rem;
+}
+
+.corner-fail {
+  background: linear-gradient(225deg, rgba(207, 34, 46, .5) 50%, transparent 50%);
+}
+
+.corner-pass {
+  background: linear-gradient(225deg, rgba(26, 127, 55, .5) 50%, transparent 50%);
+}
+
+.corner.tip:hover::after,
+.corner.tip.open::after {
   left: auto;
   right: 0;
 }
