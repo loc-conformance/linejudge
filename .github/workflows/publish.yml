@@ -39,10 +39,10 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.local/share/linejudge/bin
-          key: counters-${{ hashFiles('adapters/**') }}
+          key: counters-${{ runner.os }}-${{ hashFiles('adapters/**') }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --locked
 
       # The run stops here if any counter of the roster could not be delivered, and nothing is
       # published. The pages that are live then stay exactly as they were, which is one whole

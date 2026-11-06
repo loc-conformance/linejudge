@@ -178,6 +178,7 @@ td {
 }
 
 th + th,
+th + td,
 td + td {
   border-left: 0.0625rem solid #d8dee4;
 }
@@ -186,7 +187,7 @@ td {
   vertical-align: middle;
 }
 
-tbody tr:last-child td {
+tbody:last-child tr:last-child > * {
   border-bottom: none;
 }
 
@@ -208,6 +209,7 @@ td:first-child {
 }
 
 /* The row below would otherwise paint over a tooltip hanging out of this cell. */
+th:first-child:hover,
 td:first-child:hover {
   z-index: 5;
 }
@@ -361,7 +363,7 @@ thead th:first-child {
   color: #6e7781;
 }
 
-tr.group td {
+tr.group th {
   padding: .4rem .8rem;
   background: #dde4ec;
   border-bottom: 0.0625rem solid #c4cdd8;
@@ -372,31 +374,32 @@ tr.group td {
 }
 
 /* The group's own title stays put while the table scrolls sideways under it. */
-tr.group td span {
+tr.group th span {
   position: sticky;
   left: .8rem;
   display: inline-block;
 }
 
 /* `break-word` only breaks after the number's hyphen, so the underscored tail runs past the cell. */
-td.case {
+th.case {
   font-family: ui-monospace, Consolas, monospace;
   font-size: .85rem;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 
-td.case a {
+th.case a {
   color: #0969da;
   cursor: pointer;
   font-size: 1.05em;
   text-decoration: none;
 }
 
-td.case a:hover {
+th.case a:hover {
   text-decoration: underline;
 }
 
+tr.disabled th,
 tr.disabled td {
   background: #fafbfc;
   color: #8c959f;
@@ -875,4 +878,30 @@ a.home:hover {
   table {
     --cases-col: 11rem;
   }
+}
+
+/* The totals row under the tools' names, which used to sit inside each name's header cell. */
+tbody.summary th,
+tbody.summary td {
+  vertical-align: top;
+  border-bottom: 0.125rem solid #d0d7de;
+}
+
+tbody.summary th {
+  color: #57606a;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+/* Text that a screen reader reads and the page doesn't show, like the word behind a ✓. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -28,30 +28,40 @@ pub fn render_the_overview(sweep: &Sweep) -> String {
         (render_the_header(sweep, counted))
         (render_the_picker(sweep))
         div .boardscroll { table style=(shown) {
+            // Read by screen readers before the table, so a reader knows what the grid holds.
+            caption .visually-hidden {
+                (counted) " cases, each judged for " (sweep.counters.len()) " tools"
+            }
             colgroup {
                 col .cases;
                 @for _ in &sweep.counters { col; }
             }
+            // Only the tool's name and version head its column, as a screen reader repeats a
+            // column's header on every cell it moves to. The totals sit in the row below.
             thead { tr {
-                th { (render_the_search(counted)) }
+                th scope="col" { (render_the_search(counted)) }
                 @for counter in &sweep.counters { (render_one_column_head(counter)) }
             } }
-            tbody {
-                @for group in &sweep.groups {
-                    tr .group { td colspan=(sweep.counters.len() + 1) {
+            tbody .summary { tr {
+                th scope="row" { "summary" }
+                @for counter in &sweep.counters { (render_one_summary(counter)) }
+            } }
+            @for group in &sweep.groups {
+                tbody {
+                    tr .group { th scope="rowgroup" colspan=(sweep.counters.len() + 1) {
                         span { (format_the_group_title(&group.name)) }
                     } }
                     @for case in &group.cases {
                         @if case.disabled {
                             tr .disabled {
-                                td .case { span .tag { "disabled" } (case.name) }
+                                th .case scope="row" { span .tag { "disabled" } (case.name) }
                                 @for counter in &sweep.counters {
                                     td data-counter=(counter.name) {}
                                 }
                             }
                         } @else {
                             tr {
-                                td .case {
+                                th .case scope="row" {
                                     a .tip href=(format!("{CASES_DIR}/{}.html", case.name))
                                             data-tip=(format_as_one_line(&case.trap)) {
                                         (case.name)
@@ -146,13 +156,24 @@ fn render_the_search(counted: usize) -> Markup {
 }
 
 fn render_one_column_head(counter: &Counter) -> Markup {
-    let multi = counter.variations.len() > 1;
     html! {
-        th data-counter=(counter.name) {
+        th scope="col" data-counter=(counter.name) {
             div .tname {
                 a href=(format!("{TOOLS_DIR}/{}.html", counter.name)) { (counter.name) }
+                // The two divs sit apart on screen, and a screen reader runs them together.
+                span .visually-hidden { "\u{a0}" }
             }
             div .tver title=(counter.version) { (format_the_version_of(counter)) }
+        }
+    }
+}
+
+// A tool's totals for each of its variations, the chips that also switch which variation the
+// column shows.
+fn render_one_summary(counter: &Counter) -> Markup {
+    let multi = counter.variations.len() > 1;
+    html! {
+        td data-counter=(counter.name) {
             div .chips {
                 @for (at, variation) in counter.variations.iter().enumerate() {
                     span .chip .pick[multi] .active[multi && at == 0]
@@ -224,10 +245,13 @@ fn render_one_answer(answer: &Answer) -> Markup {
             },
             (None, Some(note)) => html! {
                 span .status.s-pass.tip data-tip=(format_as_one_line(note)) {
-                    "✓ " span .idot { "ⓘ" }
+                    span aria-hidden="true" { "✓ " span .idot { "ⓘ" } }
+                    span .visually-hidden { "agrees, with a note" }
                 }
             },
-            (None, None) => html! { span .status.s-pass { "✓" } },
+            (None, None) => html! {
+                span .status.s-pass { span aria-hidden="true" { "✓" } span .visually-hidden { "agrees" } }
+            },
         },
         Verdict::Fails => render_one_failure(answer),
     }
@@ -354,15 +378,18 @@ fn format_the_regions_of(regions: &[Region]) -> String {
         .join(" · ")
 }
 
-// Most tools open their version line by repeating their own name, which the column head has just
-// said in bold.
+// A screen reader announces the column head on every cell in the column, so it holds just the
+// version number. The whole line a tool prints stays in the tooltip.
 fn format_the_version_of(counter: &Counter) -> &str {
-    counter
+    let line = counter
         .version
         .strip_prefix(&counter.name)
         .map(str::trim_start)
         .filter(|rest| !rest.is_empty())
-        .unwrap_or(&counter.version)
+        .unwrap_or(&counter.version);
+    line.split_whitespace()
+        .find(|word| word.starts_with(|c: char| c.is_ascii_digit()))
+        .unwrap_or(line)
 }
 
 // The organisation profile is the repository's parent path, taken from it rather than written out

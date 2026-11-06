@@ -1,11 +1,13 @@
-name   = "codestats"
-repository = "https://github.com/trypsynth/codestats"
-args   = ["{file}", "--output", "json-compact", "--include-generated", "--no-gitignore", "--hidden"]
+name        = "codestats"
+binary-name = "cs"
+repository  = "https://github.com/trypsynth/codestats"
+args        = ["{file}", "--output", "json-compact", "--include-generated", "--no-gitignore", "--hidden",
+               "--config", "{empty-file}"]
 
 [acquisition]
 channel = "crates-io"
 name    = "codestats"
-version = "1.0.0"
+version = "1.0.1"
 
 [variation.default]
 dialect = "default"

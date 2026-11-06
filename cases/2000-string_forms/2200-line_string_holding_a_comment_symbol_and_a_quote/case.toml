@@ -1,0 +1,7 @@
+trap = """
+a Zig multiline string literal is written as one \\\\ line per line of text, and each \\\\ opens a raw
+string that runs to the end of its own line with no closing symbol. The first line holds // right
+after \\\\, so a counter that reads no \\\\ string and ignores punctuation beside a comment counts that
+line as a comment, while the second holds a lone double quote, which opens an unclosed string in a
+counter whose double quotes cross lines. Two real comments follow the string, so taking the first
+line as a comment and losing the comments below to the lone quote cannot cancel out"""

@@ -287,6 +287,14 @@ re-measure it when it releases, and the automated runs that build the results pa
 out. If your counter is distributed in a way the existing channels do not cover, open an issue
 about adding a channel instead of leaving the block out.
 
+It is also recommended that the adapter's `args` should also keep the counter from reading any
+configuration file on the machine. The results page is measured on a clean CI runner, so this is
+not a blocker, but it is recommended because it keeps a `check` or a `record` on your own machine
+giving the answers CI gives. The preferred way is a flag that turns every configuration off,
+so a counter is encouraged to provide one. mezura's `--no-default-config --no-local` and scc's
+`--no-config` are the model. If your counter can only be pointed at a configuration file, point it
+at `{empty-file}`, as in `--config {empty-file}`.
+
 Measuring from your own repository also works before merging: measure privately for as long as
 you want, and the pull request that adds the files just makes it public. A counter that cannot be
 downloaded at all still gets everything except the results page, from its own side.

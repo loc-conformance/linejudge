@@ -1,5 +1,5 @@
 counter = "mezura"
-version = "v3.3.0 (2026-10-29)"
+version = "v3.4.0 (2026-11-05)"
 measured-with = "linejudge 0.3.0"
 
 [answer.1010-code_then_comment_on_one_line.content]
@@ -316,6 +316,12 @@ counted = { lines = 5, code = 5, comments = 0, extra = 0 }
 [answer.2190-triple_quote_read_as_three_short_ones.region]
 counted = { lines = 5, code = 5, comments = 0, blanks = 0 }
 
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.content]
+counted = { lines = 7, code = 4, comments = 2, extra = 1 }
+
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.region]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
 [answer.3010-escaped_quote_before_comment.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
@@ -323,10 +329,10 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.content]
-counted = { lines = 5, code = 2, comments = 2, extra = 1 }
+counted = { lines = 7, code = 4, comments = 2, extra = 1 }
 
 [answer.3020-multiline_string_ending_in_backslash.region]
-counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
 
 [answer.3030-raw_string_ending_in_backslash.content]
 counted = { lines = 2, code = 1, comments = 1, extra = 0 }
@@ -335,10 +341,10 @@ counted = { lines = 2, code = 1, comments = 1, extra = 0 }
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+counted = { lines = 5, code = 4, comments = 1, extra = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
@@ -371,10 +377,10 @@ counted = { lines = 7, code = 2, comments = 4, extra = 1 }
 counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
 
 [answer.4030-character_written_with_a_backslash.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+counted = { lines = 5, code = 4, comments = 1, extra = 0 }
 
 [answer.4030-character_written_with_a_backslash.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.4040-escaped_apostrophe_outside_quotes.content]
 counted = { lines = 4, code = 2, comments = 2, extra = 0 }
@@ -407,10 +413,10 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.4080-primed_identifier_and_apostrophe.content]
-counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+counted = { lines = 5, code = 4, comments = 1, extra = 0 }
 
 [answer.4080-primed_identifier_and_apostrophe.region]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.4090-transpose_operator_and_char.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }

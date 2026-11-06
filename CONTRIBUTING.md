@@ -21,15 +21,18 @@ and the dialect file format in [dialects/README.md](dialects/README.md).
 
 ## What CI runs
 
-Both of these, on Linux, Windows and macOS:
+All of these, on Linux, Windows and macOS:
 
 ```
-cargo test --all-features
-cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features --locked
+cargo clippy --all-targets --all-features --locked -- -D warnings
+linejudge fetch
+linejudge check
 ```
 
 Keep the `--all-features`: the maintenance commands sit behind a feature, and without it clippy and
-the tests skip them silently.
+the tests skip them silently. `fetch` downloads every counter of the roster and `check` runs them
+against the corpus and their recorded answers.
 
 CI also fails if any file was checked out with CRLF line endings, because the corpus is compared
 byte for byte. Watch out for editors that rewrite line endings on save.

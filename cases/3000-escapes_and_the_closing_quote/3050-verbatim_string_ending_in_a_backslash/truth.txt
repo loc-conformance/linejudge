@@ -1,5 +1,9 @@
-let dir = @"C:\temp\" (* a real comment
-... ... . SSssssssssZ CCccccccccccccccc
+let dirs = @"C:\temp\
+... .... . SSssssssss
+// still inside the string
+ssssssssssssssssssssssssss
+D:\cache\" (* a real comment
+sssssssssZ CCccccccccccccccc
 that closes on this line *)
 cccccccccccccccccccccccccUU
 let x = 1

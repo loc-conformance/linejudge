@@ -710,6 +710,15 @@ note = """
 a // at the head of a line opens a comment inside a triple apostrophe string too, so that line
 counts as one, while the /* under it opens nothing and takes no line with it"""
 
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.default]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.stripstr]
+same-as = "default"
+
+[answer.2200-line_string_holding_a_comment_symbol_and_a_quote.docstring-as-code]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
 [answer.3010-escaped_quote_before_comment.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
@@ -720,13 +729,23 @@ same-as = "default"
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.default]
-counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+is-known-failure = true
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+note = """
+its Odin filters know no backtick string, so the line holding only // inside the raw string is
+dropped as a comment by its C++ comment filter. --strip-str-comments clears markers between double
+quotes only"""
 
 [answer.3020-multiline_string_ending_in_backslash.stripstr]
 same-as = "default"
 
 [answer.3020-multiline_string_ending_in_backslash.docstring-as-code]
-counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
+is-known-failure = true
+counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+note = """
+its Odin filters know no backtick string, so the line holding only // inside the raw string is
+dropped as a comment by its C++ comment filter. --strip-str-comments clears markers between double
+quotes only"""
 
 [answer.3030-raw_string_ending_in_backslash.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
@@ -738,13 +757,21 @@ same-as = "default"
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+its F# filters drop every line that begins with //, so line 2, inside the verbatim string, is
+counted as a comment"""
 
 [answer.3050-verbatim_string_ending_in_a_backslash.stripstr]
 same-as = "default"
 
 [answer.3050-verbatim_string_ending_in_a_backslash.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+its F# filters drop every line that begins with //, so line 2, inside the verbatim string, is
+counted as a comment"""
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
@@ -792,13 +819,21 @@ same-as = "default"
 counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
 
 [answer.4030-character_written_with_a_backslash.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+its Clojure filters drop every line that begins with ;, so line 2, inside the string opened on line
+1, is counted as a comment"""
 
 [answer.4030-character_written_with_a_backslash.stripstr]
 same-as = "default"
 
 [answer.4030-character_written_with_a_backslash.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+its Clojure filters drop every line that begins with ;, so line 2, inside the string opened on line
+1, is counted as a comment"""
 
 [answer.4040-escaped_apostrophe_outside_quotes.default]
 counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
@@ -846,13 +881,21 @@ same-as = "default"
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.4080-primed_identifier_and_apostrophe.default]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+its F# filters drop every line that begins with //, so line 2, inside the string opened on line 1,
+is counted as a comment"""
 
 [answer.4080-primed_identifier_and_apostrophe.stripstr]
 same-as = "default"
 
 [answer.4080-primed_identifier_and_apostrophe.docstring-as-code]
-counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+its F# filters drop every line that begins with //, so line 2, inside the string opened on line 1,
+is counted as a comment"""
 
 [answer.4090-transpose_operator_and_char.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
