@@ -12,7 +12,7 @@ Breaking:
 
 New:
 
-- codestats 1.0.1 added as a measured counter, with its adapter, its default dialect and its
+- codestats 1.1.0 added as a measured counter, with its adapter, its default dialect and its
   answers recorded over all 96 cases.
 - Case 2200: a Zig `\\` multiline string whose first line holds `//` and whose second holds a
   lone double quote.
