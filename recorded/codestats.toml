@@ -1,5 +1,5 @@
 counter = "codestats"
-version = "codestats 1.0.1"
+version = "codestats 1.1.0"
 measured-with = "linejudge 0.3.0"
 
 [answer.1010-code_then_comment_on_one_line.default]
@@ -162,15 +162,13 @@ counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.default]
-is-known-failure = true
-counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
+counted = { lines = 7, code = 4, comments = 3, blanks = 0 }
 
 [answer.3030-raw_string_ending_in_backslash.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
 [answer.3050-verbatim_string_ending_in_a_backslash.default]
-is-known-failure = true
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.3070-backslash_before_a_closing_quote_in_sql.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
@@ -188,8 +186,7 @@ counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
 counted = { lines = 7, code = 3, comments = 4, blanks = 0 }
 
 [answer.4030-character_written_with_a_backslash.default]
-is-known-failure = true
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.4040-escaped_apostrophe_outside_quotes.default]
 counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
@@ -207,8 +204,7 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.4080-primed_identifier_and_apostrophe.default]
-is-known-failure = true
-counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+counted = { lines = 5, code = 4, comments = 1, blanks = 0 }
 
 [answer.4090-transpose_operator_and_char.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
