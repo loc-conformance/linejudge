@@ -43,8 +43,8 @@ Other:
 - `fetch` moves a binary that a release archive holds one directory down to where `check`,
   `record` and `render` look for it. mezura's archives hold one, so after a `fetch` those commands
   ran without mezura.
-- mezura 3.4.0 declared, fetched from its GitHub release rather than built from crates.io, with its
-  answers recorded over every case. It now passes 2200 under `content`.
+- mezura 3.5.0 declared, fetched from its GitHub release rather than built from crates.io, with its
+  answers recorded over every case. It passes every case under `content` and `region`.
 - scc is run with `--no-config`, so a `.sccconfig` on the machine no longer changes its answers.
 - cloc is run with `--config` pointed at an empty file, so an `options.txt` on the machine no
   longer changes its answers.
