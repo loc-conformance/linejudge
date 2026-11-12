@@ -1,0 +1,4 @@
+trap = """
+the hole of a JavaScript template literal, from ${ to the } that closes it, is code, and here it
+runs over three lines. The comment line inside the hole is a real comment. A counter that reads the
+template as text from one backtick to the next counts that line as part of the string"""

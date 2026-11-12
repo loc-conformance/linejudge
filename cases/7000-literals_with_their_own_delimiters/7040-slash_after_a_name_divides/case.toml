@@ -1,0 +1,4 @@
+trap = """
+a slash after a name or a number is a division in JavaScript and opens no regular expression. A
+counter that opens a pattern there ends it at the slash inside the string, then takes that string's
+closing quote for an open string, which hides the block comment after it"""

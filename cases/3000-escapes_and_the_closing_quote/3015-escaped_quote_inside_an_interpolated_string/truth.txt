@@ -1,0 +1,6 @@
+var s = $"a \" {x} b"; /* a real comment
+... . . SSsssssZ.SssZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
+int y = 1;
+... . . ..

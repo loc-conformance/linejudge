@@ -1,0 +1,4 @@
+trap = """
+in a C# interpolated string a brace written twice, {{, is one brace of text and opens no hole. A
+counter that opens a hole there reads the /* inside the string as the start of a block comment, and
+the code line below comes out as a comment"""

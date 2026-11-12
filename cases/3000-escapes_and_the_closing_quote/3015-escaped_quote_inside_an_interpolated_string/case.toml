@@ -1,0 +1,4 @@
+trap = """
+in an ordinary C# interpolated string, one with no @, a backslash before a quote escapes it, as in
+any other C# string with no @. A counter that ignores the escape there ends the string at that
+quote, and the real closing quote then opens a new string that hides the block comment after it"""

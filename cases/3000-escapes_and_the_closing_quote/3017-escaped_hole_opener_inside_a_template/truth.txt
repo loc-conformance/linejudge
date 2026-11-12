@@ -1,0 +1,6 @@
+const s = `cost: \${`; /* a real comment
+..... . . SsssssssssZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
+let y = 1;
+... . . ..

@@ -1,0 +1,5 @@
+trap = """
+the PowerShell block comment opener <# is two bytes, and here they are the 64th and 65th bytes of
+the file, either side of the boundary between its first two blocks of 64 bytes. A counter that reads
+a file in blocks of that size and settles the last byte of a block before reading the next one takes
+the < for code, misses the comment, and counts its two lines as code"""

@@ -1,0 +1,4 @@
+trap = """
+since PHP 7.3 code may follow the closing word of a heredoc on the same line, and here that code is
+the ?> that leaves PHP for the page. A counter that looks for ?> only outside the lines of the
+heredoc misses it, and counts the HTML comment of the page as PHP code"""

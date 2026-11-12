@@ -1,0 +1,8 @@
+# ------------------------------------------------------------
+Cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+<# a comment over
+CCccccccccccccccc
+two lines #>
+ccccccccccUU
+Write-Host 1
+.......... .

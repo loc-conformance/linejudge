@@ -1,0 +1,5 @@
+trap = """
+a JavaScript block comment stands where a regular expression could begin, right after an =. The /*
+opens the comment, since a pattern never begins with *. A counter that opens a pattern at the slash
+ends it at the lone slash inside the comment, then takes the quote after it for an open string,
+which hides the real comment later on the line"""

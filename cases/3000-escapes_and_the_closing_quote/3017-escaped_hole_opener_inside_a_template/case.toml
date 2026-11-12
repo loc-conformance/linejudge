@@ -1,0 +1,4 @@
+trap = """
+a backslash before ${ in a JavaScript template literal makes it text, so no hole opens and the
+second backtick ends the template. A counter that opens a hole there reads that backtick as a
+template inside the hole, which runs to the end of the file and hides the block comment after it"""

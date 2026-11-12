@@ -1,0 +1,5 @@
+trap = """
+a template literal opens inside the hole of another one and runs on to the next line. Templates and
+holes nest, so the second backtick on the first line opens the inner template and ends nothing. A
+counter that pairs the backticks in order ends the outer template there, and the line inside the
+inner template comes out as a comment"""

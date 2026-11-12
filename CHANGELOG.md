@@ -12,16 +12,28 @@ Breaking:
 
 New:
 
-- codestats 1.1.0 added as a measured counter, with its adapter, its default dialect and its
-  answers recorded over all 96 cases.
-- Case 2200: a Zig `\\` multiline string whose first line holds `//` and whose second holds a
-  lone double quote.
-- An adapter can set `binary-name`, the command a counter is downloaded and run under when that
-  is not its name.
+- codestats 1.1.0 added as a measured counter
 - `[acquisition.file]` takes a file per system and architecture, such as `linux-aarch64`, which is
   tried before the file for the system.
 - `{empty-file}` in an adapter's arguments is an empty file, to point a counter's configuration
   flag at.
+- Case 2200: a Zig `\\` multiline string whose first line holds `//` and whose second holds a
+  lone double quote.
+- Case 1235: the Vim script double quote, which opens a comment at the head of a line and a string
+  after `echo`.
+- Case 1290: a PowerShell `<#` whose two bytes sit either side of the boundary between the first
+  two 64-byte blocks of the file.
+- Case 2062: a JavaScript template hole written over three lines, with a comment line inside it.
+- Case 2064: a template literal opened inside the hole of another and running on to the next line.
+- Case 2078: a C# raw interpolated string opened by `$"""`.
+- Case 2079: a doubled brace `{{` in a C# interpolated string, followed by a `/*` that is text.
+- Case 3015: an escaped quote inside a C# interpolated string.
+- Case 3017: an escaped `\${` inside a JavaScript template literal.
+- Case 6115: a PHP `?>` on the closing line of a heredoc.
+- Case 7030: a JavaScript block comment right after an `=`, where a regular expression could begin.
+- Case 7040: a JavaScript slash after a name, which divides and opens no regular expression.
+- An adapter can set `binary-name`, the command a counter is downloaded and run under when that
+  is not its name.
 
 Other:
 
@@ -29,7 +41,7 @@ Other:
 - `fetch` tries a download or build that failed transiently up to two more times, waiting 4s and
   12s, and stops on the first attempt when the refusal is final.
 - mezura 3.4.0 declared, fetched from its GitHub release rather than built from crates.io, with its
-  answers recorded over all 96 cases. It now passes 2200 under `content`.
+  answers recorded over every case. It now passes 2200 under `content`.
 - scc is run with `--no-config`, so a `.sccconfig` on the machine no longer changes its answers.
 - cloc is run with `--config` pointed at an empty file, so an `options.txt` on the machine no
   longer changes its answers.

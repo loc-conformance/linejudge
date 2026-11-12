@@ -1,0 +1,6 @@
+var s = $"{{ /* braces";
+... . . SSssssssssssssZ.
+int z = 1;
+... . . ..
+/* a real comment */
+CCccccccccccccccccUU

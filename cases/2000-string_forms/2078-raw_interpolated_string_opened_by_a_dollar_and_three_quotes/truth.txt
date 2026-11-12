@@ -1,0 +1,12 @@
+var s = $"""
+... . . SSSS
+    // still inside the string
+ssssssssssssssssssssssssssssss
+    {x}
+ssssZ.S
+    """;
+ssssZZZ.
+// a real comment
+CCccccccccccccccc
+int y = 1;
+... . . ..

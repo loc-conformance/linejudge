@@ -1,0 +1,14 @@
+<?php
+.....
+$s = <<<EOT
+.. . SSSSSS
+text
+ssss
+EOT; ?>
+ZZZ. >> HTML
+<!-- a comment of the page -->
+CCCCcccccccccccccccccccccccUUU
+<?php
+<<<<<
+echo 1;
+.... ..

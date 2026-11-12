@@ -1,0 +1,4 @@
+trap = """
+Vim script writes a line comment and a string with one symbol, the double quote. At the start of a
+line it opens a comment, and after a command such as echo it opens a string. A counter that reads
+the quote on the first line as the opening of a string counts that comment as code"""

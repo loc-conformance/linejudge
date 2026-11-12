@@ -1,0 +1,6 @@
+trap = """
+a C# raw interpolated string opens with $ and three quotes. Two openers begin inside those four
+bytes, the $" of an ordinary interpolated string and the ""\" of a raw string, and it is the raw
+string that opens. A counter that takes $" ends the string with its line, so the line inside the
+string that looks like a comment counts as one, and the closing ""\" then opens a raw string that
+hides the real comment below it"""

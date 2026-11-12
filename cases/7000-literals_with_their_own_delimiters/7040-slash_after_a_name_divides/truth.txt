@@ -1,0 +1,6 @@
+const r = a / b + "/"; /* a real comment
+..... . . . . . . SsZ. CCccccccccccccccc
+that closes on this line */
+cccccccccccccccccccccccccUU
+let y = 1;
+... . . ..

@@ -140,6 +140,12 @@ counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 [answer.1230-a_comment_word_at_the_head_of_a_longer_word.region]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
+[answer.1235-one_symbol_for_a_line_comment_and_a_string.content]
+counted = { lines = 2, code = 1, comments = 1, extra = 0 }
+
+[answer.1235-one_symbol_for_a_line_comment_and_a_string.region]
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
 [answer.1240-a_comment_opener_inside_a_vector_type.content]
 counted = { lines = 10, code = 4, comments = 2, extra = 4 }
 
@@ -157,6 +163,12 @@ counted = { lines = 7, code = 2, comments = 3, extra = 2 }
 
 [answer.1280-matlab_block_markers_sharing_their_line.region]
 counted = { lines = 7, code = 2, comments = 5, blanks = 0 }
+
+[answer.1290-block_comment_opening_on_the_64th_byte.content]
+counted = { lines = 4, code = 1, comments = 2, extra = 1 }
+
+[answer.1290-block_comment_opening_on_the_64th_byte.region]
+counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
 [answer.2010-comment_symbol_inside_string.content]
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
@@ -206,6 +218,36 @@ counted = { lines = 4, code = 4, comments = 0, extra = 0 }
 [answer.2060-backtick_template_holding_a_comment.region]
 counted = { lines = 4, code = 4, comments = 0, blanks = 0 }
 
+[answer.2062-template_hole_written_over_several_lines.content]
+is-known-failure = true
+counted = { lines = 6, code = 5, comments = 1, extra = 0 }
+note = """
+the template is read as text from one backtick to the next, hole included, so the comment line
+inside the hole counts as code. --explain shows that line in a string opened by ` on line 1"""
+
+[answer.2062-template_hole_written_over_several_lines.region]
+is-known-failure = true
+counted = { lines = 6, code = 5, comments = 1, blanks = 0 }
+note = """
+the template is read as text from one backtick to the next, hole included, so the comment line
+inside the hole counts as code. --explain shows that line in a string opened by ` on line 1"""
+
+[answer.2064-template_inside_a_template_hole.content]
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, extra = 0 }
+note = """
+the backticks pair off in order, hole or no hole, so the second one ends the outer template and the
+line inside the inner template counts as a comment. The file is counted the same with the ${ taken
+out"""
+
+[answer.2064-template_inside_a_template_hole.region]
+is-known-failure = true
+counted = { lines = 5, code = 3, comments = 2, blanks = 0 }
+note = """
+the backticks pair off in order, hole or no hole, so the second one ends the outer template and the
+line inside the inner template counts as a comment. The file is counted the same with the ${ taken
+out"""
+
 [answer.2072-verbatim_string_holding_a_doubled_quote.content]
 counted = { lines = 6, code = 5, comments = 1, extra = 0 }
 
@@ -225,6 +267,18 @@ counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
 note = """
 the string is read as text from end to end, holes included, so the quote of the character in the
 hole ends it and the two lines below are comments"""
+
+[answer.2078-raw_interpolated_string_opened_by_a_dollar_and_three_quotes.content]
+counted = { lines = 6, code = 5, comments = 1, extra = 0 }
+
+[answer.2078-raw_interpolated_string_opened_by_a_dollar_and_three_quotes.region]
+counted = { lines = 6, code = 5, comments = 1, blanks = 0 }
+
+[answer.2079-doubled_brace_in_an_interpolated_string.content]
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.2079-doubled_brace_in_an_interpolated_string.region]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.2080-odd_triple_quote_count.content]
 counted = { lines = 6, code = 5, comments = 1, extra = 0 }
@@ -326,6 +380,18 @@ counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
 counted = { lines = 3, code = 2, comments = 1, extra = 0 }
 
 [answer.3010-escaped_quote_before_comment.region]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.3015-escaped_quote_inside_an_interpolated_string.content]
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.3015-escaped_quote_inside_an_interpolated_string.region]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.3017-escaped_hole_opener_inside_a_template.content]
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.3017-escaped_hole_opener_inside_a_template.region]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.3020-multiline_string_ending_in_backslash.content]
@@ -602,6 +668,22 @@ note = """
 the file is read as php from beginning to end, so the html comment is counted with php's symbols,
 which do not include it"""
 
+[answer.6115-php_closing_tag_on_the_closing_line_of_a_heredoc.content]
+is-known-failure = true
+counted = { lines = 7, code = 7, comments = 0, extra = 0 }
+counted-regions = []
+note = """
+the file is read as php from beginning to end, so the html comment is counted with php's symbols,
+which do not include it"""
+
+[answer.6115-php_closing_tag_on_the_closing_line_of_a_heredoc.region]
+is-known-failure = true
+counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
+counted-regions = []
+note = """
+the file is read as php from beginning to end, so the html comment is counted with php's symbols,
+which do not include it"""
+
 [answer.6120-script_inside_html_inside_php.content]
 is-known-failure = true
 counted = { lines = 11, code = 8, comments = 1, extra = 2 }
@@ -646,6 +728,18 @@ counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 note = """
 the /* opens a comment that swallows the two lines under it, and the comment ending the file
 closes it"""
+
+[answer.7030-block_comment_where_a_pattern_may_begin.content]
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.7030-block_comment_where_a_pattern_may_begin.region]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
+
+[answer.7040-slash_after_a_name_divides.content]
+counted = { lines = 3, code = 2, comments = 1, extra = 0 }
+
+[answer.7040-slash_after_a_name_divides.region]
+counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
 [answer.8010-punctuation_only_line.content]
 counted = { lines = 3, code = 2, comments = 0, extra = 1 }

@@ -1,0 +1,10 @@
+const s = `a ${ `b
+..... . . SssZZ Ss
+// still inside the inner template
+ssssssssssssssssssssssssssssssssss
+c` } d`;
+sZ SssZ.
+// a real comment
+CCccccccccccccccc
+let y = 1;
+... . . ..
