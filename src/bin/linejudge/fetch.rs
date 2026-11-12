@@ -214,9 +214,10 @@ fn download_a_release_asset(
     })?;
     let _ = fs::remove_file(&archive);
     let named = format!("{name_of_binary}{EXE_SUFFIX}");
-    find_the_file_named(&named, into).ok_or_else(|| {
+    let found = find_the_file_named(&named, into).ok_or_else(|| {
         format!("{downloaded} holds no {named}; set binary-name to the command it holds, without .exe")
-    })
+    })?;
+    move_the_binary_up_to(into, &found)
 }
 
 // The release publishes plain files whose names say nothing about systems, so the adapter names
@@ -430,6 +431,19 @@ fn find_the_file_named(named: &str, under: &Path) -> Option<PathBuf> {
         .map(|entry| entry.path())
         .filter(|path| path.is_dir())
         .find_map(|dir| find_the_file_named(named, &dir))
+}
+
+// The lookup that runs a counter reads only the root of its directory.
+fn move_the_binary_up_to(dir: &Path, binary: &Path) -> Result<PathBuf, String> {
+    let Some(name) = binary.file_name() else {
+        return Err(format!("{} names no file", binary.display()));
+    };
+    let at_the_root = dir.join(name);
+    if binary != at_the_root {
+        fs::rename(binary, &at_the_root)
+            .map_err(|error| format!("{} could not be moved into place: {error}", binary.display()))?;
+    }
+    Ok(at_the_root)
 }
 
 fn list_the_file_names_in(dir: &Path) -> Vec<String> {
@@ -670,6 +684,23 @@ AB12CD34  scc_Windows_x86_64.zip
         fs::remove_dir_all(&root).unwrap();
         assert_eq!(found.unwrap(), inner.join("scc"));
         assert!(missing.is_none());
+    }
+
+    #[test]
+    fn a_binary_the_archive_held_one_directory_down_is_moved_up_to_where_the_lookup_reads() {
+        let root = std::env::temp_dir().join("linejudge-a_binary_one_directory_down");
+        let inner = root.join("mezura-v3.5.0-windows-x86_64");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&inner).unwrap();
+        fs::write(inner.join("mezura"), "a binary").unwrap();
+        fs::write(root.join("scc"), "a binary at the root").unwrap();
+        let moved = move_the_binary_up_to(&root, &inner.join("mezura"));
+        let left = move_the_binary_up_to(&root, &root.join("scc"));
+        let at_the_root = root.join("mezura").is_file();
+        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(moved.unwrap(), root.join("mezura"));
+        assert_eq!(left.unwrap(), root.join("scc"));
+        assert!(at_the_root);
     }
 
     #[test]
