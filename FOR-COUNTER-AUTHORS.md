@@ -386,7 +386,7 @@ repository as a dev-dependency:
 
 ```toml
 [dev-dependencies]
-linejudge = { version = "0.2", default-features = false }
+linejudge = { version = "0.4", default-features = false }
 ```
 
 For the tip of the repository ahead of a release, the git form works too:

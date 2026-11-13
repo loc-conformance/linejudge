@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0, unreleased
+## 0.4.0, 2026-11-13
 
 Breaking:
 
@@ -48,6 +48,8 @@ Other:
 - scc is run with `--no-config`, so a `.sccconfig` on the machine no longer changes its answers.
 - cloc is run with `--config` pointed at an empty file, so an `options.txt` on the machine no
   longer changes its answers.
+
+-----------------------------------------------------------------------------------------------------------
 
 ## 0.3.0, 2026-10-29
 
