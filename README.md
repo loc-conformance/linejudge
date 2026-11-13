@@ -148,7 +148,7 @@ mezura.content on 7020-regex_holding_a_comment_opener
      mezura says comments
 ```
 
-Line 2 is plain code and mezura called it a comment.
+Line 2 is plain code and mezura 3.2.0 called it a comment (fixed in later versions).
 
 ## Running it
 
