@@ -1,5 +1,5 @@
 counter = "codestats"
-version = "codestats 1.1.0"
+version = "codestats 1.1.2"
 measured-with = "linejudge 0.4.0"
 
 [answer.1010-code_then_comment_on_one_line.default]
@@ -317,13 +317,10 @@ counted-regions = [
 ]
 
 [answer.6115-php_closing_tag_on_the_closing_line_of_a_heredoc.default]
-is-known-failure = true
-counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
-counted-regions = []
-note = """
-the ?> on the closing line of the heredoc is missed, so the page after it is read as php and its
-html comment counts as code. Moved to the next line, or written after a plain statement with no
-heredoc, the same ?> is found and the comment is counted"""
+counted = { lines = 7, code = 6, comments = 1, blanks = 0 }
+counted-regions = [
+    { language = "HTML", lines = 1, code = 0, comments = 1, blanks = 0 },
+]
 
 [answer.6120-script_inside_html_inside_php.default]
 counted = { lines = 11, code = 10, comments = 1, blanks = 0 }
