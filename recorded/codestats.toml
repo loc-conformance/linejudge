@@ -74,6 +74,9 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 [answer.1235-one_symbol_for_a_line_comment_and_a_string.default]
 counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
 
+[answer.1237-one_symbol_for_a_line_comment_and_a_directive.default]
+counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
+
 [answer.1240-a_comment_opener_inside_a_vector_type.default]
 counted = { lines = 10, code = 6, comments = 4, blanks = 0 }
 

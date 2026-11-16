@@ -1,0 +1,5 @@
+trap = """
+GNU assembly in a .S file writes a line comment and a preprocessor line with one symbol, the hash
+sign. Followed by a directive name such as include or ifdef it opens a line for the C preprocessor,
+which is code, and followed by anything else it opens a comment. A counter that reads every hash
+sign as a comment counts the preprocessor lines as comments"""

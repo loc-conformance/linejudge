@@ -1,0 +1,14 @@
+#include "riscv_test.h"
+........ SssssssssssssZ
+# the test number lives in gp
+Ccccccccccccccccccccccccccccc
+#define TESTNUM gp
+....... ....... ..
+#ifdef __riscv_compressed
+...... ..................
+# compressed instructions are allowed
+Ccccccccccccccccccccccccccccccccccccc
+#endif
+......
+    li TESTNUM, 2
+    .. ........ .

@@ -117,6 +117,12 @@ note = """
 the double quote at the head of the comment line opens a string, so that line counts as code. A
 file holding only that line counts as one line of code"""
 
+[answer.1237-one_symbol_for_a_line_comment_and_a_directive.default]
+is-known-failure = true
+counted = { lines = 7, code = 7, comments = 0, blanks = 0 }
+note = """
+the hash sign opens no comment in its GNU Style Assembly, so the two comment lines count as code"""
+
 [answer.1240-a_comment_opener_inside_a_vector_type.default]
 is-known-failure = true
 counted = { lines = 10, code = 10, comments = 0, blanks = 0 }

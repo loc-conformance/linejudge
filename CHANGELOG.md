@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0, unreleased
+
+New:
+
+- Case 1237: GNU assembly in a `.S` file, where the hash sign opens a comment and also begins a C
+  preprocessor line such as `#include`.
+
+-----------------------------------------------------------------------------------------------------------
+
 ## 0.4.0, 2026-11-13
 
 Breaking:
