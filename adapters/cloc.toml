@@ -10,7 +10,7 @@ explain-output = "cloc-stages"
 [acquisition]
 channel = "github-release-file"
 name    = "AlDanial/cloc"
-version = "2.10"
+version = "2.12"
 
 [acquisition.file]
 windows = "cloc-{version}.exe"

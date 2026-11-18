@@ -1,5 +1,5 @@
 counter = "cloc"
-version = "2.10"
+version = "2.12"
 measured-with = "linejudge 0.4.0"
 
 [answer.1010-code_then_comment_on_one_line.default]
