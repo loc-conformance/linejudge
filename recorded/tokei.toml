@@ -147,6 +147,20 @@ line is code"""
 [answer.1290-block_comment_opening_on_the_64th_byte.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
+[answer.1310-dashes_that_begin_an_operator.default]
+is-known-failure = true
+counted = { lines = 6, code = 4, comments = 2, blanks = 0 }
+note = """
+the --> that opens the third line counts as a comment, which hides the {- after it, so the
+next two lines, inside the block comment, count as code"""
+
+[answer.1330-hash_that_starts_a_word_after_code.default]
+is-known-failure = true
+counted = { lines = 4, code = 2, comments = 2, blanks = 0 }
+note = """
+the # that opens the second line counts as a comment, although it is inside the string opened
+on the line above"""
+
 [answer.2010-comment_symbol_inside_string.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
@@ -575,3 +589,6 @@ counted-regions = [
 ]
 note = """
 the '///' line is counted as neither comment nor blank, so a file of 3 lines is reported as 2"""
+
+[answer.8060-form_feed_alone_on_a_line.default]
+counted = { lines = 4, code = 2, comments = 0, blanks = 2 }

@@ -89,6 +89,12 @@ counted = { lines = 7, code = 2, comments = 5, blanks = 0 }
 [answer.1290-block_comment_opening_on_the_64th_byte.default]
 counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
+[answer.1310-dashes_that_begin_an_operator.default]
+counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+
+[answer.1330-hash_that_starts_a_word_after_code.default]
+counted = { lines = 4, code = 3, comments = 1, blanks = 0 }
+
 [answer.2010-comment_symbol_inside_string.default]
 counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 
@@ -358,3 +364,6 @@ counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
 [answer.8050-doc_comment_with_no_text_ending_a_block.default]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.8060-form_feed_alone_on_a_line.default]
+counted = { lines = 4, code = 2, comments = 0, blanks = 2 }

@@ -1,0 +1,12 @@
+infixr 5 -->
+...... . ...
+x = a
+. . .
+  --> b {- the arrow is an operator,
+  ... . CCcccccccccccccccccccccccccc
+  so this comment opens on the line above,
+cccccccccccccccccccccccccccccccccccccccccc
+  and closes here -}
+ccccccccccccccccccUU
+-- a real comment
+CCccccccccccccccc

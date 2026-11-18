@@ -1,0 +1,5 @@
+trap = """
+A shell starts a comment with # only at the start of a word, so the ## in ${path##*/} holds no
+comment, and the # after echo done opens one. A counter that ends a line at every # misses the
+string opened on the first line, and one that takes # only at the start of a line opens a string at
+the apostrophe in the comment"""

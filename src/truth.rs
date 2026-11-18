@@ -12,7 +12,8 @@
 
 use crate::faults::Faults;
 
-const ALPHABET: &str = "SsZCcU.>< \t";
+// A form feed is whitespace, as the deriver reads it, so it stays as it is under its own line.
+const ALPHABET: &str = "SsZCcU.>< \t\x0c";
 /// The three characters that mark a comment.
 pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
 const KINDS: [Marks; 2] = [STRING_MARKS, COMMENT_MARKS];
