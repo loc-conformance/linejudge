@@ -1476,3 +1476,12 @@ same-as = "default"
 
 [answer.8050-doc_comment_with_no_text_ending_a_block.docstring-as-code]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.8070-byte_order_mark_before_a_comment.default]
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }
+
+[answer.8070-byte_order_mark_before_a_comment.stripstr]
+same-as = "default"
+
+[answer.8070-byte_order_mark_before_a_comment.docstring-as-code]
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

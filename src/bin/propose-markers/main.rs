@@ -91,6 +91,7 @@ const USAGE: &str = r#"propose-markers <spec>
     /*@1| ... |*/@2.
 "#;
 
+const BYTE_ORDER_MARK: char = '\u{feff}';
 const OPTIONAL_WORD: &str = "optional";
 
 enum Item {
@@ -265,8 +266,18 @@ fn write_truth(id: &str, items: &[Item]) -> Result<(), String> {
         .find(|path| path.file_name().is_some_and(|n| n.to_string_lossy().starts_with("input.")))
         .ok_or_else(|| format!("{id} has no input"))?;
     let text = fs::read_to_string(&input).map_err(|e| format!("{}: {e}", input.display()))?;
-    let truth = build_truth(id, items, &text.lines().collect::<Vec<&str>>())?;
+    let truth = propose_for(id, items, &text)?;
     fs::write(dir.join("truth.txt"), truth).map_err(|e| format!("{id}: {e}"))
+}
+
+// A byte order mark is no byte of the first line, so it gets no column, but the copy keeps it, as
+// the reader asks.
+fn propose_for(id: &str, items: &[Item], text: &str) -> Result<String, String> {
+    let (mark, text) = match text.strip_prefix(BYTE_ORDER_MARK) {
+        Some(rest) => (BYTE_ORDER_MARK.to_string(), rest),
+        None => (String::new(), text),
+    };
+    Ok(mark + &build_truth(id, items, &text.lines().collect::<Vec<&str>>())?)
 }
 
 fn build_truth(id: &str, items: &[Item], sources: &[&str]) -> Result<String, String> {
@@ -641,6 +652,14 @@ mod tests {
         assert!(refused.contains("is one line, so an occurrence goes at the end"), "{refused}");
         let refused = refuse(&["// a // b \\", "still"], &["1-2 C //| ...@1"]);
         assert!(refused.contains("has no closing symbol"), "{refused}");
+    }
+
+    #[test]
+    fn a_byte_order_mark_stays_on_the_copy_and_gets_no_column() {
+        let input = "\u{feff}// a\nint x;\n";
+        let truth = propose_for("a test", &parse(&["1 C //| a"]), input).unwrap();
+        assert_eq!(truth, "\u{feff}// a\nCCcc\nint x;\n... ..\n");
+        Truth::read(&truth, input).unwrap_or_else(|f| panic!("{f:?}"));
     }
 
     fn propose(sources: &[&str], spec: &[&str]) -> String {

@@ -13,6 +13,9 @@
 use crate::faults::Faults;
 
 const ALPHABET: &str = "SsZCcU.>< \t";
+// An encoding signature, not text. The copy of the first line keeps it so that an input that loses
+// it fails, but the line is judged by what comes after it.
+const BYTE_ORDER_MARK: char = '\u{feff}';
 /// The three characters that mark a comment.
 pub const COMMENT_MARKS: Marks = Marks { name: "comment", opener: 'C', interior: 'c', closer: 'U' };
 const KINDS: [Marks; 2] = [STRING_MARKS, COMMENT_MARKS];
@@ -38,6 +41,19 @@ impl Truth {
     /// `truth.txt` are there so an input edited without its markers fails loudly.
     pub fn read(marked: &str, input: &str) -> Result<Truth, Faults> {
         let mut faults = Vec::new();
+        let (input, signed) = strip_byte_order_mark(input);
+        let (marked, copied) = strip_byte_order_mark(marked);
+        if signed != copied {
+            let (has, lacks) = match signed {
+                true => ("the input", "the copy of its first line"),
+                false => ("the copy of the first line", "the input"),
+            };
+            faults.push(format!(
+                "{has} starts with a byte order mark and {lacks} does not, though the two look the \
+                 same on screen"
+            ));
+            return Err(faults.into());
+        }
         let mut lines = Vec::new();
         let mut rows = marked.lines().peekable();
 
@@ -237,6 +253,13 @@ enum Role {
     Opens,
     Inside,
     Closes,
+}
+
+fn strip_byte_order_mark(text: &str) -> (&str, bool) {
+    match text.strip_prefix(BYTE_ORDER_MARK) {
+        Some(rest) => (rest, true),
+        None => (text, false),
+    }
 }
 
 fn split_marker(row: &str, source: &str) -> Result<(String, Option<RegionClaim>), String> {
@@ -535,6 +558,36 @@ mod tests {
             covered,
             [Covering::Residue, Covering::String, Covering::Residue, Covering::Comment]
         );
+    }
+
+    #[test]
+    fn a_byte_order_mark_is_kept_in_the_copy_and_left_out_of_the_line_it_opens() {
+        let input = "\u{feff}// a\nint x;\n";
+        let truth = Truth::read("\u{feff}// a\nCCcc\nint x;\n... ..\n", input).unwrap();
+        assert_eq!(truth.lines[0].source, "// a");
+        assert_eq!(truth.lines[0].marker, "CCcc");
+        assert_eq!(truth.lines[1].source, "int x;");
+    }
+
+    #[test]
+    fn a_byte_order_mark_on_one_side_only_is_refused_and_named() {
+        let refuse = |marked: &str, input: &str| {
+            let faults = Truth::read(marked, input).unwrap_err();
+            faults.join("\n")
+        };
+        let lost = refuse("// a\nCCcc\n", "\u{feff}// a\n");
+        assert!(lost.contains("the input starts with a byte order mark"), "{lost}");
+        let gained = refuse("\u{feff}// a\nCCcc\n", "// a\n");
+        let named = "the copy of the first line starts with a byte order mark";
+        assert!(gained.contains(named), "{gained}");
+    }
+
+    #[test]
+    fn a_byte_order_mark_after_the_start_is_refused_as_any_character_above_ascii() {
+        let input = "int x;\n\u{feff}// a\n";
+        let faults = Truth::read("int x;\n... ..\n\u{feff}// a\nCCcc\n", input).unwrap_err();
+        let said = faults.join("\n");
+        assert!(said.contains("holds a character above ASCII"), "{said}");
     }
 
     // A marker shorter than its line is refused when a case is read, so the only way to meet one

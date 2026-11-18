@@ -1,0 +1,4 @@
+trap = """
+Many files saved on Windows start with a byte order mark, the bytes EF BB BF, which say the file
+is UTF-8 and are no part of its text. A counter that reads them as text counts a first line that
+holds only a comment as code"""
