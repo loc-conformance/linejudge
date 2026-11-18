@@ -1,0 +1,4 @@
+﻿// a comment after a byte order mark
+CCcccccccccccccccccccccccccccccccccc
+int x;
+... ..

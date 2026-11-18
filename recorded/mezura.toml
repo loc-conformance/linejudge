@@ -717,3 +717,17 @@ counted = { lines = 3, code = 1, comments = 1, extra = 1 }
 
 [answer.8050-doc_comment_with_no_text_ending_a_block.region]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.8070-byte_order_mark_before_a_comment.content]
+is-known-failure = true
+counted = { lines = 2, code = 2, comments = 0, extra = 0 }
+note = """
+mezura keeps the byte order mark as part of the first line. Its bytes above ASCII are a word
+outside the comment, so the line counts as code. A U+FEFF that opens a later line does the same"""
+
+[answer.8070-byte_order_mark_before_a_comment.region]
+is-known-failure = true
+counted = { lines = 2, code = 2, comments = 0, blanks = 0 }
+note = """
+mezura keeps the byte order mark as part of the first line. Its bytes above ASCII are a word
+outside the comment, so the line counts as code. A U+FEFF that opens a later line does the same"""

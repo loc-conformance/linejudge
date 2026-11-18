@@ -62,6 +62,10 @@ differs from the input, and a marker line whose length differs from the line abo
 edit an input and forget its truth, the tests fail instead of the markers quietly pointing at the
 wrong bytes.
 
+An input that starts with a byte order mark keeps it in the copy of its first line, with no column
+for it in the marker line below, since the line is judged by what comes after it. Counters still
+get the file with the mark.
+
 ## Writing it with propose-markers, the recommended way
 
 You can write a `truth.txt` by hand, but lining up the marker columns by hand is easy to get

@@ -575,3 +575,6 @@ counted-regions = [
 ]
 note = """
 the '///' line is counted as neither comment nor blank, so a file of 3 lines is reported as 2"""
+
+[answer.8070-byte_order_mark_before_a_comment.default]
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

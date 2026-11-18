@@ -467,3 +467,6 @@ counted = { lines = 4, code = 1, comments = 3, blanks = 0 }
 
 [answer.8050-doc_comment_with_no_text_ending_a_block.default]
 counted = { lines = 3, code = 1, comments = 2, blanks = 0 }
+
+[answer.8070-byte_order_mark_before_a_comment.default]
+counted = { lines = 2, code = 1, comments = 1, blanks = 0 }

@@ -6,6 +6,10 @@ New:
 
 - Case 1237: GNU assembly in a `.S` file, where the hash sign opens a comment and also begins a C
   preprocessor line such as `#include`.
+- Case 8070: a C file whose first line, a comment, follows a UTF-8 byte order mark.
+- A byte order mark at the start of a case input is left out when the input is read, so the first
+  line is judged by what comes after it. The copy of that line in `truth.txt` keeps the mark, and
+  a copy that has lost it, or gained it, is refused.
 
 Other:
 
