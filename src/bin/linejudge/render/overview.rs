@@ -165,8 +165,8 @@ fn render_one_column_head(counter: &Counter) -> Markup {
         th scope="col" data-counter=(counter.name) {
             div .tname {
                 a href=(format!("{TOOLS_DIR}/{}.html", counter.name)) { (counter.name) }
-                // The two divs sit apart on screen, and a screen reader runs them together.
-                span .visually-hidden { "\u{a0}" }
+                // The divs sit apart on screen, but NVDA read them as one word without the comma.
+                span .visually-hidden { ", " }
             }
             div .tver title=(counter.version) { (format_the_version_of(counter)) }
         }
@@ -545,6 +545,20 @@ mod tests {
         answer.exception = Some("counts the shebang as comment".to_string());
         let shown = render_one_answer(&answer).into_string();
         assert!(shown.contains("declared intent: counts the shebang as comment"), "{shown}");
+    }
+
+    #[test]
+    fn the_column_head_parts_the_name_from_the_version_for_a_screen_reader() {
+        let counter = Counter {
+            name: "mezura".to_string(),
+            version: "v3.5.0 (2026-11-12)".to_string(),
+            variations: Vec::new(),
+        };
+        let head = render_one_column_head(&counter).into_string();
+        assert!(
+            head.contains("mezura</a><span class=\"visually-hidden\">, </span></div>"),
+            "{head}"
+        );
     }
 
     #[test]

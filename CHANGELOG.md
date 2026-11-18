@@ -7,6 +7,11 @@ New:
 - Case 1237: GNU assembly in a `.S` file, where the hash sign opens a comment and also begins a C
   preprocessor line such as `#include`.
 
+Fixes:
+
+- The overview's column heads part each tool's name from its version with a hidden comma, as NVDA
+  read `mezura v3.5.0` as `mezurav3.5.0`.
+
 Other:
 
 - codestats 1.1.2 declared, with its answers recorded over every case. It now passes 6115, so the
