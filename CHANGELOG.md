@@ -7,6 +7,11 @@ New:
 - Case 1237: GNU assembly in a `.S` file, where the hash sign opens a comment and also begins a C
   preprocessor line such as `#include`.
 
+Other:
+
+- codestats 1.1.2 declared, with its answers recorded over every case. It now passes 6115, so the
+  record no longer holds it as a known failure.
+
 -----------------------------------------------------------------------------------------------------------
 
 ## 0.4.0, 2026-11-13
