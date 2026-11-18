@@ -1,0 +1,4 @@
+trap = """
+A form feed is whitespace, and some C files, such as the Linux kernel's
+include/uapi/linux/a.out.h and glibc's regex.h, put one alone on a line to break the file into
+pages. A counter that knows only spaces and tabs as whitespace counts that line as code"""

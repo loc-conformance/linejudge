@@ -6,6 +6,13 @@ New:
 
 - Case 1237: GNU assembly in a `.S` file, where the hash sign opens a comment and also begins a C
   preprocessor line such as `#include`.
+- Case 1310: a Haskell operator spelled with two dashes, `-->`, opening a line before a block
+  comment.
+- Case 1330: a shell `#` inside a word, in `${path##*/}`, and another that starts a word after
+  code, before an apostrophe.
+- Case 8060: a C line holding only a form feed, which is blank.
+- A form feed is on the marker alphabet of `truth.txt`, so a line holding one keeps it under
+  itself, as a space or a tab does.
 
 Other:
 

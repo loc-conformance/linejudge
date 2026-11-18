@@ -1,0 +1,4 @@
+trap = """
+Haskell starts a line comment with two or more dashes only when no other symbol follows them, so
+--> is an operator a program can define. A counter that takes every -- for a comment hides the {-
+after it, and counts the rest of the block comment as code"""

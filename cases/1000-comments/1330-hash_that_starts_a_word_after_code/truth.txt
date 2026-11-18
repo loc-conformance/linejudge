@@ -1,0 +1,8 @@
+base=${path##*/} "first
+................ Ssssss
+# second"
+ssssssssZ
+echo done # it's here
+.... .... Ccccccccccc
+# real
+Cccccc
