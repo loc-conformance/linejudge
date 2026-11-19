@@ -14,8 +14,9 @@ pub const DIALECTS_DIR: &str = "dialects";
 
 const DIALECT_EXTENSION: &str = "toml";
 pub(crate) const OPTIONAL_SECTION: &str = "counts-as-its-own-language";
-pub(crate) const PREDICATES: [(&str, Predicate); 7] = [
+pub(crate) const PREDICATES: [(&str, Predicate); 8] = [
     ("blank", Predicate::Blank),
+    ("continues-code", Predicate::ContinuesCode),
     ("has-residue", Predicate::HasResidue),
     ("in-comment", Predicate::InComment),
     ("in-doc-string", Predicate::InDocString),
@@ -259,6 +260,11 @@ impl fmt::Display for Condition {
 pub enum Predicate {
     /// The line holds nothing but whitespace.
     Blank,
+    /// The line is inside a doc string, as `InDocString` asks, whose opener comes right after a
+    /// line of code left unfinished: the last character of that line's residue is an open
+    /// bracket, a comma, or a backslash, so the string is a value the code goes on with, like an
+    /// argument.
+    ContinuesCode,
     /// Something of the line is outside every string and comment, whitespace not counting.
     HasResidue,
     /// Any part of the line is inside a comment, one that opened on an earlier line included.
@@ -279,6 +285,7 @@ impl fmt::Display for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Predicate::Blank => "blank",
+            Predicate::ContinuesCode => "continues-code",
             Predicate::HasResidue => "has-residue",
             Predicate::InComment => "in-comment",
             Predicate::InDocString => "in-doc-string",
@@ -405,13 +412,13 @@ mod tests {
     }
 
     #[test]
-    fn a_condition_that_asks_no_known_question_is_refused_beside_the_seven_that_exist() {
+    fn a_condition_that_asks_no_known_question_is_refused_beside_the_eight_that_exist() {
         let refused = read_a_broken_dialect(
             "a_dialect_asking_an_unknown_question",
             &ONE_DIALECT.replace("[\"blank\"]", "[\"!in-word\"]"),
         );
         assert!(refused[0].contains("rule blank-line: !in-word is not a predicate"), "{refused:?}");
-        assert!(refused[0].contains("blank, has-residue, in-comment"), "{refused:?}");
+        assert!(refused[0].contains("blank, continues-code, has-residue, in-comment"), "{refused:?}");
     }
 
     #[test]

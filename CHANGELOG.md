@@ -6,9 +6,15 @@ New:
 
 - Case 1237: GNU assembly in a `.S` file, where the hash sign opens a comment and also begins a C
   preprocessor line such as `#include`.
+- The `continues-code` predicate: the line is in a doc string whose opener comes right after a line
+  of code ending in an open bracket, a comma, or a backslash, so the string is a value that code
+  goes on with, like an argument, and not documentation.
 
 Other:
 
+- The codestats dialect counts a doc string that continues code as code, which case 2100
+  witnesses. codestats 1.1.2 counts it as comment, so the record holds 2100 as a known failure for
+  that version.
 - codestats 1.1.2 declared, with its answers recorded over every case. It now passes 6115, so the
   record no longer holds it as a known failure.
 

@@ -232,6 +232,12 @@ fn say_what_a_condition_asks(condition: &Condition) -> String {
             "part of the line is inside a comment",
             "no part of the line is inside a comment",
         ),
+        Predicate::ContinuesCode => (
+            "the line is inside a block that opened with three quotes at the start of a line, right \
+             after a line of code ending in an open bracket, a comma, or a backslash",
+            "the line is not inside a block that opened with three quotes right after a line of \
+             code left unfinished",
+        ),
         Predicate::InDocString => (
             "the line is inside a block that opened with three quotes at the start of a line",
             "the line is not inside a block that opened with three quotes at the start of a line",

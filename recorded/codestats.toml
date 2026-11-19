@@ -141,7 +141,11 @@ counted = { lines = 3, code = 2, comments = 1, blanks = 0 }
 counted = { lines = 5, code = 2, comments = 3, blanks = 0 }
 
 [answer.2100-triple_quoted_data_not_documentation.default]
+is-known-failure = true
 counted = { lines = 6, code = 3, comments = 3, blanks = 0 }
+note = """
+the triple-quoted string opening the line after `data = (` counts as a docstring, so its three
+lines count as comments"""
 
 [answer.2110-here_string_holding_an_apostrophe.default]
 counted = { lines = 7, code = 5, comments = 2, blanks = 0 }
