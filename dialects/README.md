@@ -76,6 +76,10 @@ be inside a string or comment that is open across it.
 - `word-in-residue`: a word character outside every span.
 - `in-doc-string`: the line is in a string whose opening delimiter is a tripled quote at the start
   of its own line, whitespace before it allowed.
+- `continues-code`: the line is in such a string, and the last line with residue before the
+  string's opener ends in an open bracket, a comma, or a backslash, so the string is a value the
+  code goes on with, like an argument, not documentation. An `=` or an operator is left out,
+  because Julia documents an operator by writing its docstring above a line holding just `==`.
 
 The vocabulary is implemented once, in the engine, and shared by every dialect; a dialect file
 holds no code. A new predicate lands only together with a case that uses it.

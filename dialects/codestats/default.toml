@@ -24,8 +24,14 @@ bucket = "code"
 
 [[rule]]
 name   = "a-doc-string-is-documentation"
-when   = ["in-doc-string", "!has-residue", "!blank"]
+when   = ["in-doc-string", "!continues-code", "!has-residue", "!blank"]
 bucket = "comments"
+
+# A triple-quoted string opening the line after `f(` or `x = [` is an argument or a value.
+[[rule]]
+name   = "a-doc-string-continuing-code-is-code"
+when   = ["continues-code", "!blank"]
+bucket = "code"
 
 [[rule]]
 name   = "a-comment-alone-is-comments"

@@ -10,6 +10,9 @@ use crate::truth::{Truth, TruthLine};
 use crate::truth::{COMMENT_MARKS, RESIDUE, STRING_MARKS, TAG_CLOSES, TAG_OPENS};
 
 const DOC_STRING_SYMBOLS: [&str; 2] = ["\"\"\"", "'''"];
+// The characters that leave a line of code unfinished, so a string opening the next line goes on
+// with it.
+const UNFINISHED_ENDINGS: [char; 5] = ['(', '[', '{', ',', '\\'];
 
 /// What one dialect makes of one case.
 pub struct Derivation {
@@ -117,8 +120,8 @@ fn walk_every_line(
     let counted = collect_counted_readings(dialect);
     let rules = &dialect.rules;
     let mut faults = Vec::new();
-    for (line, in_doc_string) in truth.lines.iter().zip(find_lines_in_a_doc_string(truth)) {
-        let facts = Facts::of(line, in_doc_string);
+    for (line, doc_string) in truth.lines.iter().zip(find_lines_in_a_doc_string(truth)) {
+        let facts = Facts::of(line, doc_string);
         let mut fired = vec![false; rules.len()];
         match judge_line(&facts, rules, &mut fired) {
             Ok(bucket) => {
@@ -134,6 +137,7 @@ fn walk_every_line(
 // One field per `Predicate`, answered for a single line.
 struct Facts {
     blank: bool,
+    continues_code: bool,
     has_residue: bool,
     in_comment: bool,
     in_doc_string: bool,
@@ -143,13 +147,14 @@ struct Facts {
 }
 
 impl Facts {
-    fn of(line: &TruthLine, in_doc_string: bool) -> Facts {
+    fn of(line: &TruthLine, doc_string: DocString) -> Facts {
         let columns = || line.source.chars().zip(line.marker.chars());
         Facts {
             blank: line.source.chars().all(|ch| ch.is_ascii_whitespace()),
+            continues_code: doc_string.continues_code,
             has_residue: line.marker.chars().any(is_residue),
             in_comment: line.marker.chars().any(|mark| COMMENT_MARKS.owns(mark)),
-            in_doc_string,
+            in_doc_string: doc_string.inside,
             in_string: line.marker.chars().any(|mark| STRING_MARKS.owns(mark)),
             word_in_comment: columns().any(|(ch, mark)| COMMENT_MARKS.owns(mark) && is_word(ch)),
             word_in_residue: columns().any(|(ch, mark)| is_residue(mark) && is_word(ch)),
@@ -166,6 +171,7 @@ impl Facts {
     fn holds(&self, predicate: Predicate) -> bool {
         match predicate {
             Predicate::Blank => self.blank,
+            Predicate::ContinuesCode => self.continues_code,
             Predicate::HasResidue => self.has_residue,
             Predicate::InComment => self.in_comment,
             Predicate::InDocString => self.in_doc_string,
@@ -242,16 +248,28 @@ fn collect_counted_readings(dialect: &Dialect) -> Vec<&str> {
         .collect()
 }
 
+// Whether a line is inside a doc string, and whether that doc string goes on with the code before
+// it.
+#[derive(Clone, Copy, Default)]
+struct DocString {
+    inside: bool,
+    continues_code: bool,
+}
+
 // A line in the middle of a doc string holds nothing saying it is in one, so the whole file has to
 // be read from the top and the answer kept per line.
-fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<bool> {
+fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<DocString> {
     let mut open = false;
+    let mut continuing = false;
+    // The last character of residue on the lines read so far, which says whether a doc string
+    // opening the next line goes on with that code.
+    let mut last_residue: Option<char> = None;
     let mut lines = Vec::with_capacity(truth.lines.len());
     for line in &truth.lines {
         if open && !line.marker.starts_with([STRING_MARKS.interior, STRING_MARKS.closer]) {
             open = false;
         }
-        let mut on_this_line = open;
+        let mut on_this_line = DocString { inside: open, continues_code: open && continuing };
         let columns: Vec<(char, char)> = line.source.chars().zip(line.marker.chars()).collect();
         let mut at = 0;
         while at < columns.len() {
@@ -265,13 +283,20 @@ fn find_lines_in_a_doc_string(truth: &Truth) -> Vec<bool> {
                 let nothing_before =
                     columns[..start].iter().all(|(ch, _)| ch.is_ascii_whitespace());
                 open = nothing_before && DOC_STRING_SYMBOLS.contains(&symbol.as_str());
+                continuing =
+                    open && last_residue.is_some_and(|ch| UNFINISHED_ENDINGS.contains(&ch));
             } else if mark != STRING_MARKS.interior && mark != STRING_MARKS.closer {
                 open = false;
             }
-            on_this_line |= open;
+            on_this_line.inside |= open;
+            on_this_line.continues_code |= open && continuing;
             if mark == STRING_MARKS.closer {
                 open = false;
             }
+        }
+        let residue = columns.iter().rev().find(|(ch, mark)| is_residue(*mark) && !ch.is_whitespace());
+        if let Some(&(ch, _)) = residue {
+            last_residue = Some(ch);
         }
         lines.push(on_this_line);
     }
@@ -339,7 +364,7 @@ mod tests {
 
     #[test]
     fn a_line_no_rule_decides_and_two_rules_that_disagree_are_both_refused() {
-        let facts = Facts::of(&create_a_line("x = 1", ". . ."), false);
+        let facts = Facts::of(&create_a_line("x = 1", ". . ."), DocString::default());
         let rule = |name: &str, when: Vec<Condition>, bucket: &str| Rule {
             name: name.to_string(),
             when,
@@ -360,7 +385,7 @@ mod tests {
 
     #[test]
     fn a_word_is_a_letter_a_digit_or_anything_above_ascii_and_a_column_is_a_character() {
-        let facts = |source: &str, marker: &str| Facts::of(&create_a_line(source, marker), false);
+        let facts = |source: &str, marker: &str| Facts::of(&create_a_line(source, marker), DocString::default());
         assert!(!facts("/* ... */", "CCcccccUU").word_in_comment);
         assert!(facts("/* ναι */", "CCcccccUU").word_in_comment);
         assert!(!facts("{ } ;", ". . .").word_in_residue);
@@ -459,6 +484,19 @@ mod tests {
         assert_eq!(bucket("scc", "default", "code"), 1);
         assert_eq!(bucket("tokei", "default", "comments"), 0);
         assert_eq!(bucket("tokei", "default", "code"), 4);
+    }
+
+    #[test]
+    fn a_doc_string_opening_after_unfinished_code_continues_it() {
+        let input = "f(\n\"\"\"\nnotes\n\"\"\"\n)\n\"\"\"\nmore\n\"\"\"\n";
+        let marked = "f(\n..\n\"\"\"\nSSS\nnotes\nsssss\n\"\"\"\nZZZ\n)\n.\n\
+                      \"\"\"\nSSS\nmore\nssss\n\"\"\"\nZZZ\n";
+        let truth = Truth::read(marked, input).unwrap();
+        let found = find_lines_in_a_doc_string(&truth);
+        let continuing: Vec<bool> = found.iter().map(|line| line.continues_code).collect();
+        let inside: Vec<bool> = found.iter().map(|line| line.inside).collect();
+        assert_eq!(inside, [false, true, true, true, false, true, true, true]);
+        assert_eq!(continuing, [false, true, true, true, false, false, false, false]);
     }
 
     fn read_the_corpus() -> Corpus {
